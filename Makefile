@@ -20,6 +20,10 @@ INCLUDE_FLAGS = $(GSL_INCLUDE)
 MAKEDEPEND = g++ -I$(INCLUDE_FLAGS) -M -o $*.d $<
 
 
+SRCS = reference_glm.C
+
+all: $(patsubst %.C,%,$(SRCS))
+
 
 clean:
 	rm -f $(EXEC_FILES) *~ *.P *.o
@@ -33,9 +37,6 @@ clean:
 
 # A make rule for automatically generating dependencies,
 # http://mad-scientist.net/make/autodep.html
-SRCS = reference_glm.C
-
-
 %.o : %.C
 	$(MAKEDEPEND); \
 	cp $*.d $*.P; \

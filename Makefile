@@ -1,23 +1,27 @@
+# this project seems to require g++ 4.1
+CC = g++-4.1
+
 # The location (and name) of the BLAS/Lapack libraries
-BLAS_LAPACK_LIB = -lf77blas -latlas -llapack
+BLAS_LAPACK_LIB = -lf77blas -latlas -L/usr/lib/atlas/ -llapack
 
 # Location of GSL header files and libraries
 #GSL_INCLUDE = /sw/include
 GSL_LIB = -lgsl
 
+LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB)
 # You should not need to edit anything below this line...
 
 # Optimization flags (switch this to -O0 -g for debugging)
 OPT_FLAGS = -O2
 
 # Set all include flags here for later use
-INCLUDE_FLAGS = $(GSL_INCLUDE)
+#INCLUDE_FLAGS = $(GSL_INCLUDE)
 
 # List of all files in this directory which I can execute
 #EXEC_FILES = $(shell find . -type f -perm -u+x -maxdepth 1)
 
 # Command to produce dependencies (.d files) from sources
-MAKEDEPEND = g++ -I$(INCLUDE_FLAGS) -M -o $*.d $<
+MAKEDEPEND = $(CC) -M -o $*.d $< -c
 
 
 SRCS = reference_glm.C
@@ -43,7 +47,7 @@ clean:
 	sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
             -e '/^$$/ d' -e 's/$$/ :/' < $*.d >> $*.P; \
 	rm -f $*.d
-	g++ $(OPT_FLAGS) -I$(INCLUDE_FLAGS) -c $< -o $@
+	$(CC) $(OPT_FLAGS) $< -o $@ -c
 
 
 # Note: Running 'make rank' for example, will delete the .o file as an
@@ -52,7 +56,7 @@ clean:
 # .PRECIOUS: $(SRCS:.C=.o)
 
 % : %.o
-	g++ -o $@ $< $(BLAS_LAPACK_LIB) $(GSL_LIB)
+	$(CC) -o $@ $< $(LIBS)
 
 -include $(SRCS:.C=.P)
 

@@ -1,6 +1,8 @@
 #ifndef __fortran_matrix_h__
 #define __fortran_matrix_h__
 
+#include <stdlib.h>
+
 // C++ includes
 #include <iostream>
 #include <vector>

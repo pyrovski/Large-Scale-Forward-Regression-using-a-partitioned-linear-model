@@ -1,0 +1,55 @@
+Instructions:
+
+.) Edit the Makefile and set the BLAS_LAPACK_LIB variable
+   so that you can link against the BLAS and Lapack on your
+   system.
+
+.) Edit the Makefile's GSL_INCLUDE and GSL_LIB variables to point to the
+   location of the GSL header files and libraries on your system.
+
+.) Determine the naming scheme used on your system for calling
+   Fortran functions from C.  By default, the trailing underscore,
+   eg. dgesdd_, is used.  Edit the #defines in my_lapack_blas.h
+   appropriately to account for this naming scheme.
+
+.) Type 'make reference_glm'.  This should produce an executable
+   called reference_glm.
+
+.) The reference_glm program by default reads the reference_glm.in
+   input file to obtain the path the following 3 data files:
+   
+   a) fixed.effects.nam.sorted.filtered.dat
+   b) imputed.marker.chr10.sorted.filtered.dat
+   c) residuals.chr10.sorted.dat
+
+   containing the population structure, genotypes, and phenotypes.
+   You must specify the appropriate path to these files on your
+   system.
+
+.) After running the code with ./reference_glm, the 79 different
+   p-values will be computed and displayed to the screen.
+
+
+
+Description of files:
+
+  Headers:
+  -------
+  GetPot - input parsing library header
+  fortran_matrix.h - defines the FortranMatrix object used in BLAS/Lapack computations
+  glm.h - Defines the main GLM routine (actually 2 routines, one is specialized to a Kt vector)
+  inner.h - utility function, computes the inner product between 2 vectors
+  my_lapack_blas.h - #defines and function prototypes for the BLAS/Lapack routines used in this code
+  print_matrix.h - For printing column-major matrices
+  rank.h - Computes the approximate rank of a FortranMatrix (using the SVD) relative to some tolerance
+  svd.h - The SVD creation and application routines, used by the GLM for computing pseudoinverses
+   
+  Source files:
+  ------------
+  reference_glm.C - The outer loops which call the GLM routine (defined in glm.h)
+
+  Others:
+  ------
+  reference_glm.in - Input file for reference_glm.C, must contain path, see above for additional details
+  Makefile - Set variables, etc for the compilation
+  README - This file

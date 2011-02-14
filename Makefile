@@ -25,13 +25,12 @@ MAKEDEPEND = $(CC) -M -o $*.d $< -c
 
 
 SRCS = reference_glm.C
+targets = $(patsubst %.C,%,$(SRCS))
 
-all: $(patsubst %.C,%,$(SRCS))
-
+all: $(targets)
 
 clean:
-	rm -f $(EXEC_FILES) *~ *.P *.o
-
+	rm -f $(EXEC_FILES) *~ *.P *.o $(targets)
 
 # Override built-in rule for %.o from %.C.  Define this
 # and leave it blank!  Without this, Make will try to compile

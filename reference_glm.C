@@ -9,6 +9,9 @@
 #include "glm.h"
 #include "GetPot"
 
+using namespace std;
+
+
 int main()
 {
   // Timing variables
@@ -19,18 +22,18 @@ int main()
   
   // The path on my system to the location of the data files.  Don't forget the trailing
   // slash here, as this will be prepended to the filename below
-  std::string path = "./"; // default path is the current directory.
+  string path = "./"; // default path is the current directory.
   path = input_file("path", path.c_str());
   
   // File containing the "population structure".  It is a 4892-by-26 matrix
-  std::string fixed_filename = "fixed.effects.nam.sorted.filtered.dat";
+  string fixed_filename = "fixed.effects.nam.sorted.filtered.dat";
 
   // File containing the genotypes.  It is a 4892-by-79 matrix.
-  std::string geno_filename = "imputed.marker.chr10.sorted.filtered.dat";
+  string geno_filename = "imputed.marker.chr10.sorted.filtered.dat";
 
   // File containing the phenotypes.  It is a 4892-by-1 matrix.  The file is
   // arranged in a single column.
-  std::string y_filename = "residuals.chr10.sorted.dat";
+  string y_filename = "residuals.chr10.sorted.dat";
 
   // In Matlab, these sizes are inferred from the data.  In C++, we hard-code them
   // to make reading the data simpler...
@@ -41,7 +44,7 @@ int main()
   // Matrix objects for storing the input data
   FortranMatrix fixed(pop_ind, fixed_count);
   FortranMatrix geno(geno_ind, geno_count);
-  std::vector<double> y(y_ind);
+  vector<double> y(y_ind);
 
   // Begin timing the file IO for all 3 files
   gettimeofday(&tstart, NULL);
@@ -50,7 +53,8 @@ int main()
   // Read the "fixed" array from file
   {
     // Open "fixed" file for reading
-    std::ifstream fixed_file(std::string(path+fixed_filename).c_str());
+    string filename = path + "/" + fixed_filename;
+    ifstream fixed_file(filename.c_str());
 
     if (fixed_file)
       {
@@ -60,13 +64,13 @@ int main()
 	  for (unsigned j=0; j<fixed.get_n_cols(); ++j)
 	    {
 	      fixed_file >> fixed(i,j);
-	      //std::cout << "val=" << val << std::endl;
+	      //cout << "val=" << val << endl;
 	      //fixed(i,j) = val;
 	    }
       }
     else
       {
-	std::cout << "Failed to open file: " << fixed_file << "!!" << std::endl;
+	cout << "Failed to open file: " << fixed_file << "!!" << endl;
 	return 1;
       }
   }
@@ -75,7 +79,7 @@ int main()
 
   {
     // Open "fixed" file for reading
-    std::ifstream geno_file(std::string(path+geno_filename).c_str());
+    ifstream geno_file((path + "/" + geno_filename).c_str());
 
     if (geno_file)
       {
@@ -88,7 +92,7 @@ int main()
       }
     else
       {
-	std::cout << "Failed to open file!!" << std::endl;
+	cout << "Failed to open file!!" << endl;
 	return 1;
       }
   }
@@ -100,7 +104,7 @@ int main()
 
   {
     // Open "fixed" file for reading
-    std::ifstream y_file(std::string(path+y_filename).c_str());
+    ifstream y_file((path + "/" + y_filename).c_str());
 
     if (y_file)
       {
@@ -112,7 +116,7 @@ int main()
       }
     else
       {
-	std::cout << "Failed to open file!!" << std::endl;
+	cout << "Failed to open file!!" << endl;
 	return 1;
       }
   }
@@ -124,7 +128,7 @@ int main()
     const double io_elapsed_time = (static_cast<double>(tstop.tv_sec  - tstart.tv_sec) +
 				    static_cast<double>(tstop.tv_usec - tstart.tv_usec)*1.e-6);
 
-    std::cout << "Time required for I/O: " << io_elapsed_time << " s." << std::endl;
+    cout << "Time required for I/O: " << io_elapsed_time << " s." << endl;
   }
   
   
@@ -135,7 +139,7 @@ int main()
  Kt(0, fixed_count+1) = 1.; // Set last entry = 1
 
   // Version B, Kt assumed a vector.
-//  std::vector<double> Kt(fixed_count+2);
+//  vector<double> Kt(fixed_count+2);
 //  Kt.back() = 1.; // Set last entry = 1
 
 
@@ -144,7 +148,7 @@ int main()
   // Kt.print("Kt"); 
   
   // An array to hold the results of the GLM calculations
-  std::vector<double> Pval(geno_count);
+  vector<double> Pval(geno_count);
 
   // Initialize the X-matrix.  The first column is all ones, the next
   // fixed_count columns are equatl to the fixed matrix, and the last
@@ -185,7 +189,7 @@ int main()
       glm(X, y, Kt, glm_data);
 
       // Debugging: print the computed p value
-      // std::cout << "glm_data.p=" << glm_data.p << std::endl;
+      // cout << "glm_data.p=" << glm_data.p << endl;
 
       // Store the computed value in an array
       Pval[i] = glm_data.p;
@@ -199,16 +203,16 @@ int main()
     const double computation_elapsed_time = (static_cast<double>(tstop.tv_sec  - tstart.tv_sec) +
 					     static_cast<double>(tstop.tv_usec - tstart.tv_usec)*1.e-6);
 
-    std::cout << "Time required for computations: "
+    cout << "Time required for computations: "
 	      << computation_elapsed_time
 	      << " s."
-	      << std::endl;
+	      << endl;
   }
   
   // Print out the Pval array
-std::cout << "Pval=" << std::endl;
+cout << "Pval=" << endl;
 for (unsigned i=0; i<Pval.size(); ++i)
- std::cout << Pval[i] << std::endl;
+ cout << Pval[i] << endl;
     
   return 0;
 }

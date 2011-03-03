@@ -11,6 +11,9 @@
 #include "fortran_matrix.h"
 #include "svd.h"
 #include "rank.h" 
+
+using namespace std;
+
 //#include "inner.h" // Inner product of two vectors
 
 // This file contains data structures/routines for handling the
@@ -21,7 +24,7 @@
 struct GLMData
 {
   // Solution to the pseudoinverse problem X * beta = y
-  std::vector<double> beta;
+  vector<double> beta;
 
   // 1 - fcdf(F, V1, V2), as computed in the glm function
   double p;
@@ -39,34 +42,28 @@ struct GLMData
 // This version of the glm function assumes Kt is a vector.  It makes
 // the code a good deal cleaner (but not really any faster when Kt is
 // a 1-by-N matrix) than the more general case where Kt is a matrix.
+/*
+void glm(const FortranMatrix &Xf, 
+const FortranMatrix &XftXf, 
+const FortranMatrix &XftXfti, 
+const vector<double> &snp, 
+const double snptsnp, 
+const double snpty, 
+const double yty, 
+const vector<double> &Kt, 
+const vector<double> &Xfty, 
+const double rK, 
+GLMData& glm_data)
+*/
 void glm(const FortranMatrix& X,
-	 const std::vector<double>& y,
-	 const std::vector<double>& Kt,
+	 const vector<double>& y,
+	 const vector<double>& Kt,
 	 GLMData& glm_data /*return value, to be filled in*/)
 {  
   int n  = y.size();
   int V1 = 1; // Kt is assumed to be a row vector in this version
 
-  // Compute the matrix-vector product, XTy := X' * y.  
-  std::vector<double> XTy = matvec(X, y, /*transX=*/true);
 
-  // Create the matrix X^T * X  via multiplication.  X^T * X will
-  // actually be used in the rest of the computations, X is no longer
-  // needed...
-  FortranMatrix XTX = matmat(X, X, /*transA=*/true, /*transB=*/false);
-  
-  // Solve (X^T * X)*beta = X^T*y for beta.  Note that X and X^T * X
-  // have the same rank.
-
-  // Initialize SVD components, A = U * S * V^T
-  std::vector<double> S;
-  FortranMatrix U, VT;
-
-  // Create the SVD of X^T * X 
-  svd_create(XTX, U, S, VT);
-
-  // Apply the SVD to obtain beta
-  int rX = svd_apply(U, S, VT, /*result=*/glm_data.beta, XTy);
 
   // Compute "V2" now that we know rX == rank(X) == rank(X^T X)
   glm_data.V2 = n - rX;
@@ -78,7 +75,7 @@ void glm(const FortranMatrix& X,
   glm_data.ErrorSS = yty - cblas_ddot(glm_data.beta.size(), &glm_data.beta[0], 1, &XTy[0], 1);
 
   // Debugging: print ErrorSS
-  // std::cout << "glm_data.ErrorSS=" << glm_data.ErrorSS << std::endl;
+  // cout << "glm_data.ErrorSS=" << glm_data.ErrorSS << endl;
 
   ////////////////////////////////////////////////////////////////////////////////
   // Up to here, the matrix-Kt and vector-Kt versions of the glm
@@ -99,7 +96,7 @@ void glm(const FortranMatrix& X,
 
   // 1.) Re-use the SVD of X^T * X to compute temp = G * Kt', for the
   // temporary result vector, temp.  
-  std::vector<double> temp;
+  vector<double> temp;
   svd_apply(U, S, VT, /*result=*/temp, Kt);
   
   // 2.) Compute the inner product c = (Kt,temp), using 'temp'
@@ -112,12 +109,12 @@ void glm(const FortranMatrix& X,
   double F = Kb * Kb / c * static_cast<double>(glm_data.V2) / static_cast<double>(rK) / glm_data.ErrorSS; 
 
   // Debugging: print F
-  // std::cout << "F=" << F << std::endl;
+  // cout << "F=" << F << endl;
 
   // F must be positive otherwise the F distribution will return nan
   if (F < 0)
     {
-      std::cerr << "Error! F<0 obtained, F distribution can only args >= 0." << std::endl;
+      cerr << "Error! F<0 obtained, F distribution can only args >= 0." << endl;
       exit(1);
     }
   

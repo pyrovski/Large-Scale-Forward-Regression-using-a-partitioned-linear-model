@@ -117,17 +117,6 @@ int main()
     
     cout << "Time required for I/O: " << io_elapsed_time << " s." << endl;
   }
-
-  /*! @todo precompute
-    XftXf
-    XftXfi
-    rank(XftXfi)
-    
-    for each snp:
-    snpty
-    snptsnp
-   */
-  
   
   // Version A, Kt a general matrix.
   // Create the Kt matrix.  It has 1 row and fixed_count+2 columns.
@@ -146,23 +135,59 @@ int main()
   // Initialize the X-matrix.  The first column is all ones, the next
   // fixed_count columns are equal to the fixed matrix, and the last
   // column (which changes) is the i'th column of the geno array.
-  FortranMatrix X(geno_ind/*4892*/, fixed_count+2/*28*/);
+  unsigned n = fixed_count + 1;
+  FortranMatrix X(geno_ind/*4892*/, n/*27*/);
 
   // Fill first column of X with 1's
   for (unsigned i=0; i<X.get_n_rows(); ++i)
     X(i,0) = 1.;
 
   // Fill next fixed_count columns with the fixed array contents
-  for (unsigned j=0; j<fixed_count; ++j)
-    for (unsigned i=0; i<X.get_n_rows(); ++i)
-      X(i,j+1) = fixed(i,j);
+  memcpy(&X.values[X.get_n_rows()], &fixed.values[0], 
+	 fixed_count * X.get_n_rows() * sizeof(double));
 
-  // To hold return values of the GLM call.  Apparently we only use
-  // "p" currently.
-  GLMData glm_data;
-
+  
   // Begin timing the computations
   gettimeofday(&tstart, NULL);
+
+  /*! @todo precompute
+    XtX
+    XtXi
+    rank(XtXi)
+    
+    for each snp:
+    snpty
+    snptsnp
+   */
+  
+  //! @todo one of these is faster
+  //FortranMatrix XtX = matmat(X, X, false, true); 
+  FortranMatrix XtX = matmat(X, X, true, false); 
+
+  // Solve (X^T * X)*beta = X^T*y for beta.  Note that X and X^T * X
+  // have the same rank.
+
+  // Initialize SVD components, A = U * S * V^T
+  vector<double> S;
+  FortranMatrix U, VT;
+
+  // Create the SVD of X^T * X 
+  svd_create(XtX, U, S, VT);
+
+  // XtXi = V * S^-1 * Ut
+  // S^-1 = 1./S, where S > tol
+
+  // Compute the matrix-vector product, XTy := X' * y.  
+  vector<double> XTy = matvec(X, y, /*transX=*/true);
+
+  // To hold return values of the GLM call.
+  GLMData glm_data;
+  
+  vector<double> beta;
+
+  // Apply the SVD to obtain beta
+  unsigned rX = svd_apply(U, S, VT, /*result=*/beta, Xty);
+
   
   // For each column of the geno array, set up the "X" matrix,
   // call the GLM routine, and store the computed p value.  Note
@@ -170,17 +195,12 @@ int main()
   // a vector for its second argument) but this could be generalized later.
   for (unsigned i=0; i<geno_count; ++i)
     {
-      // Fill the last column of X with i'th column of the geno array
-      for (unsigned row=0; row<X.get_n_rows(); ++row)
-	X(row, fixed_count+1) = geno(row,i);
-      
       // Call the glm function.  Note that X is currently overwritten by this function,
       // and therefore would need to be re-formed completely at each iteration...
       glm(X, y, Kt, glm_data);
-      //glm(Xf, XftXf, XftXfti, snp, snptsnp, snpty, yty, Kt, Xfty, rK, glm_data);
+      //glm(X, XtX, XtXti, snp, snptsnp, snpty, yty, Kt, Xty, rK, glm_data);
 
       // Store the computed value in an array
-      Pval[i] = glm_data.p;
       Fval[i] = glm_data.F;
     }
 

@@ -1,5 +1,4 @@
-# this project seems to require g++ 4.1
-CC = g++-4.1
+CC = g++
 
 # The location (and name) of the BLAS/Lapack libraries
 BLAS_LAPACK_LIB = -lf77blas -latlas -L/usr/lib/atlas/ -llapack

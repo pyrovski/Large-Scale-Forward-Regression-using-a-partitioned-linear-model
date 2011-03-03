@@ -2,13 +2,13 @@ CC = g++
 
 # The location (and name) of the BLAS/Lapack libraries
 BLAS_LAPACK_LIB = -lf77blas -latlas -L/usr/lib/atlas/ -llapack
+# You should not need to edit anything below this line...
 
 # Location of GSL header files and libraries
 #GSL_INCLUDE = /sw/include
 GSL_LIB = -lgsl
 
 LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB)
-# You should not need to edit anything below this line...
 
 # Optimization flags (switch this to -O0 -g for debugging)
 OPT_FLAGS = -O2

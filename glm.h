@@ -26,6 +26,8 @@ struct GLMData
   // 1 - fcdf(F, V1, V2), as computed in the glm function
   double p;
 
+  double F; // input to fcdf
+
   // y'*y - beta'*Xy, as computed in the glm function
   double ErrorSS;
 
@@ -49,18 +51,9 @@ void glm(const FortranMatrix& X,
 	 const FortranMatrix& Kt,
 	 GLMData& glm_data /*return value, to be filled in*/)
 {
-  // Debugging: identify ourself.
-  // std::cout << "Calling glm function with Kt matrix." << std::endl;
-  
-  // Debugging: print the Kt
-  // Kt.print("Kt at start of glm");
-  
   int n  = y.size();
   int V1 = Kt.get_n_rows();
 
-  // Debugging
-  // std::cout << "V1=" << V1 << std::endl;
-  
   // Compute the matrix-vector product, XTy := X' * y.  
   std::vector<double> XTy = matvec(X, y, /*transX=*/true);
   
@@ -81,30 +74,13 @@ void glm(const FortranMatrix& X,
 
   // Apply the SVD to obtain beta
   int rX = svd_apply(U, S, VT, /*result=*/glm_data.beta, XTy);
-
-  // Debugging
-//  std::cout << "rows(X^T * X)="
-//	    << XTX.get_n_rows()
-//	    << ", cols(X^T * X)="
-//	    << XTX.get_n_cols()
-//	    << ", rX=" << rX << std::endl;
-
-  // Debugging: print beta
-  //std::cout << "beta=" << std::endl;
-  //for (unsigned i=0; i<glm_data.beta.size(); ++i)
-  //  std::cout << glm_data.beta[i] << std::endl;
   
   // Compute "V2" now that we know rX == rank(X) == rank(X^T X)
   glm_data.V2 = n - rX;
 
-  // Debugging: print V2
-  // std::cout << "glm_data.V2=" << glm_data.V2 << std::endl;
-
   // Compute ErrorSS for return in the GLMData data structure
   glm_data.ErrorSS = inner(y,y) - inner(glm_data.beta, XTy);
 
-  // Debugging: print ErrorSS
-  // std::cout << "glm_data.ErrorSS=" << glm_data.ErrorSS << std::endl;
 
   ////////////////////////////////////////////////////////////////////////////////
   // Up to here, the matrix-Kt and vector-Kt versions of the glm
@@ -113,25 +89,11 @@ void glm(const FortranMatrix& X,
   // Compute the matrix-vector product, Kb = Kt * beta.
   std::vector<double> Kb = matvec(Kt, glm_data.beta);
 
-  
-  // Debugging:
-  //std::cout << "Kb=" << std::endl;
-  //for (unsigned i=0; i<Kb.size(); ++i)
-  //  std::cout << Kb[i] << std::endl;
-
-  // Debugging:
-  //Kt.print("before rank(Kt)");
-  
   // We need the rank of the Kt "matrix" now.  In this version,
   // we assume Kt is *not* a vector, and therefore a full rank
   // (involving the SVD) calculation is needed...
   int rK = rank(Kt);
   
-  // Debugging:
-  // Kt.print("after rank(Kt)");
-  
-  // Debugging (this should be=1 if Kt is a vector...)
-  // std::cout << "rK=" << rK << std::endl;
   if (rK==0)
     {
       std::cerr << "Error! Invalid Kt matrix passed with rank 0!" << std::endl;
@@ -148,21 +110,9 @@ void glm(const FortranMatrix& X,
   FortranMatrix B;
   svd_apply(U, S, VT, /*result=*/B, Kt, /*transKt=*/true);
 
-  // Debugging: print information about B
-  //  B.print("B");
-  //  std::cout << "rows(B)="
-  //	    << B.get_n_rows()
-  //	    << ", cols(B)="
-  //	    << B.get_n_cols()
-  //	    << std::endl;
-  
-
   // 2.) Compute the matrix-matrix product C = Kt * B, using the B
   // from the step above.  
   FortranMatrix C = matmat(Kt, B);
-
-  // Debugging:
-  // C.print("C");
 
   // 3.) Solve for gamma in the equation inv(C) * Kb = gamma, for 'gamma'.
   //
@@ -172,27 +122,12 @@ void glm(const FortranMatrix& X,
   // or even Cholesky decompositions here.
   std::vector<double> gamma;
   int rC = svd_solve(C, /*result=*/gamma, Kb);
-      
-  // Debugging/FYI:
-//  std::cout << "rows(C)="
-//	    << C.get_n_rows()
-//	    << ", cols(C)="
-//	    << C.get_n_cols()
-//	    << ", rC="
-//	    << rC
-//	    << std::endl;
-      
+            
   // .) Compute the inner product of Kb and gamma
   double inner_Kb_gamma = inner(Kb, gamma);
 
-  // Debugging: print scalar result of the inner product between Kb, gamma
-  // std::cout << "inner_Kb_gamma=" << inner_Kb_gamma << std::endl;
-
   // .) Compute F
   double F = inner_Kb_gamma * static_cast<double>(glm_data.V2) / static_cast<double>(rK) / glm_data.ErrorSS; 
-
-  // Debugging: print F, must be positive otherwise the F distribution will return nan
-  // std::cout << "F=" << F << std::endl;
 
   if (F < 0)
     {
@@ -217,19 +152,10 @@ void glm(const FortranMatrix& X,
 	 const std::vector<double>& y,
 	 const std::vector<double>& Kt,
 	 GLMData& glm_data /*return value, to be filled in*/)
-{
-  // Debugging: identify ourself.
-  // std::cout << "Calling glm function with Kt vector." << std::endl;
-  
-  // Debugging: print the Kt
-  // Kt.print("Kt at start of glm");
-  
+{  
   int n  = y.size();
   int V1 = 1; // Kt is assumed to be a row vector in this version
 
-  // Debugging
-  // std::cout << "V1=" << V1 << std::endl;
-  
   // Compute the matrix-vector product, XTy := X' * y.  
   std::vector<double> XTy = matvec(X, y, /*transX=*/true);
 
@@ -251,29 +177,11 @@ void glm(const FortranMatrix& X,
   // Apply the SVD to obtain beta
   int rX = svd_apply(U, S, VT, /*result=*/glm_data.beta, XTy);
 
-  // Debugging
-//  std::cout << "rows(X^T * X)="
-//	    << XTX.get_n_rows()
-//	    << ", cols(X^T * X)="
-//	    << XTX.get_n_cols()
-//	    << ", rX=" << rX << std::endl;
-
-  // Debugging: print beta
-  //std::cout << "beta=" << std::endl;
-  //for (unsigned i=0; i<glm_data.beta.size(); ++i)
-  //  std::cout << glm_data.beta[i] << std::endl;
-  
   // Compute "V2" now that we know rX == rank(X) == rank(X^T X)
   glm_data.V2 = n - rX;
 
-  // Debugging: print V2
-  // std::cout << "glm_data.V2=" << glm_data.V2 << std::endl;
-
   // Compute ErrorSS for return in the GLMData data structure
   glm_data.ErrorSS = inner(y,y) - inner(glm_data.beta, XTy);
-
-  // Debugging: print ErrorSS
-  // std::cout << "glm_data.ErrorSS=" << glm_data.ErrorSS << std::endl;
 
   ////////////////////////////////////////////////////////////////////////////////
   // Up to here, the matrix-Kt and vector-Kt versions of the glm
@@ -303,9 +211,6 @@ void glm(const FortranMatrix& X,
   // 3.) Note: for F we need to compute Kb' * inv(c) * Kb, but since c
   // is a scalar, we just divide!
   double F = Kb * Kb / c * static_cast<double>(glm_data.V2) / static_cast<double>(rK) / glm_data.ErrorSS; 
-
-  // Debugging: print F
-  // std::cout << "F=" << F << std::endl;
 
   // F must be positive otherwise the F distribution will return nan
   if (F < 0)

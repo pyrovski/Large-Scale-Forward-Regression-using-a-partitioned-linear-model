@@ -111,11 +111,22 @@ int main()
   
   {
     // Compute time taken for IO
-    const double io_elapsed_time = (static_cast<double>(tstop.tv_sec  - tstart.tv_sec) +
-				    static_cast<double>(tstop.tv_usec - tstart.tv_usec)*1.e-6);
+    const double io_elapsed_time = 
+      (static_cast<double>(tstop.tv_sec  - tstart.tv_sec) +
+       static_cast<double>(tstop.tv_usec - tstart.tv_usec)*1.e-6);
     
     cout << "Time required for I/O: " << io_elapsed_time << " s." << endl;
   }
+
+  /*! @todo precompute
+    XftXf
+    XftXfi
+    rank(XftXfi)
+    
+    for each snp:
+    snpty
+    snptsnp
+   */
   
   
   // Version A, Kt a general matrix.
@@ -127,14 +138,10 @@ int main()
   // Version B, Kt assumed a vector.
   //  vector<double> Kt(fixed_count+2);
   //  Kt.back() = 1.; // Set last entry = 1
-
-
-  
-  // Debugging:
-  // Kt.print("Kt"); 
   
   // An array to hold the results of the GLM calculations
   vector<double> Pval(geno_count);
+  vector<double> Fval(geno_count);
 
   // Initialize the X-matrix.  The first column is all ones, the next
   // fixed_count columns are equal to the fixed matrix, and the last
@@ -167,18 +174,14 @@ int main()
       for (unsigned row=0; row<X.get_n_rows(); ++row)
 	X(row, fixed_count+1) = geno(row,i);
       
-      // Debugging: print X
-      // X.print("X");
-
       // Call the glm function.  Note that X is currently overwritten by this function,
       // and therefore would need to be re-formed completely at each iteration...
       glm(X, y, Kt, glm_data);
-
-      // Debugging: print the computed p value
-      // cout << "glm_data.p=" << glm_data.p << endl;
+      //glm(Xf, XftXf, XftXfti, snp, snptsnp, snpty, yty, Kt, Xfty, rK, glm_data);
 
       // Store the computed value in an array
       Pval[i] = glm_data.p;
+      Fval[i] = glm_data.F;
     }
 
   // Finish timing the computations

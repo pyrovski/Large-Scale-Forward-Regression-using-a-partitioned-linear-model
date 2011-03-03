@@ -171,34 +171,50 @@ int main()
   vector<double> S;
   FortranMatrix U, VT;
 
+  GLMData glm_data;
+  vector<double> beta;
+
   // Create the SVD of X^T * X 
   svd_create(XtX, U, S, VT);
-
+  unsigned rX = svd_apply(U, S, VT, /*result=*/beta, Xty);
   // XtXi = V * S^-1 * Ut
   // S^-1 = 1./S, where S > tol
 
   // Compute the matrix-vector product, XTy := X' * y.  
-  vector<double> XTy = matvec(X, y, /*transX=*/true);
+  vector<double> Xty = matvec(X, y, /*transX=*/true);
+  double yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
 
   // To hold return values of the GLM call.
-  GLMData glm_data;
-  
-  vector<double> beta;
 
-  // Apply the SVD to obtain beta
-  unsigned rX = svd_apply(U, S, VT, /*result=*/beta, Xty);
 
+  gettimeofday(&tstop, NULL);
   
+  {
+    const double computation_prep_time = 
+      (tstop.tv_sec  - tstart.tv_sec) +
+      (tstop.tv_usec - tstart.tv_usec)*1.e-6;
+    cout << "Time required for computation prep: "
+	 << computation_prep_time << " s" << endl;
+  }
+  
+  gettimeofday(&tstart, NULL);
+
   // For each column of the geno array, set up the "X" matrix,
   // call the GLM routine, and store the computed p value.  Note
   // we are assuming y is a vector for now (because GLM currently expects
   // a vector for its second argument) but this could be generalized later.
   for (unsigned i=0; i<geno_count; ++i)
     {
+      vector <double> snp(geno_ind);
+      for(unsigned j = 0; j < geno_ind; j++)
+	snp[j] = geno(j, i);
+
+      double snptsnp = cblas_ddot(geno_ind, &snp[0], 1, &snp[0], 1);
+
       // Call the glm function.  Note that X is currently overwritten by this function,
       // and therefore would need to be re-formed completely at each iteration...
-      glm(X, y, Kt, glm_data);
-      //glm(X, XtX, XtXti, snp, snptsnp, snpty, yty, Kt, Xty, rK, glm_data);
+      //glm(X, y, Kt, glm_data);
+      glm(X, XtX, XtXi, snp, snptsnp, snpty, yty, Kt, Xty, rX, glm_data);
 
       // Store the computed value in an array
       Fval[i] = glm_data.F;
@@ -210,13 +226,13 @@ int main()
   {
     // Compute time taken for IO
     const double computation_elapsed_time = 
-      (static_cast<double>(tstop.tv_sec  - tstart.tv_sec) +
-       static_cast<double>(tstop.tv_usec - tstart.tv_usec)*1.e-6);
-
+      (double)(tstop.tv_sec  - tstart.tv_sec) +
+      (tstop.tv_usec - tstart.tv_usec)*1.e-6;
+  
     cout << "Time required for computations: "
-	 << computation_elapsed_time
-	 << " s."
-	 << endl;
+	 << computation_elapsed_time << " s" << endl;
+    cout << "Time per SNP: " << computation_elapsed_time / geno_count 
+	 << " s" << endl;
   }
   
   // Print out the Pval array

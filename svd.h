@@ -125,10 +125,6 @@ int svd_apply(/*in */FortranMatrix& U,
   int m = U.get_n_rows(); // U is mxm
   int n = VT.get_n_rows(); // V^T is nxn
 
-  // Debugging:
-  // std::cout << "m=" << m << std::endl;
-  // std::cout << "n=" << n << std::endl;
-  
   // Check the size of the rhs for compatibility
   //   A   *   x   =   b
   // (mxn)   (nx1)   (mx1)
@@ -140,10 +136,6 @@ int svd_apply(/*in */FortranMatrix& U,
   
   if (tol == -1.)
     tol = std::max(m,n) * S[0] * std::numeric_limits<double>::epsilon();
-
-  // Debugging
-  //  std::cout << "Using tol=" << tol << std::endl;
-
 
   // Compute y     = U^T   * b
   //         (mx1) = (mxm) * (mx1)
@@ -159,9 +151,6 @@ int svd_apply(/*in */FortranMatrix& U,
   int rank=0;
   for (unsigned i=0; i<std::min(m,n); ++i)
     {
-      // Debugging
-      // std::cout << "S[" << i << "]=" << S[i] << std::endl;
-      
       if (S[i] <= tol)
 	y[i] = 0.;
       else
@@ -175,9 +164,6 @@ int svd_apply(/*in */FortranMatrix& U,
   // This is a consequence of multiplying by S^-1, which is
   // a diagonal matrix of size (nxm)
   y.resize(n);
-
-  // Debugging
-  // print_matrix( "U^T * b", 1, y.size(), &y[0], 1 );
 
   // Now compute   x   =   V   *   y
   //             (nx1) = (nxn) * (nx1)
@@ -233,16 +219,10 @@ int svd_apply(/*in */ FortranMatrix& U,
 		       : matmat(U, B, /*transA=*/true, /*transB=*/false)
 		       );
 
-  // Debugging
-  // print_matrix( "U^T * B", UTB.get_n_rows(), UTB.get_n_cols(), &(UTB.values[0]), UTB.get_n_rows() );
-
   // Compute tolerance if necessary
   if (tol == -1.)
     tol = std::max(m,n) * S[0] * std::numeric_limits<double>::epsilon();
 
-  // Debugging:
-  // std::cout << "Tolerance = " << tol << std::endl;
-  
   // Next, scale each row of U^T B by 1/S[i] if S[i] is larger than
   // the tolerance, otherwise, zero it.  Also compute the approximate
   // rank at this point.  In all cases I've tested, S has n entries.
@@ -250,11 +230,6 @@ int svd_apply(/*in */ FortranMatrix& U,
   // of the S array.  If m < n, then the last n-m entries of S are
   // identically zero.
 
-  // Debugging:
-  //if (m < n)
-  //  for (unsigned i=0; i<S.size(); ++i)
-  //    std::cout << "S[" << i << "]=" << S[i] << std::endl;
-  
   int rank = 0;
   for (unsigned i=0; i<std::min(m,n); ++i)
     {
@@ -278,9 +253,6 @@ int svd_apply(/*in */ FortranMatrix& U,
 	}
     }
 
-  // Debugging
-  // print_matrix( "S^+ * U^T * B", UTB.get_n_rows(), UTB.get_n_cols(), &(UTB.values[0]), UTB.get_n_rows() );
-
   // Note: multiplication by S^+ leads to the nxr matrix S^+ U^T B,
   // our matrix currently still has m logical rows....so we'd like to
   // call matmat(VT, UTB, true, false) directly, but the sizes won't be compatible.
@@ -301,30 +273,7 @@ int svd_apply(/*in */ FortranMatrix& U,
       for (unsigned int k=0; k<r; ++k)
 	{
 	  X(i,k) += VT(j,i) * UTB(j,k); // Note: we have VT, want V, hence VT(j,i)
-	}
-  
-  
-//  if (n>m)
-//    {
-//      std::cout << "n>m"  << std::endl;
-//      //exit(1);
-//      for (unsigned int i=0; i<n; ++i)
-//	for (unsigned int j=0; j<m/*min(m,n)*/; ++j)
-//	  for (unsigned int k=0; k<r; ++k)
-//	    {
-//		X(i,k) += VT(j,i) * UTB(j,k); // Note: we have VT, want V, hence VT(j,i)
-//	    }
-//    }
-//  else
-//    {
-//      std::cout << "n<=m"  << std::endl;
-//      for (unsigned int i=0; i<n; ++i)
-//	for (unsigned int j=0; j<n; ++j)
-//	  for (unsigned int k=0; k<r; ++k)
-//	    X(i,k) += VT(j,i) * UTB(j,k); // Note: we have VT, want V, hence VT(j,i)
-//    }
-
-  
+	}  
   return rank;
 }
 

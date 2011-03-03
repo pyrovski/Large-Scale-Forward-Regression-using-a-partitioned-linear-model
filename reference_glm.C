@@ -137,7 +137,7 @@ int main()
   vector<double> Pval(geno_count);
 
   // Initialize the X-matrix.  The first column is all ones, the next
-  // fixed_count columns are equatl to the fixed matrix, and the last
+  // fixed_count columns are equal to the fixed matrix, and the last
   // column (which changes) is the i'th column of the geno array.
   FortranMatrix X(geno_ind/*4892*/, fixed_count+2/*28*/);
 
@@ -186,8 +186,9 @@ int main()
 
   {
     // Compute time taken for IO
-    const double computation_elapsed_time = (static_cast<double>(tstop.tv_sec  - tstart.tv_sec) +
-					     static_cast<double>(tstop.tv_usec - tstart.tv_usec)*1.e-6);
+    const double computation_elapsed_time = 
+      (static_cast<double>(tstop.tv_sec  - tstart.tv_sec) +
+       static_cast<double>(tstop.tv_usec - tstart.tv_usec)*1.e-6);
 
     cout << "Time required for computations: "
 	 << computation_elapsed_time

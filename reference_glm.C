@@ -56,23 +56,17 @@ int main()
     string filename = path + "/" + fixed_filename;
     ifstream fixed_file(filename.c_str());
 
-    if (fixed_file)
-      {
-	// Loop over all rows and columns, set entries in the fixed matrix
-	// double val=99;
-	for (unsigned i=0; i<fixed.get_n_rows(); ++i)
-	  for (unsigned j=0; j<fixed.get_n_cols(); ++j)
-	    {
-	      fixed_file >> fixed(i,j);
-	      //cout << "val=" << val << endl;
-	      //fixed(i,j) = val;
-	    }
-      }
-    else
-      {
-	cout << "Failed to open file: " << fixed_file << "!!" << endl;
-	return 1;
-      }
+    if (fixed_file){
+      // Loop over all rows and columns, set entries in the fixed matrix
+      // double val=99;
+      for (unsigned i=0; i<fixed.get_n_rows(); ++i)
+	for (unsigned j=0; j<fixed.get_n_cols(); ++j){
+	  fixed_file >> fixed(i,j);
+	}
+    } else {
+      cout << "Failed to open file: " << fixed_file << "!!" << endl;
+      return 1;
+    }
   }
 
   // Read the geno array from file
@@ -80,24 +74,20 @@ int main()
   {
     // Open "fixed" file for reading
     ifstream geno_file((path + "/" + geno_filename).c_str());
-
-    if (geno_file)
-      {
-	// Loop over all rows and columns, set entries in the matrix
-	for (unsigned i=0; i<geno.get_n_rows(); ++i)
-	  for (unsigned j=0; j<geno.get_n_cols(); ++j)
-	    {
-	      geno_file >> geno(i,j);
-	    }
-      }
-    else
-      {
-	cout << "Failed to open file!!" << endl;
-	return 1;
-      }
+    
+    if (geno_file){
+      // Loop over all rows and columns, set entries in the matrix
+      for (unsigned i=0; i<geno.get_n_rows(); ++i)
+	for (unsigned j=0; j<geno.get_n_cols(); ++j){
+	  geno_file >> geno(i,j);
+	}
+    } else {
+      cout << "Failed to open file!!" << endl;
+      return 1;
+    }
   }
-
-
+  
+  
   // Read the y-array from file.  Currently stored as a vector since that
   // is how it is passed to the glm function, but could be changed to a
   // FortranMatrix with one column...
@@ -106,28 +96,24 @@ int main()
     // Open "fixed" file for reading
     ifstream y_file((path + "/" + y_filename).c_str());
 
-    if (y_file)
-      {
+    if (y_file){
 	// Loop over all rows and columns, set entries in the matrix
-	for (unsigned i=0; i<y.size(); ++i)
-	  {
-	    y_file >> y[i];
-	  }
-      }
-    else
-      {
-	cout << "Failed to open file!!" << endl;
-	return 1;
-      }
+	for (unsigned i=0; i<y.size(); ++i) {
+	  y_file >> y[i];
+	}
+    } else {
+      cout << "Failed to open file!!" << endl;
+      return 1;
+    }
   }
-
+  
   gettimeofday(&tstop, NULL);
-
+  
   {
     // Compute time taken for IO
     const double io_elapsed_time = (static_cast<double>(tstop.tv_sec  - tstart.tv_sec) +
 				    static_cast<double>(tstop.tv_usec - tstart.tv_usec)*1.e-6);
-
+    
     cout << "Time required for I/O: " << io_elapsed_time << " s." << endl;
   }
   
@@ -135,12 +121,12 @@ int main()
   // Version A, Kt a general matrix.
   // Create the Kt matrix.  It has 1 row and fixed_count+2 columns.
   // The entries of Kt are all zero except for the last entry, which is 1.
- FortranMatrix Kt(1,fixed_count+2);
- Kt(0, fixed_count+1) = 1.; // Set last entry = 1
+  FortranMatrix Kt(1,fixed_count+2);
+  Kt(0, fixed_count+1) = 1.; // Set last entry = 1
 
   // Version B, Kt assumed a vector.
-//  vector<double> Kt(fixed_count+2);
-//  Kt.back() = 1.; // Set last entry = 1
+  //  vector<double> Kt(fixed_count+2);
+  //  Kt.back() = 1.; // Set last entry = 1
 
 
   
@@ -204,15 +190,15 @@ int main()
 					     static_cast<double>(tstop.tv_usec - tstart.tv_usec)*1.e-6);
 
     cout << "Time required for computations: "
-	      << computation_elapsed_time
-	      << " s."
-	      << endl;
+	 << computation_elapsed_time
+	 << " s."
+	 << endl;
   }
   
   // Print out the Pval array
-cout << "Pval=" << endl;
-for (unsigned i=0; i<Pval.size(); ++i)
- cout << Pval[i] << endl;
+  cout << "Pval=" << endl;
+  for (unsigned i=0; i<Pval.size(); ++i)
+    cout << Pval[i] << endl;
     
   return 0;
 }

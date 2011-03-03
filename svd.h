@@ -4,6 +4,7 @@
 // C++ headers
 #include <vector>
 #include <iostream>
+#include <limits>
 
 // Local headers
 #include "fortran_matrix.h"

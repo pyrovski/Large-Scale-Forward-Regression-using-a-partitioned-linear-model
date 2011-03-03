@@ -128,27 +128,6 @@ int main()
   }
   
   
-  // Debugging
-// for (unsigned i=0; i<fixed.get_n_rows(); ++i)
-//   {
-//     for (unsigned j=0; j<fixed.get_n_cols(); ++j)
-//	std::cout << fixed(i,j) << ' ';
-//     std::cout << '\n';
-//   }
-
-//  for (unsigned i=0; i<geno.get_n_rows(); ++i)
-//    {
-//      for (unsigned j=0; j<geno.get_n_cols(); ++j)
-//	std::cout << geno(i,j) << ' ';
-//      std::cout << '\n';
-//    }
-
-// for (unsigned i=0; i<y.size(); ++i)
-//   {
-//     std::cout << y[i] << std::endl;
-//   }
-
-
   // Version A, Kt a general matrix.
   // Create the Kt matrix.  It has 1 row and fixed_count+2 columns.
   // The entries of Kt are all zero except for the last entry, which is 1.

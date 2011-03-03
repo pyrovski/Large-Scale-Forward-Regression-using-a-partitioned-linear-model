@@ -12,7 +12,7 @@ LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB)
 # You should not need to edit anything below this line...
 
 # Optimization flags (switch this to -O0 -g for debugging)
-OPT_FLAGS = -O2
+OPT_FLAGS = -g
 
 # Set all include flags here for later use
 #INCLUDE_FLAGS = $(GSL_INCLUDE)

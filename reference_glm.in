@@ -1,5 +1,5 @@
 # The path to the data files
-path = /Users/peterson/code/iplant/TACC_Dec_2010/data_maize_nam/
+path = /code/glm/statinf/GLM-Matlab/TACC_Dec_2010/data_maize_nam
 
 # Local Variables:
 # mode: shell-script

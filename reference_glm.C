@@ -11,7 +11,6 @@
 
 using namespace std;
 
-
 int main()
 {
   // Timing variables
@@ -133,26 +132,30 @@ int main()
   
   
   // Debugging
-// for (unsigned i=0; i<fixed.get_n_rows(); ++i)
-//   {
-//     for (unsigned j=0; j<fixed.get_n_cols(); ++j)
-//	cout << fixed(i,j) << ' ';
-//     cout << '\n';
-//   }
+#ifdef _DEBUG
+  cout << "fixed effects:" << endl;
+  for (unsigned i=0; i<fixed.get_n_rows(); ++i)
+    {
+      for (unsigned j=0; j<fixed.get_n_cols(); ++j)
+	cout << fixed(i,j) << ' ';
+      cout << '\n';
+    }
 
-//  for (unsigned i=0; i<geno.get_n_rows(); ++i)
-//    {
-//      for (unsigned j=0; j<geno.get_n_cols(); ++j)
-//	cout << geno(i,j) << ' ';
-//      cout << '\n';
-//    }
+  cout << "geno:" << endl;
+  for (unsigned i=0; i<geno.get_n_rows(); ++i)
+    {
+      for (unsigned j=0; j<geno.get_n_cols(); ++j)
+	cout << geno(i,j) << ' ';
+      cout << '\n';
+    }
 
-// for (unsigned i=0; i<y.size(); ++i)
-//   {
-//     cout << y[i] << endl;
-//   }
-
-
+  cout << "y:" << endl;
+  
+  for (unsigned i=0; i<y.size(); ++i)
+    {
+      cout << y[i] << endl;
+    }
+#endif
   // Version A, Kt a general matrix.
   // Create the Kt matrix.  It has 1 row and fixed_count+2 columns.
   // The entries of Kt are all zero except for the last entry, which is 1.

@@ -31,6 +31,9 @@ extern "C"
 		 double* alpha, double* a, int* lda,
 		 double* b, int* ldb, double* beta,
 		 double* c, int* ldc);  
+
+  double cblas_ddot(const int N, const double *X, const int incX,
+		    const double *Y, const int incY);
 }
 
 

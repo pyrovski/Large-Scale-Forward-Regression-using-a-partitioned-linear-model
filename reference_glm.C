@@ -132,12 +132,12 @@ int main()
   // Version A, Kt a general matrix.
   // Create the Kt matrix.  It has 1 row and fixed_count+2 columns.
   // The entries of Kt are all zero except for the last entry, which is 1.
-  FortranMatrix Kt(1,fixed_count+2);
-  Kt(0, fixed_count+1) = 1.; // Set last entry = 1
+  //FortranMatrix Kt(1,fixed_count+2);
+  //Kt(0, fixed_count+1) = 1.; // Set last entry = 1
 
   // Version B, Kt assumed a vector.
-  //  vector<double> Kt(fixed_count+2);
-  //  Kt.back() = 1.; // Set last entry = 1
+  vector<double> Kt(fixed_count+2);
+   Kt.back() = 1.; // Set last entry = 1
   
   // An array to hold the results of the GLM calculations
   vector<double> Pval(geno_count);

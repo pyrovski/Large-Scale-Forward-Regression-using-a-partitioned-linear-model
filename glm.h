@@ -9,8 +9,6 @@
 
 // Local headers
 #include "fortran_matrix.h"
-#include "svd.h"
-#include "rank.h" 
 
 using namespace std;
 
@@ -43,7 +41,7 @@ struct GLMData
 void glm(const FortranMatrix &X, 
 	 const FortranMatrix &XtX, 
 	 const FortranMatrix &XtXti, 
-	 const vector<double> &snp, 
+	 const vector<double> &Xtsnp, 
 	 const double snptsnp, 
 	 const double snpty, 
 	 const double yty, 
@@ -52,7 +50,7 @@ void glm(const FortranMatrix &X,
 	 const double rX,
 	 GLMData& glm_data)
 {  
-  int m  = snp.size();
+  int m  = X.get_n_rows();
   int V1 = 1; // Kt is assumed to be a row vector in this version
 
 

@@ -8,6 +8,8 @@
 #include "fortran_matrix.h"
 #include "glm.h"
 #include "GetPot"
+#include "svd.h"
+#include "cblas.h"
 
 using namespace std;
 
@@ -155,9 +157,9 @@ int main()
     XtXi
     rank(XtXi)
     
-    for each snp:
-    snpty
-    snptsnp
+    for each SNP:
+    SNPty
+    SNPtSNP
    */
   
   //! @todo one of these is faster
@@ -173,6 +175,7 @@ int main()
 
   GLMData glm_data;
   vector<double> beta;
+  vector<double> Xty = matvec(X, y, /*transX=*/true);
 
   // Create the SVD of X^T * X 
   svd_create(XtX, U, S, VT);
@@ -180,8 +183,9 @@ int main()
   // XtXi = V * S^-1 * Ut
   // S^-1 = 1./S, where S > tol
 
+  FortranMatrix XtXi;
+
   // Compute the matrix-vector product, XTy := X' * y.  
-  vector<double> Xty = matvec(X, y, /*transX=*/true);
   double yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
 
   // To hold return values of the GLM call.
@@ -203,22 +207,33 @@ int main()
   // call the GLM routine, and store the computed p value.  Note
   // we are assuming y is a vector for now (because GLM currently expects
   // a vector for its second argument) but this could be generalized later.
-  for (unsigned i=0; i<geno_count; ++i)
-    {
-      vector <double> snp(geno_ind);
-      for(unsigned j = 0; j < geno_ind; j++)
-	snp[j] = geno(j, i);
+  for (unsigned i=0; i<geno_count; ++i){
+    vector <double> XtSNP(geno_ind);
+    cblas_dgemv(CblasColMajor, 
+		CblasTrans,
+		geno_ind,
+		X.get_n_cols(),
+		1.0,
+		&X.values[0],
+		geno_ind,
+		&geno.values[i],
+		geno_ind,
+		0.0,
+		&XtSNP[0],
+		1);
 
-      double snptsnp = cblas_ddot(geno_ind, &snp[0], 1, &snp[0], 1);
+    //! @todo these will never change for each SNP
+    double SNPtSNP = cblas_ddot(geno_ind, &geno.values[i], geno_ind, &geno.values[i], geno_ind);
+    double SNPty = cblas_ddot(geno_ind, &geno.values[i], geno_ind, &y[0], 1);
 
-      // Call the glm function.  Note that X is currently overwritten by this function,
-      // and therefore would need to be re-formed completely at each iteration...
-      //glm(X, y, Kt, glm_data);
-      glm(X, XtX, XtXi, snp, snptsnp, snpty, yty, Kt, Xty, rX, glm_data);
+    // Call the glm function.  Note that X is currently overwritten by this function,
+    // and therefore would need to be re-formed completely at each iteration...
+    //glm(X, y, Kt, glm_data);
+    glm(X, XtX, XtXi, XtSNP, SNPtSNP, SNPty, yty, Kt, Xty, rX, glm_data);
 
-      // Store the computed value in an array
-      Fval[i] = glm_data.F;
-    }
+    // Store the computed value in an array
+    Fval[i] = glm_data.F;
+  }
 
   // Finish timing the computations
   gettimeofday(&tstop, NULL);

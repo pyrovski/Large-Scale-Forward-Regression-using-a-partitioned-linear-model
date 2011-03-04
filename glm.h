@@ -65,6 +65,8 @@ void glm(const FortranMatrix &X,
   // G = XtXi
   // compute transpose of SNPtXG: nx1
   vector<double> GtXtSNP(n, 0.0);
+
+  //! @todo use cblas_dsymv for this
   cblas_dgemv(CblasColMajor,
 	      CblasTrans,
 	      n,
@@ -92,14 +94,33 @@ void glm(const FortranMatrix &X,
   S = 1.0 / S;
 
   // compute G' = (X'tX')i, X' = [X SNP]
-  FortranMatrix Gn(n, n) = XtXti;
+  // Gn = [G + S*(snptXG'*snptXG), -S*snptXG'; -S*snptXG, S]; % n + 1 x n + 1
+  FortranMatrix Gn = XtXi;
+
+  // compute G + S *(snptXG'*snptXG) (n x n)
+  //! @todo cblas_dspr(CblasColMajor, ); ? requires packed symmetric matrix
+  cblas_dsyr(CblasColMajor, CblasUpper, n, S, &GtXtSNP[0], 1, &Gn.values[0], n);
+
   Gn.resize_retain(n + 1, n + 1);
 
-  // Compute "V2" now that we know rX == rank(X) == rank(X^T X)
-  glm_data.V2 = m - rX;
+  // compute right and bottom edges of Gn
+  cblas_daxpy(n, S, &GtXtSNP[0], 1, &Gn.values[n * (n + 1)], 1);
+  cblas_dcopy(n, &Gn.values[n * (n + 1)], 1, &Gn.values[n], n + 1);
 
-  // compute beta (vector)
-
+  // store bottom right element of Gn
+  Gn(n, n) = S;
+ 
+  //! @todo Xtyn = [Xty; snpty]; % n + 1 x 1
+  vector<double> Xtyn(n + 1);
+  Xtyn.assign(Xty.begin(), Xty.end());
+  Xtyn.back() = SNPty;
+  
+  // compute beta (n + 1 x 1)
+  // beta = Gn * Xtyn
+  glm_data.beta.resize(n + 1);
+  cblas_dgemv(CblasColMajor, CblasNoTrans, n + 1, n + 1, 1.0, 
+	      &Gn.values[0], n + 1, &Xtyn[0], 1, 0.0, &glm_data.beta[0], 1);
+  
   // Compute ErrorSS for return in the GLMData data structure
   glm_data.ErrorSS = yty - cblas_ddot(glm_data.beta.size(), &glm_data.beta[0], 1, &Xty[0], 1);
 
@@ -115,6 +136,11 @@ void glm(const FortranMatrix &X,
   // We need the rank of the Kt "matrix" now.  Since Kt is
   // assumed to be a vector, we can just assume it has rank 1.
   int rK = 1;
+
+  //! @todo update rX from trace
+
+  // Compute "V2" now that we know rX == rank(X) == rank(X^T X)
+  glm_data.V2 = m - rX;
 
   // F = Kb' * inv(Kt * G * Kt') * Kb * V2 / (rK * ErrorSS);
 

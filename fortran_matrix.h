@@ -2,14 +2,18 @@
 #define __fortran_matrix_h__
 
 #include <stdlib.h>
+#include <string.h>
 
 // C++ includes
 #include <iostream>
 #include <vector>
+#include <iostream>
 
 // Local project includes
 #include "my_lapack_blas.h"
 #include "print_matrix.h"
+
+using namespace std;
 
 // This Matrix is stored in column-major order.  That way it can be
 // created as normal in C++, and passed to Fortran LAPACK/BLAS routines.  Note:
@@ -21,6 +25,21 @@ public:
   FortranMatrix(unsigned nr=0, unsigned nc=0) : n_rows(nr), n_cols(nc), values(nr*nc) {}
 
   //! @todo operator = or FortranMatrix(const FortranMatrix &)
+  FortranMatrix operator = (const FortranMatrix &rhs){
+    this->values = rhs.values;
+    this->n_rows = rhs.n_rows;
+    this->n_cols = rhs.n_cols;
+  }
+
+  void add(const FortranMatrix &rhs){
+    if(rhs.n_rows != n_rows || rhs.n_cols != n_cols){
+      cerr << "invalid matrix dimensions" << endl;
+      exit(1);
+    }
+    for(unsigned col = 0; col < n_cols; col++)
+      for(unsigned row = 0; row < n_rows; row++)
+	values[row + n_rows * col] += rhs.values[row + n_rows * col];
+  }
 
   // Returns a writable reference to the (i,j) entry of the matrix
   double& operator()(unsigned i, unsigned j)
@@ -76,9 +95,18 @@ public:
   
   // retain old values in correct coordinates
   void resize_retain(unsigned new_n_rows, unsigned new_n_cols){
+    unsigned old_n_rows = n_rows, old_n_cols = n_cols;
+    if(new_n_rows < old_n_rows || new_n_cols < old_n_cols){
+      cerr << "invalid resize; fixme" << endl;
+      exit(1);
+    } else if (new_n_rows == old_n_rows && new_n_cols == old_n_cols)
+      return;
+    
     this->resize(new_n_rows, new_n_cols);
-    //! @todo finish
-    //for(unsigned 
+    // first column is already in the right place
+    for(unsigned col = old_n_cols - 1; col > 0; col--)
+      //! @todo this could be faster; memmove uses temporary storage
+      memmove(&values[new_n_rows * col], &values[old_n_rows * col], old_n_rows * sizeof(double));
   }
 
   // Return a writable reference to the number of rows/cols of the matrix.

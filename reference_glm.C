@@ -194,10 +194,10 @@ int main()
   XtXi.transpose_self();
 
   double maxS = 0.0;
-  for(unsigned i = 0; i < geno_count; i++)
+  for(unsigned i = 0; i < n; i++)
     maxS = max(maxS, S[i]); // compute norm(XtX, 2) = max(S)
-  double tol = geno_count * numeric_limits<double>::min() * maxS;
-  for(unsigned i = 0; i < geno_count; i++)
+  double tol = n * numeric_limits<double>::min() * maxS;
+  for(unsigned i = 0; i < n; i++)
     if(S[i])
       if(S[i] > tol)
 	S[i] = 1.0/S[i];
@@ -206,29 +206,27 @@ int main()
     
   // emulate matrix-matrix multiply, with second matrix diagonal
   // use XtXi temporarily for V * 1./S
-  for(unsigned col = 0; col < geno_count; col++)
-    cblas_daxpy(geno_count,
+  for(unsigned col = 0; col < n; col++)
+    cblas_dscal(n,
 		S[col],
-		&XtXi.values[col * geno_count],
-		1,
-		&XtXi.values[col * geno_count],
+		&XtXi.values[col * n],
 		1);
 
   // compute XtXi = V * S^-1 * Ut
   cblas_dgemm(CblasColMajor,
 	      CblasNoTrans, // V_Si is not transposed
 	      CblasTrans, // U is transposed
-	      geno_count,
-	      geno_count,
-	      geno_count,
+	      n,
+	      n,
+	      n,
 	      1.0,
 	      &XtXi.values[0],
-	      geno_count,
+	      n,
 	      &U.values[0],
-	      geno_count,
+	      n,
 	      0.0,
 	      &XtXi.values[0],
-	      geno_count);
+	      n);
 
   // Compute the matrix-vector product, XTy := X' * y.  
   double yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
@@ -253,6 +251,8 @@ int main()
 
     // compute Xt * SNP    
     vector <double> XtSNP(geno_ind);
+
+    //! @todo check m, n, lda
     cblas_dgemv(CblasColMajor, 
 		CblasTrans,
 		geno_ind,
@@ -260,15 +260,16 @@ int main()
 		1.0,
 		&X.values[0],
 		geno_ind,
-		&geno.values[i],
-		geno_ind,
+		&geno.values[i*geno_ind], // address of first SNP element
+		1, // INCX = 1 because geno is column-major
 		0.0,
 		&XtSNP[0],
 		1);
 
     //! @todo these will never change for each SNP, so they could be moved out of all loops
-    double SNPtSNP = cblas_ddot(geno_ind, &geno.values[i], geno_ind, &geno.values[i], geno_ind);
-    double SNPty = cblas_ddot(geno_ind, &geno.values[i], geno_ind, &y[0], 1);
+    double SNPtSNP = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
+				&geno.values[i*geno_ind], 1);
+    double SNPty = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
 
     // Call the glm function.  Note that X is currently overwritten by this function,
     // and therefore would need to be re-formed completely at each iteration...

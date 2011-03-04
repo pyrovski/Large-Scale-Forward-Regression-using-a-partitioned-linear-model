@@ -20,6 +20,8 @@ public:
   // Constructor, by default, an empty matrix is constructed
   FortranMatrix(unsigned nr=0, unsigned nc=0) : n_rows(nr), n_cols(nc), values(nr*nc) {}
 
+  //! @todo operator = or FortranMatrix(const FortranMatrix &)
+
   // Returns a writable reference to the (i,j) entry of the matrix
   double& operator()(unsigned i, unsigned j)
   {
@@ -70,6 +72,13 @@ public:
     n_rows = new_n_rows;
     n_cols = new_n_cols;
     values.resize(n_rows*n_cols);
+  }
+  
+  // retain old values in correct coordinates
+  void resize_retain(unsigned new_n_rows, unsigned new_n_cols){
+    this->resize(new_n_rows, new_n_cols);
+    //! @todo finish
+    //for(unsigned 
   }
 
   // Return a writable reference to the number of rows/cols of the matrix.

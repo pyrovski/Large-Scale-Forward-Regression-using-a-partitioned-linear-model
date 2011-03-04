@@ -6,9 +6,12 @@
 
 // External library headers
 #include <gsl/gsl_cdf.h> 
+#include <cblas.h>
 
 // Local headers
 #include "fortran_matrix.h"
+
+#define swap(item1, item2, itemT) (itemT = item1; item1 = item2; item2 = item1)
 
 using namespace std;
 
@@ -40,23 +43,62 @@ struct GLMData
 // a 1-by-N matrix) than the more general case where Kt is a matrix.
 void glm(const FortranMatrix &X, 
 	 const FortranMatrix &XtX, 
-	 const FortranMatrix &XtXti, 
-	 const vector<double> &Xtsnp, 
-	 const double snptsnp, 
-	 const double snpty, 
+	 const FortranMatrix &XtXi, 
+	 const vector<double> &XtSNP,
+	 const double SNPtSNP, 
+	 const double SNPty, 
 	 const double yty, 
 	 const vector<double> &Kt, 
 	 const vector<double> &Xty, 
 	 const double rX,
 	 GLMData& glm_data)
 {  
-  int m  = X.get_n_rows();
+  int m  = X.get_n_rows(), n = X.get_n_cols();
   int V1 = 1; // Kt is assumed to be a row vector in this version
 
+  /*
+  vector<double> SNPtX(m); // SNPtX = (XtSNP)t
+  for(unsigned i = 0; i < m; i++)
+    SNPtX[i] = XtSNP[m - 1 - i];
+  */
 
+  // G = XtXi
+  // compute transpose of SNPtXG: nx1
+  vector<double> GtXtSNP(n, 0.0);
+  cblas_dgemv(CblasColMajor,
+	      CblasTrans,
+	      n,
+	      n,
+	      1.0,
+	      &XtXi.values[0],
+	      n,
+	      &XtSNP[0],
+	      1,
+	      0.0,
+	      &GtXtSNP[0],
+	      1);
+
+  // compute SNPtXGXtSNP (scalar)
+  double SNPtXGXtSNP = cblas_ddot(n, &XtSNP[0], 1, &GtXtSNP[0], 1);
+
+  // compute S = Schur complement of partitioned inverse
+  double S = SNPtSNP - SNPtXGXtSNP;
+  if(!S){
+    // bad news
+    glm_data.F = 0.0;
+    return;
+  }
+
+  S = 1.0 / S;
+
+  // compute G' = (X'tX')i, X' = [X SNP]
+  FortranMatrix Gn(n, n) = XtXti;
+  Gn.resize_retain(n + 1, n + 1);
 
   // Compute "V2" now that we know rX == rank(X) == rank(X^T X)
   glm_data.V2 = m - rX;
+
+  // compute beta (vector)
 
   // Compute ErrorSS for return in the GLMData data structure
   glm_data.ErrorSS = yty - cblas_ddot(glm_data.beta.size(), &glm_data.beta[0], 1, &Xty[0], 1);
@@ -68,7 +110,7 @@ void glm(const FortranMatrix &X,
   // Compute the matrix-vector product, Kb = Kt * beta.
   // Note if Kt is actually a vector, Kb will be a scalar...
   //double Kb = inner(Kt, glm_data.beta);
-  double Kb = cblas_ddot(Kt.size(), &Kt[0], 1, &glm_data.beta[0], 1);
+  double Kb = glm_data.beta.back();
 
   // We need the rank of the Kt "matrix" now.  Since Kt is
   // assumed to be a vector, we can just assume it has rank 1.

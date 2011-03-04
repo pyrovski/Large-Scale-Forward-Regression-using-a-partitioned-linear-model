@@ -3,6 +3,8 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <limits>
+#include <algorithm>
 
 // Local project includes
 #include "fortran_matrix.h"
@@ -171,25 +173,65 @@ int main()
 
   // Initialize SVD components, A = U * S * V^T
   vector<double> S;
-  FortranMatrix U, VT;
+  FortranMatrix U, XtXi; // XtXi is used as VT first
 
   GLMData glm_data;
   vector<double> beta;
   vector<double> Xty = matvec(X, y, /*transX=*/true);
 
   // Create the SVD of X^T * X 
-  svd_create(XtX, U, S, VT);
-  unsigned rX = svd_apply(U, S, VT, /*result=*/beta, Xty);
+  svd_create(XtX, U, S, XtXi);
+  unsigned rX = svd_apply(U, S, XtXi, /*result=*/beta, Xty);
   // XtXi = V * S^-1 * Ut
   // S^-1 = 1./S, where S > tol
 
-  FortranMatrix XtXi;
+  /* compute V * 1./S
+     S is stored as a vector, but represents an nxn diagonal matrix
+  */
+
+  // first compute V from Vt
+    
+  XtXi.transpose_self();
+
+  double maxS = 0.0;
+  for(unsigned i = 0; i < geno_count; i++)
+    maxS = max(maxS, S[i]); // compute norm(XtX, 2) = max(S)
+  double tol = geno_count * numeric_limits<double>::min() * maxS;
+  for(unsigned i = 0; i < geno_count; i++)
+    if(S[i])
+      if(S[i] > tol)
+	S[i] = 1.0/S[i];
+      else
+	S[i] = 0.0;
+    
+  // emulate matrix-matrix multiply, with second matrix diagonal
+  // use XtXi temporarily for V * 1./S
+  for(unsigned col = 0; col < geno_count; col++)
+    cblas_daxpy(geno_count,
+		S[col],
+		&XtXi.values[col * geno_count],
+		1,
+		&XtXi.values[col * geno_count],
+		1);
+
+  // compute XtXi = V * S^-1 * Ut
+  cblas_dgemm(CblasColMajor,
+	      CblasNoTrans, // V_Si is not transposed
+	      CblasTrans, // U is transposed
+	      geno_count,
+	      geno_count,
+	      geno_count,
+	      1.0,
+	      &XtXi.values[0],
+	      geno_count,
+	      &U.values[0],
+	      geno_count,
+	      0.0,
+	      &XtXi.values[0],
+	      geno_count);
 
   // Compute the matrix-vector product, XTy := X' * y.  
   double yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
-
-  // To hold return values of the GLM call.
-
 
   gettimeofday(&tstop, NULL);
   
@@ -208,6 +250,8 @@ int main()
   // we are assuming y is a vector for now (because GLM currently expects
   // a vector for its second argument) but this could be generalized later.
   for (unsigned i=0; i<geno_count; ++i){
+
+    // compute Xt * SNP    
     vector <double> XtSNP(geno_ind);
     cblas_dgemv(CblasColMajor, 
 		CblasTrans,
@@ -222,7 +266,7 @@ int main()
 		&XtSNP[0],
 		1);
 
-    //! @todo these will never change for each SNP
+    //! @todo these will never change for each SNP, so they could be moved out of all loops
     double SNPtSNP = cblas_ddot(geno_ind, &geno.values[i], geno_ind, &geno.values[i], geno_ind);
     double SNPty = cblas_ddot(geno_ind, &geno.values[i], geno_ind, &y[0], 1);
 

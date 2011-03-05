@@ -42,7 +42,7 @@ public:
   }
 
   // Returns a writable reference to the (i,j) entry of the matrix
-  double& operator()(unsigned i, unsigned j)
+  inline double& operator()(unsigned i, unsigned j)
   {
     return values[i + n_rows*j];
   }

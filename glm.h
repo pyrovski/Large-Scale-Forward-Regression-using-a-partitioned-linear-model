@@ -50,7 +50,7 @@ void glm(const FortranMatrix &X,
 	 const double yty, 
 	 const vector<double> &Kt, 
 	 const vector<double> &Xty, 
-	 const double rX,
+	 double rX,
 	 GLMData& glm_data)
 {  
   int m  = X.get_n_rows(), n = X.get_n_cols();
@@ -83,7 +83,7 @@ void glm(const FortranMatrix &X,
   // compute SNPtXGXtSNP (scalar)
   double SNPtXGXtSNP = cblas_ddot(n, &XtSNP[0], 1, &GtXtSNP[0], 1);
 
-  // compute S = Schur complement of partitioned inverse
+  // compute S = Schur complement of partitioned matrix to invert
   double S = SNPtSNP - SNPtXGXtSNP;
   if(!S){
     // bad news
@@ -97,32 +97,49 @@ void glm(const FortranMatrix &X,
   // Gn = [G + S*(snptXG'*snptXG), -S*snptXG'; -S*snptXG, S]; % n + 1 x n + 1
   FortranMatrix Gn = XtXi;
 
-  // compute G + S *(snptXG'*snptXG) (n x n)
-  //! @todo cblas_dspr(CblasColMajor, ); ? requires packed symmetric matrix
-  cblas_dsyr(CblasColMajor, CblasUpper, n, S, &GtXtSNP[0], 1, &Gn.values[0], n);
+  // compute G + S *(SNPtXG'*SNPtXG) (n x n)
+  // = G + S * (GtXtSNP*GtXtSNP')?= to within machine precision
+  /*! @todo cblas_dspr(CblasColMajor, ); ? requires packed symmetric matrix,
+    future operations using this result must also assume Gn is packed
+   */
+  //cblas_dsyr(CblasColMajor, CblasUpper, n, S, &GtXtSNP[0], 1, &Gn.values[0], n);
+  cblas_dger(CblasColMajor, n,
+	     n, S, &GtXtSNP[0], 1, &GtXtSNP[0], 1,
+	     &Gn.values[0], n);
+
+  //Gn.print("Gn before resize");
 
   Gn.resize_retain(n + 1, n + 1);
 
+  //Gn.print("Gn after resize");
+
+
   // compute right and bottom edges of Gn
+  // right edge
   cblas_daxpy(n, S, &GtXtSNP[0], 1, &Gn.values[n * (n + 1)], 1);
   cblas_dcopy(n, &Gn.values[n * (n + 1)], 1, &Gn.values[n], n + 1);
 
   // store bottom right element of Gn
   Gn(n, n) = S;
  
-  //! @todo Xtyn = [Xty; snpty]; % n + 1 x 1
-  vector<double> Xtyn(n + 1);
-  Xtyn.assign(Xty.begin(), Xty.end());
-  Xtyn.back() = SNPty;
+  // Xtyn = [Xty; snpty]; % n + 1 x 1
+  vector<double> Xtyn(n+1);
+  Xtyn.assign(Xty.begin(), Xty.end()); // sets size to n
+  Xtyn.push_back(SNPty); // append 1
   
   // compute beta (n + 1 x 1)
   // beta = Gn * Xtyn
   glm_data.beta.resize(n + 1);
+
+  //! @todo use cblas_dsymv()
   cblas_dgemv(CblasColMajor, CblasNoTrans, n + 1, n + 1, 1.0, 
 	      &Gn.values[0], n + 1, &Xtyn[0], 1, 0.0, &glm_data.beta[0], 1);
+
+  //! @todo beta is wrong
   
   // Compute ErrorSS for return in the GLMData data structure
-  glm_data.ErrorSS = yty - cblas_ddot(glm_data.beta.size(), &glm_data.beta[0], 1, &Xty[0], 1);
+  glm_data.ErrorSS = yty - 
+    cblas_ddot(n + 1, &glm_data.beta[0], 1, &Xtyn[0], 1);
 
   ////////////////////////////////////////////////////////////////////////////////
   // Up to here, the matrix-Kt and vector-Kt versions of the glm
@@ -138,25 +155,19 @@ void glm(const FortranMatrix &X,
   int rK = 1;
 
   //! @todo update rX from trace
+  double trn = S * (SNPtSNP - SNPtXGXtSNP);
+  rX++;
 
   // Compute "V2" now that we know rX == rank(X) == rank(X^T X)
   glm_data.V2 = m - rX;
 
-  // F = Kb' * inv(Kt * G * Kt') * Kb * V2 / (rK * ErrorSS);
 
   // 3.) Note: for F we need to compute Kb' * inv(c) * Kb, but since c
   // is a scalar, we just divide!
-  double F =  0;
-  //Kb * Kb / c * static_cast<double>(glm_data.V2) / static_cast<double>(rK) / glm_data.ErrorSS; 
+  // F = Kb' * inv(Kt * G * Kt') * Kb * V2 / (rK * ErrorSS);
+  glm_data.F = (1.0 / S) * Kb * Kb * glm_data.V2 / (rK * glm_data.ErrorSS);
 
-  // F must be positive otherwise the F distribution will return nan
-  if (F < 0){
-    cerr << "Error! F<0 obtained, F distribution can only args >= 0." << endl;
-    exit(1);
-  }
-  
-  // Compute probability, p.  This part requires the GSL.
-  glm_data.p = 1. - gsl_cdf_fdist_P(F, static_cast<double>(V1), static_cast<double>(glm_data.V2));
+  //Kb * Kb / c * static_cast<double>(glm_data.V2) / static_cast<double>(rK) / glm_data.ErrorSS; 
 }
 
 

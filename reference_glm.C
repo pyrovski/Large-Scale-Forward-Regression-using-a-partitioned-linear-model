@@ -6,6 +6,8 @@
 #include <limits>
 #include <algorithm>
 
+#define _DEBUG
+
 // Local project includes
 #include "fortran_matrix.h"
 #include "glm.h"
@@ -173,16 +175,15 @@ int main()
 
   // Initialize SVD components, A = U * S * V^T
   vector<double> S;
-  FortranMatrix U, XtXi; // XtXi is used as VT first
+  FortranMatrix U, Vt, XtXi;
 
   GLMData glm_data;
   vector<double> beta;
   vector<double> Xty = matvec(X, y, /*transX=*/true);
 
   // Create the SVD of X^T * X 
-  svd_create(XtX, U, S, XtXi);
-  // use XtXi as VT
-  unsigned rX = svd_apply(U, S, XtXi, /*result=*/beta, Xty);
+  svd_create(XtX, U, S, Vt);
+  unsigned rX = svd_apply(U, S, Vt, /*result=*/beta, Xty);
   // XtXi = V * S^-1 * Ut
   // S^-1 = 1./S, where S > tol
 
@@ -192,7 +193,7 @@ int main()
 
   // first compute V from Vt
     
-  XtXi.transpose_self();
+  Vt.transpose_self();
 
   double maxS = 0.0;
   for(unsigned i = 0; i < n; i++)
@@ -206,14 +207,14 @@ int main()
 	S[i] = 0.0;
     
   // emulate matrix-matrix multiply, with second matrix diagonal
-  // use XtXi temporarily for V * 1./S
   for(unsigned col = 0; col < n; col++)
     cblas_dscal(n,
 		S[col],
-		&XtXi.values[col * n],
+		&Vt.values[col * n],
 		1);
 
   // compute XtXi = V * S^-1 * Ut
+  XtXi.resize(n, n);
   cblas_dgemm(CblasColMajor,
 	      CblasNoTrans, // V_Si is not transposed
 	      CblasTrans, // U is transposed
@@ -221,7 +222,7 @@ int main()
 	      n,
 	      n,
 	      1.0,
-	      &XtXi.values[0],
+	      &Vt.values[0],
 	      n,
 	      &U.values[0],
 	      n,
@@ -296,10 +297,10 @@ int main()
 	 << " s" << endl;
   }
   
-  // Print out the Pval array
-  cout << "Pval=" << endl;
-  for (unsigned i=0; i<Pval.size(); ++i)
-    cout << Pval[i] << endl;
+  // Print out the Fval array
+  cout << "Fval=" << endl;
+  for (unsigned i=0; i<Fval.size(); ++i)
+    cout << Fval[i] << endl;
     
   return 0;
 }

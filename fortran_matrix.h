@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 // C++ includes
 #include <iostream>
@@ -104,9 +105,16 @@ public:
     
     this->resize(new_n_rows, new_n_cols);
     // first column is already in the right place
-    for(unsigned col = old_n_cols - 1; col > 0; col--)
+    for(unsigned col = old_n_cols - 1; col > 0; col--){
       //! @todo this could be faster; memmove uses temporary storage
       memmove(&values[new_n_rows * col], &values[old_n_rows * col], old_n_rows * sizeof(double));
+      // clear newly resized space (rest of column)
+      bzero(&values[new_n_rows * col + old_n_rows], 
+	    sizeof(double) * (new_n_rows - old_n_rows));
+    }
+    // zero first column
+    bzero(&values[old_n_rows], 
+	  sizeof(double) * (new_n_rows - old_n_rows));
   }
 
   // Return a writable reference to the number of rows/cols of the matrix.

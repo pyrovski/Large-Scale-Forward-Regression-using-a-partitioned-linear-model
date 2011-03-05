@@ -181,6 +181,7 @@ int main()
 
   // Create the SVD of X^T * X 
   svd_create(XtX, U, S, XtXi);
+  // use XtXi as VT
   unsigned rX = svd_apply(U, S, XtXi, /*result=*/beta, Xty);
   // XtXi = V * S^-1 * Ut
   // S^-1 = 1./S, where S > tol
@@ -196,7 +197,7 @@ int main()
   double maxS = 0.0;
   for(unsigned i = 0; i < n; i++)
     maxS = max(maxS, S[i]); // compute norm(XtX, 2) = max(S)
-  double tol = n * numeric_limits<double>::min() * maxS;
+  double tol = n * numeric_limits<double>::epsilon() * maxS;
   for(unsigned i = 0; i < n; i++)
     if(S[i])
       if(S[i] > tol)

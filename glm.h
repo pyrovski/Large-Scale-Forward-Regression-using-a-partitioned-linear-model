@@ -11,6 +11,8 @@
 // Local headers
 #include "fortran_matrix.h"
 
+//#define _DEBUG
+
 #define swap(item1, item2, itemT) (itemT = item1; item1 = item2; item2 = item1)
 
 using namespace std;
@@ -56,12 +58,6 @@ void glm(const FortranMatrix &X,
   int m  = X.get_n_rows(), n = X.get_n_cols();
   int V1 = 1; // Kt is assumed to be a row vector in this version
 
-  /*
-  vector<double> SNPtX(m); // SNPtX = (XtSNP)t
-  for(unsigned i = 0; i < m; i++)
-    SNPtX[i] = XtSNP[m - 1 - i];
-  */
-
   // G = XtXi
   // compute transpose of SNPtXG: nx1
   vector<double> GtXtSNP(n, 0.0);
@@ -79,6 +75,9 @@ void glm(const FortranMatrix &X,
 	      0.0,
 	      &GtXtSNP[0],
 	      1);
+
+  writeD("GtXtSNP.dat", GtXtSNP);
+
 
   // compute SNPtXGXtSNP (scalar)
   double SNPtXGXtSNP = cblas_ddot(n, &XtSNP[0], 1, &GtXtSNP[0], 1);
@@ -108,7 +107,8 @@ void glm(const FortranMatrix &X,
 	     &Gn.values[0], n);
 
   //Gn.print("Gn before resize");
-
+  //! @todo this could be avoided by use of lda in computation of XtXi;
+  // just allocate XtXi as n+1xn+1 and use lda=n+1, M = n, N = n
   Gn.resize_retain(n + 1, n + 1);
 
   //Gn.print("Gn after resize");
@@ -141,10 +141,6 @@ void glm(const FortranMatrix &X,
   glm_data.ErrorSS = yty - 
     cblas_ddot(n + 1, &glm_data.beta[0], 1, &Xtyn[0], 1);
 
-  ////////////////////////////////////////////////////////////////////////////////
-  // Up to here, the matrix-Kt and vector-Kt versions of the glm
-  // function are identical...
-  
   // Compute the matrix-vector product, Kb = Kt * beta.
   // Note if Kt is actually a vector, Kb will be a scalar...
   //double Kb = inner(Kt, glm_data.beta);
@@ -155,19 +151,15 @@ void glm(const FortranMatrix &X,
   int rK = 1;
 
   //! @todo update rX from trace
-  double trn = S * (SNPtSNP - SNPtXGXtSNP);
+  //double trn = S * (SNPtSNP - SNPtXGXtSNP);
   rX++;
 
   // Compute "V2" now that we know rX == rank(X) == rank(X^T X)
   glm_data.V2 = m - rX;
 
 
-  // 3.) Note: for F we need to compute Kb' * inv(c) * Kb, but since c
-  // is a scalar, we just divide!
   // F = Kb' * inv(Kt * G * Kt') * Kb * V2 / (rK * ErrorSS);
   glm_data.F = (1.0 / S) * Kb * Kb * glm_data.V2 / (rK * glm_data.ErrorSS);
-
-  //Kb * Kb / c * static_cast<double>(glm_data.V2) / static_cast<double>(rK) / glm_data.ErrorSS; 
 }
 
 

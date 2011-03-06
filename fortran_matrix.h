@@ -25,7 +25,6 @@ public:
   // Constructor, by default, an empty matrix is constructed
   FortranMatrix(unsigned nr=0, unsigned nc=0) : n_rows(nr), n_cols(nc), values(nr*nc) {}
 
-  //! @todo operator = or FortranMatrix(const FortranMatrix &)
   FortranMatrix operator = (const FortranMatrix &rhs){
     this->values = rhs.values;
     this->n_rows = rhs.n_rows;
@@ -60,7 +59,21 @@ public:
 		  this->get_n_rows() );    
   }
 
+  int write(string filename){
+    write_matrix(filename.c_str(),
+		 n_rows,
+		 n_cols,
+		 &values[0],
+		 n_rows);
+    return 0;
+  }
 
+
+#ifdef _DEBUG
+  int writeD(string filename){return this->write(filename);}
+#else
+  int writeD(string filename){return 0;}
+#endif
 
   // Replace this matrix with its transpose.  Here we simply
   // use n_rows*n_cols temporary storage.  In-place transposition
@@ -108,6 +121,12 @@ public:
     for(unsigned col = old_n_cols - 1; col > 0; col--){
       //! @todo this could be faster; memmove uses temporary storage
       memmove(&values[new_n_rows * col], &values[old_n_rows * col], old_n_rows * sizeof(double));
+      /*
+      double *base = &values[old_n_rows * col];
+      double *dest = &values[new_n_rows * col];
+      for(unsigned row = old_n_rows - 1; row >= 0; row--)
+	dest[row] = base[row];
+      */
       // clear newly resized space (rest of column)
       bzero(&values[new_n_rows * col + old_n_rows], 
 	    sizeof(double) * (new_n_rows - old_n_rows));
@@ -259,5 +278,13 @@ std::vector<double> matvec(const FortranMatrix& A, const std::vector<double>& x,
   return y;
 }
 
+#ifdef _DEBUG
+void writeD(string filename, const vector<double> &v){
+  write_matrix(filename.c_str(), v.size(), 1, &v[0], 1);
+}
+#else
+void writeD(string filename, const vector<double> &v){
+}
+#endif
 
 #endif

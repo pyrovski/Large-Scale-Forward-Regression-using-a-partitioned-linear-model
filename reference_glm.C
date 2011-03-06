@@ -6,7 +6,7 @@
 #include <limits>
 #include <algorithm>
 
-#define _DEBUG
+//#define _DEBUG
 
 // Local project includes
 #include "fortran_matrix.h"
@@ -156,7 +156,7 @@ int main()
   // Begin timing the computations
   gettimeofday(&tstart, NULL);
 
-  /*! @todo precompute
+  /*! precompute
     XtX
     XtXi
     rank(XtXi)
@@ -169,6 +169,7 @@ int main()
   //! @todo one of these is faster
   //FortranMatrix XtX = matmat(X, X, false, true); 
   FortranMatrix XtX = matmat(X, X, true, false); 
+  XtX.writeD("XtX.dat");
 
   // Solve (X^T * X)*beta = X^T*y for beta.  Note that X and X^T * X
   // have the same rank.
@@ -180,10 +181,17 @@ int main()
   GLMData glm_data;
   vector<double> beta;
   vector<double> Xty = matvec(X, y, /*transX=*/true);
+  
+  writeD("Xty.dat", Xty);
 
   // Create the SVD of X^T * X 
   svd_create(XtX, U, S, Vt);
   unsigned rX = svd_apply(U, S, Vt, /*result=*/beta, Xty);
+
+  U.writeD("U.dat");
+  writeD("S.dat", S);
+
+  Vt.writeD("Vt.dat");
   // XtXi = V * S^-1 * Ut
   // S^-1 = 1./S, where S > tol
 
@@ -229,6 +237,8 @@ int main()
 	      0.0,
 	      &XtXi.values[0],
 	      n);
+
+  XtXi.writeD("XtXi.dat");
 
   // Compute the matrix-vector product, XTy := X' * y.  
   double yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);

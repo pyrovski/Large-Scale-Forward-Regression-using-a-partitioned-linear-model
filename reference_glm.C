@@ -286,6 +286,9 @@ int main()
     // Call the glm function.  Note that X is currently overwritten by this function,
     // and therefore would need to be re-formed completely at each iteration...
     //glm(X, y, Kt, glm_data);
+    /*
+      ~200 us per SNP on Core i3, ~116 us per SNP on Core i7
+     */
     glm(X, XtX, XtXi, XtSNP, SNPtSNP, SNPty, yty, Kt, Xty, rX, glm_data);
 
     // Store the computed value in an array

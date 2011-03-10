@@ -37,6 +37,7 @@ struct GLMData
 
   // length(y) - rank(X), as computed in the glm function
   int V2;
+
 };
 
 
@@ -162,5 +163,70 @@ void glm(const FortranMatrix &X,
   glm_data.F = (1.0 / S) * Kb * Kb * glm_data.V2 / (rK * glm_data.ErrorSS);
 }
 
+
+void plm(
+	 // inputs
+	 const FortranMatrix &X, 
+	 const FortranMatrix &XtXi, 
+	 const vector<double> &XtSNP,
+	 const double SNPtSNP, 
+	 const double SNPty, 
+	 const double yty, 
+	 const vector<double> &Xty, 
+	 const unsigned rX,
+	 const double SSE,
+	 const GLMData &glm_data,
+	 // output
+	 double &SSE_new,
+	 GLMData& glm_data_new
+	 )
+{
+  // previous V2 in glm_data
+
+  int m  = X.get_n_rows(), n = X.get_n_cols();
+
+  // G = XtXi
+  // compute transpose of SNPtXG: nx1
+  vector<double> GtXtSNP(n, 0.0);
+
+  //! @todo use cblas_dsymv for this
+  cblas_dgemv(CblasColMajor,
+	      CblasTrans,
+	      n,
+	      n,
+	      1.0,
+	      &XtXi.values[0],
+	      n,
+	      &XtSNP[0],
+	      1,
+	      0.0,
+	      &GtXtSNP[0],
+	      1);
+
+  writeD("GtXtSNP.dat", GtXtSNP);
+
+
+  // compute SNPtXGXtSNP (scalar)
+  double SNPtXGXtSNP = cblas_ddot(n, &XtSNP[0], 1, &GtXtSNP[0], 1);
+
+  // compute S = Schur complement of partitioned matrix to invert
+  double S = SNPtSNP - SNPtXGXtSNP;
+  if(!S){ //! @todo if zero within tolerance
+    // bad news
+    glm_data_new.F = 0.0;
+    return;
+  }
+
+  S = 1.0 / S;
+
+  // compute snpty - snptXGXty = snptMy == scalar
+  // already know snpty, snptXG', Xty
+  double SNPtMy = SNPty - cblas_ddot(n, &GtXtSNP[0], -1, &Xty[0], 1);
+
+  double SSM = SNPtMy * SNPtMy * S;
+  glm_data_new.V2--;
+  SSE_new = SSE - SSM;
+  glm_data_new.F = glm_data.V2 * SSM / SSE_new;
+}
 
 #endif

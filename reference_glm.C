@@ -137,7 +137,8 @@ int main()
   // An array to hold the results of the GLM calculations
   vector<double> Pval(geno_count);
   vector<double> Fval(geno_count);
-
+  vector<double> V2s(geno_count);
+  
   // Initialize the X-matrix.  The first column is all ones, the next
   // fixed_count columns are equal to the fixed matrix, and the last
   // column (which changes) is the i'th column of the geno array.
@@ -178,7 +179,7 @@ int main()
   vector<double> S;
   FortranMatrix U, Vt, XtXi;
 
-  GLMData glm_data;
+  GLMData glm_data, glm_data_new;
   vector<double> beta;
   vector<double> Xty = matvec(X, y, /*transX=*/true);
   
@@ -243,6 +244,10 @@ int main()
   // Compute the matrix-vector product, XTy := X' * y.  
   double yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
 
+  //! @todo compute initial V2, SSE
+    
+  double SSE = 0.0, SSE_new;
+
   gettimeofday(&tstop, NULL);
   
   {
@@ -253,6 +258,8 @@ int main()
 	 << computation_prep_time << " s" << endl;
   }
   
+  glm_data_new = glm_data;
+
   gettimeofday(&tstart, NULL);
 
   // For each column of the geno array, set up the "X" matrix,
@@ -265,6 +272,7 @@ int main()
     vector <double> XtSNP(geno_ind);
 
     //! @todo check m, n, lda
+    //! @todo can be computed incrementally between major iterations
     cblas_dgemv(CblasColMajor, 
 		CblasTrans,
 		geno_ind,
@@ -287,9 +295,11 @@ int main()
     // and therefore would need to be re-formed completely at each iteration...
     //glm(X, y, Kt, glm_data);
     /*
-      ~200 us per SNP on Core i3, ~116 us per SNP on Core i7
+      ~200 us per SNP on Core i3, ~106 us per SNP on Core i7
      */
-    glm(X, XtX, XtXi, XtSNP, SNPtSNP, SNPty, yty, Kt, Xty, rX, glm_data);
+    //glm(X, XtX, XtXi, XtSNP, SNPtSNP, SNPty, yty, Kt, Xty, rX, glm_data);
+    
+    plm(X, XtXi, XtSNP, SNPtSNP, SNPty, yty, Xty, rX, SSE, glm_data, SSE_new, glm_data_new);
 
     // Store the computed value in an array
     Fval[i] = glm_data.F;

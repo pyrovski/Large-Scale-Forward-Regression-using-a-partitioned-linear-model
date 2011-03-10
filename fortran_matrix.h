@@ -144,8 +144,8 @@ public:
 
   // Const version of the above, just returns a copy of the number of
   // rows/cols, does not allow anything to be modified.
-  unsigned get_n_rows() const { return n_rows; }
-  unsigned get_n_cols() const { return n_cols; }
+  inline unsigned get_n_rows() const { return n_rows; }
+  inline unsigned get_n_cols() const { return n_cols; }
 
 
   //

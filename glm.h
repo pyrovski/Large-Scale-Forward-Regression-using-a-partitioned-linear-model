@@ -191,7 +191,7 @@ void plm(
 
   //! @todo use cblas_dsymv for this
   cblas_dgemv(CblasColMajor,
-	      CblasTrans,
+	      CblasTrans, //! @todo G is symmetric; don't need transpose
 	      n,
 	      n,
 	      1.0,
@@ -203,10 +203,11 @@ void plm(
 	      &GtXtSNP[0],
 	      1);
 
-  writeD("GtXtSNP.dat", GtXtSNP);
+  writeD("GtXtSNP.dat", GtXtSNP); // ok
 
 
   // compute SNPtXGXtSNP (scalar)
+  // <SNPtX GtXtSNP> == <XtSNP GtXtSNP>
   double SNPtXGXtSNP = cblas_ddot(n, &XtSNP[0], 1, &GtXtSNP[0], 1);
 
   // compute S = Schur complement of partitioned matrix to invert
@@ -214,6 +215,7 @@ void plm(
   if(!S){ //! @todo if zero within tolerance
     // bad news
     glm_data_new.F = 0.0;
+    glm_data_new.V2 = glm_data.V2;
     return;
   }
 
@@ -221,10 +223,11 @@ void plm(
 
   // compute snpty - snptXGXty = snptMy == scalar
   // already know snpty, snptXG', Xty
-  double SNPtMy = SNPty - cblas_ddot(n, &GtXtSNP[0], -1, &Xty[0], 1);
+  double SNPtMy = -cblas_ddot(n, &GtXtSNP[0], 1, &Xty[0], 1);
+  SNPtMy += SNPty;
 
   double SSM = SNPtMy * SNPtMy * S;
-  glm_data_new.V2--;
+  glm_data_new.V2 = glm_data.V2 - 1;
   glm_data_new.ErrorSS = glm_data.ErrorSS - SSM;
   glm_data_new.F = glm_data.V2 * SSM / glm_data_new.ErrorSS;
 }

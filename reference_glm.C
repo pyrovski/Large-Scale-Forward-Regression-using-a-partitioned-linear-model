@@ -244,7 +244,7 @@ int main()
 
   //! @todo compute initial V2 = m - rX, SSE = yty - beta' * Xty
     
-  glm_data.ErrorSS = yty - cblas_ddot(n, &beta[0], -1, &Xty[0], 1), 
+  glm_data.ErrorSS = yty - cblas_ddot(n, &beta[0], 1, &Xty[0], 1), 
   
   glm_data.V2 = geno_ind - rX;
 
@@ -267,8 +267,6 @@ int main()
 	 << computation_prep_time << " s" << endl;
   }
   
-  glm_data_new = glm_data;
-
   gettimeofday(&tstart, NULL);
 
   // For each column of the geno array, set up the "X" matrix,

@@ -20,6 +20,12 @@ void svd_create(/*in */FortranMatrix& A,
 		/*out*/std::vector<double>& S,
 		/*out*/FortranMatrix& VT)
 {
+/*! @todo
+  other LAPACK routines might match Matlab more closely for SVD;
+  maybe dgesvd?
+ */
+
+
   // Number of rows/cols in A
   int m = A.get_n_rows();
   int n = A.get_n_cols();
@@ -115,9 +121,9 @@ void svd_create(/*in */FortranMatrix& A,
 // including singular values up to the tolerance, tol.  As a
 // by-product of applyin the SVD, the approximate rank (to within tol)
 // of the matrix is returned.
-int svd_apply(/*in */FortranMatrix& U,
-	      /*in */std::vector<double>& S,
-	      /*in */FortranMatrix& VT,
+int svd_apply(/*in */const FortranMatrix& U,
+	      /*in */const std::vector<double>& S,
+	      /*in */const FortranMatrix& VT,
 	      /*out*/std::vector<double>& x,
 	      /*in */const std::vector<double>& b,
 	      /*in,default*/double tol=-1.0)
@@ -167,6 +173,8 @@ int svd_apply(/*in */FortranMatrix& U,
 
   // Now compute   x   =   V   *   y
   //             (nx1) = (nxn) * (nx1)
+  // Now compute   x   =   V   *   S^-1 * U^T * y
+
   // Note that we have V^T, so we have to use the transposed matvec again...
   x = matvec(VT, y, /*transVT=*/true);
 

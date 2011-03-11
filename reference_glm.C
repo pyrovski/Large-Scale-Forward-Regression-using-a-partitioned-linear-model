@@ -167,8 +167,6 @@ int main()
     SNPtSNP
    */
   
-  //! @todo one of these is faster
-  //FortranMatrix XtX = matmat(X, X, false, true); 
   FortranMatrix XtX = matmat(X, X, true, false); 
   XtX.writeD("XtX.dat");
 
@@ -187,12 +185,14 @@ int main()
 
   // Create the SVD of X^T * X 
   svd_create(XtX, U, S, Vt);
-  unsigned rX = svd_apply(U, S, Vt, /*result=*/beta, Xty);
-
   U.writeD("U.dat");
   writeD("S.dat", S);
 
   Vt.writeD("Vt.dat");
+  unsigned rX = svd_apply(U, S, Vt, /*result=*/beta, Xty);
+
+  writeD("beta.dat", beta);
+
   // XtXi = V * S^-1 * Ut
   // S^-1 = 1./S, where S > tol
 
@@ -244,9 +244,20 @@ int main()
   // Compute the matrix-vector product, XTy := X' * y.  
   double yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
 
-  //! @todo compute initial V2, SSE
+  //! @todo compute initial V2 = m - rX, SSE = yty - beta' * Xty
     
-  double SSE = 0.0, SSE_new;
+  double 
+    SSE = cblas_ddot(n, &beta[0], -1, &Xty[0], 1), 
+    SSE_new;
+
+
+  vector<double> SNPtSNP(geno_count), SNPty(geno_count);
+  for (unsigned i=0; i<geno_count; ++i){
+    //! these will never change for each SNP, so they could be moved out of all loops
+    SNPtSNP[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
+				&geno.values[i*geno_ind], 1);
+    SNPty[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
+  }
 
   gettimeofday(&tstop, NULL);
   
@@ -286,11 +297,6 @@ int main()
 		&XtSNP[0],
 		1);
 
-    //! @todo these will never change for each SNP, so they could be moved out of all loops
-    double SNPtSNP = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
-				&geno.values[i*geno_ind], 1);
-    double SNPty = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
-
     // Call the glm function.  Note that X is currently overwritten by this function,
     // and therefore would need to be re-formed completely at each iteration...
     //glm(X, y, Kt, glm_data);
@@ -299,10 +305,14 @@ int main()
      */
     //glm(X, XtX, XtXi, XtSNP, SNPtSNP, SNPty, yty, Kt, Xty, rX, glm_data);
     
-    plm(X, XtXi, XtSNP, SNPtSNP, SNPty, yty, Xty, rX, SSE, glm_data, SSE_new, glm_data_new);
+    plm(X, XtXi, XtSNP, SNPtSNP[i], SNPty[i], yty, Xty, rX, SSE, glm_data, 
+	SSE_new, glm_data_new);
 
+    // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
+    // if V1 = 0, ignore; F is undefined
     // Store the computed value in an array
     Fval[i] = glm_data.F;
+    V2s[i] = glm_data.V2; 
   }
 
   // Finish timing the computations

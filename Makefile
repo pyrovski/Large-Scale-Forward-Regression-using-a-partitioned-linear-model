@@ -1,3 +1,11 @@
+ifeq ($(dbg),1)
+DBG=-D_DEBUG
+OPT_FLAGS = -g
+else
+DBG=
+OPT_FLAGS = -O3
+endif
+
 CC = g++
 
 # The location (and name) of the BLAS/Lapack libraries
@@ -10,9 +18,6 @@ GSL_LIB = -lgsl
 
 LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB)
 
-# Optimization flags (switch this to -O0 -g for debugging)
-OPT_FLAGS = -O3
-
 # Set all include flags here for later use
 #INCLUDE_FLAGS = $(GSL_INCLUDE)
 
@@ -20,8 +25,7 @@ OPT_FLAGS = -O3
 #EXEC_FILES = $(shell find . -type f -perm -u+x -maxdepth 1)
 
 # Command to produce dependencies (.d files) from sources
-MAKEDEPEND = $(CC) -M -o $*.d $< -c
-
+MAKEDEPEND = $(CC) $(DBG) -M -o $*.d $< -c
 
 SRCS = reference_glm.C
 targets = $(patsubst %.C,%,$(SRCS))
@@ -45,7 +49,7 @@ clean:
 	sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
             -e '/^$$/ d' -e 's/$$/ :/' < $*.d >> $*.P; \
 	rm -f $*.d
-	$(CC) $(OPT_FLAGS) $< -o $@ -c
+	$(CC) $(DBG) $(OPT_FLAGS) $< -o $@ -c
 
 
 # Note: Running 'make rank' for example, will delete the .o file as an

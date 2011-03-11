@@ -17,6 +17,8 @@
 
 using namespace std;
 
+using namespace std;
+
 // This file contains data structures/routines for handling the
 // internals of the GLM function originally written in Matlab.
 

@@ -6,8 +6,6 @@
 #include <limits>
 #include <algorithm>
 
-//#define _DEBUG
-
 // Local project includes
 #include "fortran_matrix.h"
 #include "glm.h"

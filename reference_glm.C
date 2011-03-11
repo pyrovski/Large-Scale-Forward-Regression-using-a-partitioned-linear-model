@@ -301,6 +301,9 @@ int main()
      */
     //glm(X, XtX, XtXi, XtSNP, SNPtSNP, SNPty, yty, Kt, Xty, rX, glm_data);
     
+    /*
+      170 us per SNP on Core i3, 92 us per SNP on Core i7
+     */
     plm(X, XtXi, XtSNP, SNPtSNP[i], SNPty[i], yty, Xty, rX, glm_data, 
 	glm_data_new);
 

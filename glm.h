@@ -229,7 +229,7 @@ void plm(
   double SSM = SNPtMy * SNPtMy * S;
   glm_data_new.V2 = glm_data.V2 - 1;
   glm_data_new.ErrorSS = glm_data.ErrorSS - SSM;
-  glm_data_new.F = glm_data.V2 * SSM / glm_data_new.ErrorSS;
+  glm_data_new.F = glm_data_new.V2 * SSM / glm_data_new.ErrorSS;
 }
 
 #endif

@@ -3,6 +3,9 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <limits>
+#include <algorithm>
+
 
 // Local project includes
 #include "fortran_matrix.h"

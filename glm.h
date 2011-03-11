@@ -13,6 +13,8 @@
 #include "rank.h" 
 #include "inner.h" // Inner product of two vectors
 
+using namespace std;
+
 // This file contains data structures/routines for handling the
 // internals of the GLM function originally written in Matlab.
 

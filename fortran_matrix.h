@@ -286,5 +286,8 @@ void writeD(string filename, const vector<double> &v){
 void writeD(string filename, const vector<double> &v){
 }
 #endif
+void write(string filename, const vector<double> &v){
+  write_matrix(filename.c_str(), v.size(), 1, &v[0], 1);
+}
 
 #endif

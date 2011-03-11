@@ -176,10 +176,8 @@ void plm(
 	 const double yty, 
 	 const vector<double> &Xty, 
 	 const unsigned rX,
-	 const double SSE,
 	 const GLMData &glm_data,
 	 // output
-	 double &SSE_new,
 	 GLMData& glm_data_new
 	 )
 {
@@ -227,8 +225,8 @@ void plm(
 
   double SSM = SNPtMy * SNPtMy * S;
   glm_data_new.V2--;
-  SSE_new = SSE - SSM;
-  glm_data_new.F = glm_data.V2 * SSM / SSE_new;
+  glm_data_new.ErrorSS = glm_data.ErrorSS - SSM;
+  glm_data_new.F = glm_data.V2 * SSM / glm_data_new.ErrorSS;
 }
 
 #endif

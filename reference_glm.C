@@ -244,9 +244,9 @@ int main()
 
   //! @todo compute initial V2 = m - rX, SSE = yty - beta' * Xty
     
-  double 
-    SSE = cblas_ddot(n, &beta[0], -1, &Xty[0], 1), 
-    SSE_new;
+  glm_data.ErrorSS = yty - cblas_ddot(n, &beta[0], -1, &Xty[0], 1), 
+  
+  glm_data.V2 = geno_ind - rX;
 
 
   vector<double> SNPtSNP(geno_count), SNPty(geno_count);
@@ -303,14 +303,14 @@ int main()
      */
     //glm(X, XtX, XtXi, XtSNP, SNPtSNP, SNPty, yty, Kt, Xty, rX, glm_data);
     
-    plm(X, XtXi, XtSNP, SNPtSNP[i], SNPty[i], yty, Xty, rX, SSE, glm_data, 
-	SSE_new, glm_data_new);
+    plm(X, XtXi, XtSNP, SNPtSNP[i], SNPty[i], yty, Xty, rX, glm_data, 
+	glm_data_new);
 
     // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
     // if V1 = 0, ignore; F is undefined
     // Store the computed value in an array
-    Fval[i] = glm_data.F;
-    V2s[i] = glm_data.V2; 
+    Fval[i] = glm_data_new.F;
+    V2s[i] = glm_data_new.V2; 
   }
 
   // Finish timing the computations
@@ -327,11 +327,8 @@ int main()
     cout << "Time per SNP: " << computation_elapsed_time / geno_count 
 	 << " s" << endl;
   }
-  
-  // Print out the Fval array
-  cout << "Fval=" << endl;
-  for (unsigned i=0; i<Fval.size(); ++i)
-    cout << Fval[i] << endl;
+
+  write("Fval.dat", Fval);
     
   return 0;
 }

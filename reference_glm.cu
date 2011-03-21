@@ -46,7 +46,9 @@ int main()
   // to make reading the data simpler...
   unsigned pop_ind = 4892, fixed_count = 26; // rows, columns of the fixed array
   unsigned geno_ind = 4892, geno_count = 79; // rows, columns of the geno array
-  unsigned y_ind = 4892, y_count = 1;        // rows, columns of the y vector
+  unsigned y_ind = 4892;//, y_count = 1;        // rows, columns of the y vector
+
+  const unsigned m = geno_ind;
 
   // Matrix objects for storing the input data
   FortranMatrix fixed(pop_ind, fixed_count);
@@ -270,6 +272,10 @@ int main()
 	 << computation_prep_time << " s" << endl;
   }
   
+  ftype *d_X, *d_snp, *d_snptsnp, *d_snpty,
+    errorSS, errorDF, *d_f;
+  
+
   gettimeofday(&tstart, NULL);
 
   // For each column of the geno array, set up the "X" matrix,
@@ -307,8 +313,17 @@ int main()
     /*
       170 us per SNP on Core i3, 92 us per SNP on Core i7
      */
+
+    /*
     plm(X, XtXi, XtSNP, SNPtSNP[i], SNPty[i], yty, Xty, rX, glm_data, 
 	glm_data_new);
+    */
+    
+    plm<<<geno_count, 32, shared_size(n)>>>(m, n, d_X, d_snp, d_snptsnp, errorSS, errorDF, 
+					    // d_G, in constant memory
+					    // d_Xty, in constant memory
+					    d_snpty, 
+					    d_f);
 
     // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
     // if V1 = 0, ignore; F is undefined

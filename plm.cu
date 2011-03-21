@@ -5,16 +5,24 @@
 
 extern __shared__ ftype shared[];
 
+uint shared_size(uint n){
+  return 3*n + 3;
+}
+__constant__ ftype d_Xty[50];
+
+// extra space for padding.  Could make this triangular.
+__constant__ ftype d_G[80*80];
+
 __global__ void plm(// inputs
-		    const unsigned n,    // colums of X
 		    const unsigned m,    // rows of X
+		    const unsigned n,    // colums of X
 		    const ftype *X,      // m x n matrix. padding?
 		    const ftype *snp,    // m x 1 vector, unique to block
 		    const ftype *snptsnp, // scalar, unique to block
 		    const ftype errorSS, // scalar
 		    const ftype errorDF, // scalar
-		    const ftype *G,      // symmetric matrix. padding?
-		    const ftype *Xty,    // n x 1 vector
+		    //const ftype *G,      // symmetric matrix. padding?
+		    //const ftype *Xty,    // n x 1 vector
 		    const ftype *snpty,   // scalar, unique to block
 		    // outputs
 		    ftype *f){
@@ -37,7 +45,7 @@ __global__ void plm(// inputs
 	 Xtsnp); 
 
   // GtXtsnp
-  matVec(n, n, G, 
+  matVec(n, n, d_G, 
 	 n,  //! @todo length of column plus padding
 	 Xtsnp, GtXtsnp); 
 
@@ -52,7 +60,7 @@ __global__ void plm(// inputs
       *s = 1/ *s;
     __syncthreads();
 
-    dot(n, GtXtsnp, Xty, snptmy);
+    dot(n, GtXtsnp, d_Xty, snptmy);
     
     if(!TID){
       *snptmy += snpty[BID];

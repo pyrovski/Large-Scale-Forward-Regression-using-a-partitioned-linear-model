@@ -25,10 +25,11 @@ public:
   // Constructor, by default, an empty matrix is constructed
   FortranMatrix(unsigned nr=0, unsigned nc=0) : n_rows(nr), n_cols(nc), values(nr*nc) {}
 
-  FortranMatrix operator = (const FortranMatrix &rhs){
+  const FortranMatrix & operator = (const FortranMatrix &rhs){
     this->values = rhs.values;
     this->n_rows = rhs.n_rows;
     this->n_cols = rhs.n_cols;
+    return *this;
   }
 
   void add(const FortranMatrix &rhs){

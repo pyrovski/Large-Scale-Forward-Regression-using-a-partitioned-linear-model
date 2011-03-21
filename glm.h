@@ -59,7 +59,7 @@ void glm(const FortranMatrix &X,
 	 GLMData& glm_data)
 {  
   int m  = X.get_n_rows(), n = X.get_n_cols();
-  int V1 = 1; // Kt is assumed to be a row vector in this version
+  //int V1 = 1; // Kt is assumed to be a row vector in this version
 
   // G = XtXi
   // compute transpose of SNPtXG: nx1
@@ -186,7 +186,7 @@ void plm(
   int m  = X.get_n_rows(), n = X.get_n_cols();
 
   // G = XtXi
-  // compute transpose of SNPtXG: nx1
+  // compute transpose of SNPtXG: 1xn
   vector<double> GtXtSNP(n, 0.0);
 
   //! @todo use cblas_dsymv for this

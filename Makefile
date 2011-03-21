@@ -6,6 +6,8 @@ DBG=
 OPT_FLAGS = -O3
 endif
 
+# warning: this breaks things on other architectures...
+CUDA_FLAGS=-arch sm_13
 
 CUDA_SDK=/home/user/NVIDIA_GPU_Computing_SDK3.2
 CUDA_TK=/usr/local/cuda
@@ -26,12 +28,6 @@ LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB)
 # Set all include flags here for later use
 #INCLUDE_FLAGS = $(GSL_INCLUDE)
 
-# List of all files in this directory which I can execute
-#EXEC_FILES = $(shell find . -type f -perm -u+x -maxdepth 1)
-
-# Command to produce dependencies (.d files) from sources
-MAKEDEPEND = $(CC) $(DBG) -M -o $*.d $< -c $(CUDA_INC)
-
 SRCS = reference_glm.cu
 targets = $(patsubst %.cu,%,$(SRCS))
 
@@ -47,7 +43,7 @@ clean:
 
 
 %.o : %.cu
-	$(CC) $(DBG) $(OPT_FLAGS) $(CUDA_INC) $< -o $@ -c
+	$(CC) $(DBG) $(OPT_FLAGS) $(CUDA_INC) $(CUDA_FLAGS) $< -o $@ -c
 
 
 

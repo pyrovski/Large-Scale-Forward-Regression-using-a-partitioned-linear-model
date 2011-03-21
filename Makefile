@@ -6,7 +6,12 @@ DBG=
 OPT_FLAGS = -O3
 endif
 
-CC = g++
+
+CUDA_SDK=/home/user/NVIDIA_GPU_Computing_SDK3.2
+CUDA_TK=/usr/local/cuda
+CUDA_INC=-I$(CUDA_SDK)/C/common/inc -I$(CUDA_TK)/include
+
+CC = $(CUDA_TK)/bin/nvcc
 
 # The location (and name) of the BLAS/Lapack libraries
 BLAS_LAPACK_LIB = -lf77blas -latlas -L/usr/lib/atlas/ -llapack
@@ -25,40 +30,28 @@ LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB)
 #EXEC_FILES = $(shell find . -type f -perm -u+x -maxdepth 1)
 
 # Command to produce dependencies (.d files) from sources
-MAKEDEPEND = $(CC) $(DBG) -M -o $*.d $< -c
+MAKEDEPEND = $(CC) $(DBG) -M -o $*.d $< -c $(CUDA_INC)
 
-SRCS = reference_glm.C
-targets = $(patsubst %.C,%,$(SRCS))
+SRCS = reference_glm.cu
+targets = $(patsubst %.cu,%,$(SRCS))
 
 all: $(targets)
 
 clean:
 	rm -f $(EXEC_FILES) *~ *.P *.o $(targets)
 
-# Override built-in rule for %.o from %.C.  Define this
+# Override built-in rule for %.o from %.cpp.  Define this
 # and leave it blank!  Without this, Make will try to compile
-# directly from %.C to executable without using our stuff below...
-% : %.C
+# directly from %.cpp to executable without using our stuff below...
+% : %.cu
 
 
-# A make rule for automatically generating dependencies,
-# http://mad-scientist.net/make/autodep.html
-%.o : %.C
-	$(MAKEDEPEND); \
-	cp $*.d $*.P; \
-	sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
-            -e '/^$$/ d' -e 's/$$/ :/' < $*.d >> $*.P; \
-	rm -f $*.d
-	$(CC) $(DBG) $(OPT_FLAGS) $< -o $@ -c
+%.o : %.cu
+	$(CC) $(DBG) $(OPT_FLAGS) $(CUDA_INC) $< -o $@ -c
 
 
-# Note: Running 'make rank' for example, will delete the .o file as an
-# itermediate.  You can avoid this behavior by making the .o files "PRECIOUS":
-
-# .PRECIOUS: $(SRCS:.C=.o)
 
 % : %.o
 	$(CC) -o $@ $< $(LIBS)
 
--include $(SRCS:.C=.P)
 

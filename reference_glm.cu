@@ -5,6 +5,7 @@
 #include <vector>
 #include <limits>
 #include <algorithm>
+#include <cuda.h>
 
 // Local project includes
 #include "fortran_matrix.h"
@@ -12,6 +13,8 @@
 #include "GetPot"
 #include "svd.h"
 #include "cblas.h"
+
+#include "plm.cu"
 
 using namespace std;
 

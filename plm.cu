@@ -35,7 +35,6 @@ __global__ void plm(// inputs
   ftype Xtsnp, GtXtsnp; // each thread stores one element of each array
   //! @todo these might use fewer registers if kept in shared memory
   ftype snptmy; // scalar
-  ftype fval; // scalar
   ftype s; // scalar
 
   unsigned BID = blockIdx.x + gridDim.x * blockIdx.y;
@@ -72,12 +71,12 @@ __global__ void plm(// inputs
       ftype modelSS = snptmy * snptmy * s;
       ftype errorSS2 = errorSS - modelSS;
       ftype V2 = errorDF - 1;
-      fval = modelSS / errorSS2 * V2;
+      f[BID] = modelSS / errorSS2 * V2;
     }
-    __syncthreads();
+    return;
   } else {
-    fval = 0;
+    if(!TID)
+      f[BID] = 0;
+    return;
   }
-  if(!TID)
-    f[BID] = fval;
 }

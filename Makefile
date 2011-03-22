@@ -9,7 +9,9 @@ CUDA_FLAGS =
 endif
 
 # warning: this breaks things on other architectures...
-CUDA_FLAGS+=-arch sm_13 -Xptxas -v
+-include CUDA_SM
+CUDA_SM_VER ?= sm_20
+CUDA_FLAGS+=-arch $(CUDA_SM_VER) -Xptxas -v
 # -maxrregcount=16
 -include CUDA_PATHS
 CUDA_SDK?=/home/user/NVIDIA_GPU_Computing_SDK3.2

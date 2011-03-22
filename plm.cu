@@ -23,7 +23,7 @@ __global__ void plm(// inputs
 		    const ftype *Xtsnp,        // n x 1 vector, unique to block
 		    const unsigned XtsnpPitch, 
 		    const ftype errorSS,       // scalar
-		    const ftype errorDF,       // scalar
+		    const unsigned errorDF,       // scalar
 		    //const ftype *G,          // symmetric matrix. padding?
 		    //const ftype *Xty,        // n x 1 vector
 		    const ftype *snpty,        // scalar, unique to block
@@ -44,18 +44,6 @@ __global__ void plm(// inputs
   unsigned TID = threadIdx.x;
   // snptsnp - snptXGXtsnp:
 
-  // (snptX)' = Xtsnp
-
-  // Xtsnp
-  /*! @todo maintain this on the host
-     @todo as written, this needs m elements in shared memory, not n
-  Xtsnp = vecGMatG(TID, 
-		   snp + BID * snpPitch,
-		   m, n, X, 
-		   snpPitch,   //! length of column plus padding
-		   reduce); 
-  
-  */
   // GtXtsnp
   GtXtsnp = vecGMatCSq(TID, Xtsnp, blockDim.x, d_G, 
 		     blockDim.x,  //! length of column plus padding

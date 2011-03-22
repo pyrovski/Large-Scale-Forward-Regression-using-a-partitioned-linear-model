@@ -72,9 +72,8 @@ int main()
       // Loop over all rows and columns, set entries in the fixed matrix
       // double val=99;
       for (unsigned i=0; i<fixed.get_n_rows(); ++i)
-	for (unsigned j=0; j<fixed.get_n_cols(); ++j){
+	for (unsigned j=0; j<fixed.get_n_cols(); ++j)
 	  fixed_file >> fixed(i,j);
-	}
     } else {
       cout << "Failed to open file: " << fixed_file << "!!" << endl;
       return 1;
@@ -90,9 +89,8 @@ int main()
     if (geno_file){
       // Loop over all rows and columns, set entries in the matrix
       for (unsigned i=0; i<geno.get_n_rows(); ++i)
-	for (unsigned j=0; j<geno.get_n_cols(); ++j){
+	for (unsigned j=0; j<geno.get_n_cols(); ++j)
 	  geno_file >> geno(i,j);
-	}
     } else {
       cout << "Failed to open file!!" << endl;
       return 1;
@@ -110,9 +108,8 @@ int main()
 
     if (y_file){
 	// Loop over all rows and columns, set entries in the matrix
-	for (unsigned i=0; i<y.size(); ++i) {
+	for (unsigned i=0; i<y.size(); ++i)
 	  y_file >> y[i];
-	}
     } else {
       cout << "Failed to open file!!" << endl;
       return 1;
@@ -124,8 +121,8 @@ int main()
   {
     // Compute time taken for IO
     const double io_elapsed_time = 
-      (static_cast<double>(tstop.tv_sec  - tstart.tv_sec) +
-       static_cast<double>(tstop.tv_usec - tstart.tv_usec)*1.e-6);
+      (double)(tstop.tv_sec  - tstart.tv_sec) +
+      (tstop.tv_usec - tstart.tv_usec)*1.e-6;
     
     cout << "Time required for I/O: " << io_elapsed_time << " s." << endl;
   }
@@ -257,7 +254,7 @@ int main()
   glm_data.V2 = geno_ind - rX;
 
   
-  FortranMatrix XtSNP(n, geno_ind);
+  FortranMatrix XtSNP(n, geno_count);
     // compute Xt * SNP    
 
     //! @todo fix lda for incremental computation
@@ -277,7 +274,7 @@ int main()
 	      &XtSNP.values[0],
 	      n
 	      );
-  XtSNP.writeD("Xtsnp.dat"); //! @todo this is wrong
+  XtSNP.writeD("Xtsnp.dat");
 
   vector<double> SNPtSNP(geno_count), SNPty(geno_count);
   //SNPty[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
@@ -313,7 +310,9 @@ int main()
   }
   
   ftype *d_X, *d_snp, *d_snptsnp, *d_Xtsnp, *d_snpty,
-    errorSS, errorDF, *d_f;
+    errorSS = 8.6988e+03,
+    *d_f; //! @todo need to compute initial errorSS, errorDF
+  unsigned errorDF = 4866;
   
   // column-major with padding
   size_t d_XPitch, d_XtsnpPitch;
@@ -351,7 +350,11 @@ int main()
   
   cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(ftype)));
 
-  gettimeofday(&tstart, NULL);
+  //gettimeofday(&tstart, NULL);
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
+  
   
   // For each column of the geno array, set up the "X" matrix,
   // call the GLM routine, and store the computed p value.  Note
@@ -377,6 +380,7 @@ int main()
     
   // d_G, in constant memory
   // d_Xty, in constant memory
+  cudaEventRecord(start, 0);
   plm<<<geno_count, n, n * sizeof(ftype)>>>
     (m, 
      //d_X, 
@@ -388,6 +392,7 @@ int main()
      errorSS, errorDF, 
      d_snpty, 
      d_f);
+  cudaEventRecord(stop, 0);
   cutilSafeCall(cudaThreadSynchronize());
   // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
   // if V1 = 0, ignore; F is undefined
@@ -395,15 +400,13 @@ int main()
   //Fval[i] = glm_data_new.F;
   //V2s[i] = glm_data_new.V2; 
   
-  // Finish timing the computations
-  gettimeofday(&tstop, NULL);
-
-  {
-    // Compute time taken for IO
-    const double computation_elapsed_time = 
-      (double)(tstop.tv_sec  - tstart.tv_sec) +
-      (tstop.tv_usec - tstart.tv_usec)*1.e-6;
+  cutilSafeCall(cudaMemcpy(&Fval[0], d_f, n * sizeof(ftype),
+			   cudaMemcpyDeviceToHost));
   
+  {
+    float computation_elapsed_time;
+    cudaEventElapsedTime(&computation_elapsed_time, start, stop);
+    computation_elapsed_time /= 1000.0f;
     cout << "Time required for computations: "
 	 << computation_elapsed_time << " s" << endl;
     cout << "Time per SNP: " << computation_elapsed_time / geno_count 

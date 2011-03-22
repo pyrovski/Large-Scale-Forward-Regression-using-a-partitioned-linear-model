@@ -20,7 +20,6 @@ void print_matrix( const char* desc, int m, int n, const double* a, int lda)
       std::cout /*<< std::setw(13)*/ << " " << a[i+j*lda];
     std::cout << std::endl;
   }
-  std::cout << std::endl;
   std::cout.flags(flags);
 }
 
@@ -40,7 +39,6 @@ void write_matrix(const char *filename, int m, int n, const double *a, int lda){
       file /*<< std::setw(13)*/ << " " << a[i+j*lda];
     file << std::endl;
   }
-  file << std::endl;
   file.close();
 }
 

@@ -31,7 +31,7 @@ LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB)
 # Set all include flags here for later use
 #INCLUDE_FLAGS = $(GSL_INCLUDE)
 
-SRCS = reference_glm.cu plm.cu cuda_blas.cu type.h
+SRCS = reference_glm.cu plm.cu cuda_blas.cu type.h fortran_matrix.h print_matrix.h
 target = reference_glm
 
 all: $(target)

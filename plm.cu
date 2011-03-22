@@ -16,7 +16,6 @@ __constant__ ftype d_Xty[iterationLimit + 27];
 // extra space for padding.  Could make this triangular.
 __constant__ ftype d_G[(iterationLimit + 27)*(iterationLimit + 27)];
 
-//! @todo could replace N with blockDim.x
 __global__ void plm(// inputs
 		    const unsigned m,          // rows of X
 		    //const unsigned n,        // colums of X
@@ -33,6 +32,10 @@ __global__ void plm(// inputs
 		    const ftype *snpty,        // scalar, unique to block
 		    // outputs
 		    ftype *f){
+  /*! @todo could compute two SNPs per thread block.  
+    This would ease the limitation of 8 thread blocks/MP for SM 1.3 devices.
+   */
+
   ftype *reduce = shared; // n x 1
   //ftype *reduce2 = reduce + n;
   ftype GtXtsnp; // each thread stores one element of each array // Xtsnp

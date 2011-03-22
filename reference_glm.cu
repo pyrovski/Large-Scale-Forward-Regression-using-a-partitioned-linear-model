@@ -319,9 +319,7 @@ int main()
   }
   
   ftype *d_X, *d_snp, *d_snptsnp, *d_Xtsnp, *d_snpty,
-    errorSS = 8.6988e+03,
-    *d_f; //! @todo need to compute initial errorSS, errorDF
-  unsigned errorDF = 4866;
+    *d_f; 
   
   // column-major with padding
   size_t d_XPitch, d_XtsnpPitch;
@@ -399,7 +397,7 @@ int main()
      d_snptsnp, 
      d_Xtsnp, 
      d_XtsnpPitch, 
-     errorSS, errorDF, 
+     glm_data.ErrorSS, glm_data.V2, 
      d_snpty, 
      d_f);
   cudaEventRecord(stop, 0);
@@ -410,7 +408,7 @@ int main()
   //Fval[i] = glm_data_new.F;
   //V2s[i] = glm_data_new.V2; 
   
-  cutilSafeCall(cudaMemcpy(&Fval[0], d_f, n * sizeof(ftype),
+  cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(ftype),
 			   cudaMemcpyDeviceToHost));
   
   {

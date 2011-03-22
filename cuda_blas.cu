@@ -1,19 +1,27 @@
 #include "type.h"
 
 __device__ void reduceCore(const unsigned TID, unsigned N, ftype *reduce){
+  /*
+  if(!TID){
+    for(int i = 1; i < N; i++)
+      reduce[0] += reduce[i];
+  }
+  */
   unsigned threads;
-  while(N){
+  while(N/2){
     if(N % 2){
       threads = (N + 1) / 2;
-      if(TID == threads - 1)
-	reduce[TID + threads] = 0;
+      //if(TID == threads - 1)
+      //reduce[TID + threads] = 0;
+      if(TID < threads - 1)
+	reduce[TID] += reduce[TID + threads];
     } else {
       threads = N / 2;
+      if(TID < threads)
+	reduce[TID] += reduce[TID + threads];
     }
-    if(TID < threads)
-      reduce[TID] += reduce[TID + threads];
     __syncthreads();
-    N /= 2;
+    N = threads;
   }
 }
 

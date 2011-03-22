@@ -44,14 +44,28 @@ __global__ void plm(// inputs
   unsigned TID = threadIdx.x;
   // snptsnp - snptXGXtsnp:
 
+
   // GtXtsnp
   GtXtsnp = vecGMatCSq(TID, Xtsnp, blockDim.x, d_G, 
 		     blockDim.x,  //! length of column plus padding
 		     reduce); 
-
+  
   // snptsnp - snptXGXtsnp
   dotRG(TID, blockDim.x, GtXtsnp, Xtsnp, reduce);
   s = snptsnp[BID] - *reduce;
+#ifdef _DEBUG
+  #if __CUDA_ARCH__ >= 200
+  if(!BID){
+    printf("b%u\tt%u\tGtXtsnp: %le\n", BID, TID, GtXtsnp);
+    printf("b%u\tt%u\tXtsnp: %le\n", BID, TID, Xtsnp[TID]);
+    printf("b%u\tt%u\tG(1,%u): %le\n", BID, TID, TID, d_G[TID]);
+    if(!TID){
+      printf("b%u\tt%u\tsnptsnp: %le\n", BID, TID, snptsnp[BID]);
+      printf("b%u\tt%u\ts: %le\n", BID, TID, s);
+    }
+  }
+  #endif
+#endif
   // 1/(above)
   if(s > ftypeTol){
     s = (ftype)1/s;
@@ -70,7 +84,7 @@ __global__ void plm(// inputs
     return;
   } else {
     if(!TID)
-      f[BID] = 0;
+      f[BID] = -1;
     return;
   }
 }

@@ -21,6 +21,15 @@
 
 using namespace std;
 
+unsigned int nextPow2( unsigned int x ) {
+    --x;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+    return ++x;
+}
 
 int main()
 {
@@ -380,6 +389,7 @@ int main()
     
   // d_G, in constant memory
   // d_Xty, in constant memory
+  unsigned threads = nextPow2(n);
   cudaEventRecord(start, 0);
   plm<<<geno_count, n, n * sizeof(ftype)>>>
     (m, 

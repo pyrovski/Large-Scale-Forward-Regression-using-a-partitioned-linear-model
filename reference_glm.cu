@@ -6,6 +6,7 @@
 #include <limits>
 #include <algorithm>
 #include <cuda.h>
+#include <cutil_inline.h>
 
 // Local project includes
 #include "fortran_matrix.h"
@@ -279,42 +280,49 @@ int main()
   
   // column-major with padding
   size_t d_XPitch;
-  cudaMallocPitch(&d_X, &d_XPitch, m * sizeof(ftype), iterationLimit);
+  cutilSafeCall(cudaMallocPitch(&d_X, &d_XPitch, m * sizeof(ftype), 
+				n));
   
   //! @todo the host should store growing matrices with padding
-  cudaMemcpy2D(&d_X, d_XPitch, &X.values[0], m * sizeof(ftype), 
-	       m * sizeof(ftype), iterationLimit, cudaMemcpyHostToDevice);
+  cutilSafeCall(cudaMemcpy2D(d_X, d_XPitch, &X.values[0], m * sizeof(ftype), 
+			     m * sizeof(ftype), n, 
+			     cudaMemcpyHostToDevice));
   
   size_t d_snpPitch;
-  cudaMallocPitch(&d_snp, &d_snpPitch, m, geno_count * sizeof(ftype));
+  cutilSafeCall(cudaMallocPitch(&d_snp, &d_snpPitch, m * sizeof(ftype), 
+				geno_count));
 
-  cudaMemcpy2D(&d_snp, d_snpPitch, &geno.values[0], m * sizeof(ftype), 
-	       m * sizeof(ftype), geno_count, cudaMemcpyHostToDevice);
+  cutilSafeCall(cudaMemcpy2D(d_snp, d_snpPitch, &geno.values[0], m * sizeof(ftype), 
+			     m * sizeof(ftype), geno_count, cudaMemcpyHostToDevice));
   
   //! @todo this won't be coalesced
-  cudaMalloc(&d_snptsnp, geno_count * sizeof(ftype));
-  cudaMemcpy(d_snptsnp, &SNPtSNP[0], geno_count * sizeof(ftype), 
-	     cudaMemcpyHostToDevice);
-
-  cudaMalloc(&d_snpty, geno_count * sizeof(ftype));
-  cudaMemcpy(d_snpty, &SNPty[0], geno_count * sizeof(ftype), 
-	     cudaMemcpyHostToDevice);
-
-  cudaMemcpyToSymbol(d_G, &XtXi.values[0], n * n * sizeof(ftype));
+  cutilSafeCall(cudaMalloc(&d_snptsnp, geno_count * sizeof(ftype)));
+  cutilSafeCall(cudaMemcpy(d_snptsnp, &SNPtSNP[0], geno_count * sizeof(ftype), 
+			   cudaMemcpyHostToDevice));
+  
+  cutilSafeCall(cudaMalloc(&d_snpty, geno_count * sizeof(ftype)));
+  cutilSafeCall(cudaMemcpy(d_snpty, &SNPty[0], geno_count * sizeof(ftype), 
+			   cudaMemcpyHostToDevice));
+  
+  cutilSafeCall(cudaMemcpyToSymbol(d_G, &XtXi.values[0], n * n * sizeof(ftype)));
+  cutilSafeCall(cudaMemcpyToSymbol(d_Xty, &Xty[0], n * sizeof(ftype)));
+  
+  cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(ftype)));
 
   gettimeofday(&tstart, NULL);
-
+  
   // For each column of the geno array, set up the "X" matrix,
   // call the GLM routine, and store the computed p value.  Note
   // we are assuming y is a vector for now (because GLM currently expects
   // a vector for its second argument) but this could be generalized later.
-  for (unsigned i=0; i<geno_count; ++i){
+  //for (unsigned i=0; i<geno_count; ++i){
 
     // compute Xt * SNP    
-    vector <double> XtSNP(geno_ind);
+    //vector <double> XtSNP(geno_ind);
 
     //! @todo fix lda for incremental computation
     //! @todo can be computed incrementally between major iterations
+    /*
     cblas_dgemv(CblasColMajor, 
 		CblasTrans,
 		geno_ind,
@@ -327,6 +335,7 @@ int main()
 		0.0,
 		&XtSNP[0],
 		1);
+    */
 
     // Call the glm function.  Note that X is currently overwritten by this function,
     // and therefore would need to be re-formed completely at each iteration...
@@ -345,19 +354,19 @@ int main()
 	glm_data_new);
     */
     
-    plm<<<geno_count, 32, n * sizeof(ftype)>>>
+    plm<<<geno_count, n, n * sizeof(ftype)>>>
       (m, n, d_X, d_snp, d_snpPitch, d_snptsnp, errorSS, errorDF, 
        // d_G, in constant memory
        // d_Xty, in constant memory
        d_snpty, 
        d_f);
-    
+    cutilSafeCall(cudaThreadSynchronize());
     // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
     // if V1 = 0, ignore; F is undefined
     // Store the computed value in an array
-    Fval[i] = glm_data_new.F;
-    V2s[i] = glm_data_new.V2; 
-  }
+    //Fval[i] = glm_data_new.F;
+    //V2s[i] = glm_data_new.V2; 
+    //}
 
   // Finish timing the computations
   gettimeofday(&tstop, NULL);

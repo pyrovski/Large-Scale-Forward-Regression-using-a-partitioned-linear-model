@@ -30,7 +30,6 @@ __global__ void plm(// inputs
 		    const ftype *snpty,   // scalar, unique to block
 		    // outputs
 		    ftype *f){
-
   ftype *reduce = shared; // n x 1
   //ftype *reduce2 = reduce + n;
   ftype Xtsnp, GtXtsnp; // each thread stores one element of each array
@@ -45,16 +44,20 @@ __global__ void plm(// inputs
   // (snptX)' = Xtsnp
 
   // Xtsnp
+  /*! maintain this on the host?
+     @todo as written, this needs m elements in shared memory, not n
   Xtsnp = vecGMatG(TID, 
-		   snp + BID * m,
+		   snp + BID * snpPitch,
 		   m, n, X, 
 		   snpPitch,   //! length of column plus padding
 		   reduce); 
   
+  */
   // GtXtsnp
   GtXtsnp = vecRMatC(TID, Xtsnp, n, n, d_G, 
 		     n,  //! length of column plus padding
 		     reduce); 
+  /*
 
   // snptsnp - snptXGXtsnp
   dotRR(TID, n, Xtsnp, GtXtsnp, reduce);
@@ -80,4 +83,7 @@ __global__ void plm(// inputs
       f[BID] = 0;
     return;
   }
+  */
+    if(!TID)
+      f[BID] = 0;
 }

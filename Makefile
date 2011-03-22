@@ -1,13 +1,15 @@
 ifeq ($(dbg),1)
 DBG=-D_DEBUG
 OPT_FLAGS = -g
+CUDA_FLAGS = -G
 else
 DBG=
 OPT_FLAGS = -O3
+CUDA_FLAGS = 
 endif
 
 # warning: this breaks things on other architectures...
-CUDA_FLAGS=-arch sm_13 -Xptxas -v
+CUDA_FLAGS+=-arch sm_13 -Xptxas -v
 # -maxrregcount=16
 
 CUDA_SDK=/home/user/NVIDIA_GPU_Computing_SDK3.2

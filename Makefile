@@ -8,6 +8,7 @@ endif
 
 # warning: this breaks things on other architectures...
 CUDA_FLAGS=-arch sm_13 -Xptxas -v
+# -maxrregcount=16
 
 CUDA_SDK=/home/user/NVIDIA_GPU_Computing_SDK3.2
 CUDA_TK=/usr/local/cuda
@@ -28,13 +29,13 @@ LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB)
 # Set all include flags here for later use
 #INCLUDE_FLAGS = $(GSL_INCLUDE)
 
-SRCS = reference_glm.cu plm.cu cuda_blas.cu
+SRCS = reference_glm.cu plm.cu cuda_blas.cu type.h
 target = reference_glm
 
 all: $(target)
 
 clean:
-	rm -f $(EXEC_FILES) *~ *.P *.o $(targets)
+	rm -f $(EXEC_FILES) *~ *.P *.o $(target)
 
 $(target): $(SRCS)
 	$(CC) $(DBG) $(OPT_FLAGS) $(CUDA_INC) $(CUDA_FLAGS) $< -o $@ $(LIBS)

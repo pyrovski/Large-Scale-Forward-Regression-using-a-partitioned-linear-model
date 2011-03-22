@@ -11,9 +11,9 @@ endif
 # warning: this breaks things on other architectures...
 CUDA_FLAGS+=-arch sm_13 -Xptxas -v
 # -maxrregcount=16
-
-CUDA_SDK=/home/user/NVIDIA_GPU_Computing_SDK3.2
-CUDA_TK=/usr/local/cuda
+-include CUDA_PATHS
+CUDA_SDK?=/home/user/NVIDIA_GPU_Computing_SDK3.2
+CUDA_TK?=/usr/local/cuda
 CUDA_INC=-I$(CUDA_SDK)/C/common/inc -I$(CUDA_TK)/include
 
 CC = $(CUDA_TK)/bin/nvcc

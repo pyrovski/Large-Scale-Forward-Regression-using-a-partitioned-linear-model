@@ -6,9 +6,6 @@
 //__shared__ ftype fval; // scalar
 extern __shared__ ftype shared[];
 
-uint shared_size(uint n){
-  return n;
-}
 __constant__ ftype d_Xty[iterationLimit + 27];
 
 //const unsigned GPitch = (iterationLimit + 27) % 16 ? iterationLimit + 27 : (iterationLimit + 27)/16 * 16 + 16;

@@ -277,27 +277,29 @@ int main()
 	      &XtSNP.values[0],
 	      n
 	      );
-    /*
-    cblas_dgemv(CblasColMajor, 
-		CblasTrans,
-		geno_ind,
-		X.get_n_cols(),
-		1.0,
-		&X.values[0],
-		geno_ind,
-		&geno.values[i*geno_ind], // address of first SNP element
-		1, // INCX = 1 because geno is column-major
-		0.0,
-		&XtSNP(0, i),
-		1);
-    */
-  
+  XtSNP.writeD("Xtsnp.dat"); //! @todo this is wrong
+
   vector<double> SNPtSNP(geno_count), SNPty(geno_count);
+  //SNPty[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
+  cblas_dgemv(CblasColMajor,
+	      CblasTrans,
+	      m,
+	      geno_count,
+	      1.0,
+	      &geno.values[0],
+	      m,
+	      &y[0],
+	      1,
+	      0.0,
+	      &SNPty[0],
+	      1
+	      );
+  writeD("SNPty.dat", SNPty);
+  
   for (unsigned i=0; i<geno_count; ++i){
     //! these will never change for each SNP, so they could be moved out of all loops
     SNPtSNP[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
 				&geno.values[i*geno_ind], 1);
-    SNPty[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
   }
 
   gettimeofday(&tstop, NULL);

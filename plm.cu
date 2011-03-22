@@ -47,7 +47,7 @@ __global__ void plm(// inputs
 
   // GtXtsnp
   GtXtsnp = vecGMatCSq(TID, Xtsnp, blockDim.x, d_G, 
-		     blockDim.x,  //! length of column plus padding
+		     blockDim.x,  //! length of column plus padding (no padding)
 		     reduce); 
   
   // snptsnp - snptXGXtsnp

@@ -256,7 +256,42 @@ int main()
   
   glm_data.V2 = geno_ind - rX;
 
+  
+  FortranMatrix XtSNP(n, geno_ind);
+    // compute Xt * SNP    
 
+    //! @todo fix lda for incremental computation
+    //! @todo can be computed incrementally between major iterations
+  cblas_dgemm(CblasColMajor,
+	      CblasTrans,
+	      CblasNoTrans,
+	      n, 
+	      geno_count,
+	      geno_ind,
+	      1.0,
+	      &X.values[0],
+	      m, 
+	      &geno.values[0],
+	      m,
+	      0.0,
+	      &XtSNP.values[0],
+	      n
+	      );
+    /*
+    cblas_dgemv(CblasColMajor, 
+		CblasTrans,
+		geno_ind,
+		X.get_n_cols(),
+		1.0,
+		&X.values[0],
+		geno_ind,
+		&geno.values[i*geno_ind], // address of first SNP element
+		1, // INCX = 1 because geno is column-major
+		0.0,
+		&XtSNP(0, i),
+		1);
+    */
+  
   vector<double> SNPtSNP(geno_count), SNPty(geno_count);
   for (unsigned i=0; i<geno_count; ++i){
     //! these will never change for each SNP, so they could be moved out of all loops
@@ -275,13 +310,13 @@ int main()
 	 << computation_prep_time << " s" << endl;
   }
   
-  ftype *d_X, *d_snp, *d_snptsnp, *d_snpty,
+  ftype *d_X, *d_snp, *d_snptsnp, *d_Xtsnp, *d_snpty,
     errorSS, errorDF, *d_f;
   
   // column-major with padding
-  size_t d_XPitch;
+  size_t d_XPitch, d_XtsnpPitch;
   cutilSafeCall(cudaMallocPitch(&d_X, &d_XPitch, m * sizeof(ftype), 
-				n));
+				n + iterationLimit));
   
   //! @todo the host should store growing matrices with padding
   cutilSafeCall(cudaMemcpy2D(d_X, d_XPitch, &X.values[0], m * sizeof(ftype), 
@@ -299,6 +334,11 @@ int main()
   cutilSafeCall(cudaMalloc(&d_snptsnp, geno_count * sizeof(ftype)));
   cutilSafeCall(cudaMemcpy(d_snptsnp, &SNPtSNP[0], geno_count * sizeof(ftype), 
 			   cudaMemcpyHostToDevice));
+
+  cutilSafeCall(cudaMallocPitch(&d_Xtsnp, &d_XtsnpPitch, n * sizeof(ftype), geno_count));
+  cutilSafeCall(cudaMemcpy2D(d_Xtsnp, d_XtsnpPitch, &XtSNP.values[0], 
+			     n * sizeof(ftype), n * sizeof(ftype), geno_count, 
+			     cudaMemcpyHostToDevice));
   
   cutilSafeCall(cudaMalloc(&d_snpty, geno_count * sizeof(ftype)));
   cutilSafeCall(cudaMemcpy(d_snpty, &SNPty[0], geno_count * sizeof(ftype), 
@@ -315,27 +355,6 @@ int main()
   // call the GLM routine, and store the computed p value.  Note
   // we are assuming y is a vector for now (because GLM currently expects
   // a vector for its second argument) but this could be generalized later.
-  //for (unsigned i=0; i<geno_count; ++i){
-
-    // compute Xt * SNP    
-    //vector <double> XtSNP(geno_ind);
-
-    //! @todo fix lda for incremental computation
-    //! @todo can be computed incrementally between major iterations
-    /*
-    cblas_dgemv(CblasColMajor, 
-		CblasTrans,
-		geno_ind,
-		X.get_n_cols(),
-		1.0,
-		&X.values[0],
-		geno_ind,
-		&geno.values[i*geno_ind], // address of first SNP element
-		1, // INCX = 1 because geno is column-major
-		0.0,
-		&XtSNP[0],
-		1);
-    */
 
     // Call the glm function.  Note that X is currently overwritten by this function,
     // and therefore would need to be re-formed completely at each iteration...
@@ -354,20 +373,26 @@ int main()
 	glm_data_new);
     */
     
-    plm<<<geno_count, n, n * sizeof(ftype)>>>
-      (m, n, d_X, d_snp, d_snpPitch, d_snptsnp, errorSS, errorDF, 
-       // d_G, in constant memory
-       // d_Xty, in constant memory
-       d_snpty, 
-       d_f);
-    cutilSafeCall(cudaThreadSynchronize());
-    // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
-    // if V1 = 0, ignore; F is undefined
-    // Store the computed value in an array
-    //Fval[i] = glm_data_new.F;
-    //V2s[i] = glm_data_new.V2; 
-    //}
-
+  // d_G, in constant memory
+  // d_Xty, in constant memory
+  plm<<<geno_count, n, n * sizeof(ftype)>>>
+    (m, 
+     //d_X, 
+     //d_snp, 
+     //d_XPitch, // also used as pitch for d_X
+     d_snptsnp, 
+     d_Xtsnp, 
+     d_XtsnpPitch, 
+     errorSS, errorDF, 
+     d_snpty, 
+     d_f);
+  cutilSafeCall(cudaThreadSynchronize());
+  // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
+  // if V1 = 0, ignore; F is undefined
+  // Store the computed value in an array
+  //Fval[i] = glm_data_new.F;
+  //V2s[i] = glm_data_new.V2; 
+  
   // Finish timing the computations
   gettimeofday(&tstop, NULL);
 

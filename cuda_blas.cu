@@ -37,26 +37,34 @@ __device__ void dotRG(const unsigned TID,
 		      const unsigned N, 
 		      const ftype x,
 		      const ftype *y,
-		      ftype *reduce){
+		      ftype *reduce){ // assume blockDim.x elements
   reduce[TID] = x * y[TID];
   __syncthreads();
   reduceCore(TID, N, reduce);
 }
 
+__device__ void dotGG(const unsigned TID,
+		      const unsigned N, 
+		      const ftype *x,
+		      const ftype *y,
+		      ftype *reduce){ // assume blockDim.x elements
+  reduce[TID] = x[TID] * y[TID];
+  __syncthreads();
+  reduceCore(TID, N, reduce);
+}
 
 /*
-  A is in constant memory.  A must be column-major.
+  A is in constant memory.  A must be column-major and square.
  */
-__device__ ftype vecRMatC(const unsigned TID,
-			  const ftype x,
-			  const unsigned M, 
+__device__ ftype vecGMatCSq(const unsigned TID,
+			  const ftype *x,
 			  const unsigned N,
 			  const ftype *A, 
 			  const unsigned lda,
 			  ftype *reduce){
   ftype retVal;
   for(int i = 0; i < N; i++){
-    dotRG(TID, M, x, A + lda * i, reduce);
+    dotGG(TID, N, x, A + lda * i, reduce);
     if(i == TID)
       retVal = *reduce;
   }
@@ -70,7 +78,8 @@ __device__ ftype vecGMatG(const unsigned TID,
 			  const unsigned N,
 			  const ftype *A, 
 			  const unsigned lda,
-			  ftype *reduce){
+			  ftype *reduce) // reduce must be of length >= N, N <= M
+{
   ftype retVal;
   for(int i = 0; i < N; i++){
     dotRG(TID, M, x[TID], A + lda * i, reduce);

@@ -288,11 +288,19 @@ int main()
   size_t d_snpPitch;
   cudaMallocPitch(&d_snp, &d_snpPitch, m, geno_count * sizeof(ftype));
 
-  cudaMemcpy2D(&d_snp, d_snpPitch, &geno.values[0],m * sizeof(ftype), 
+  cudaMemcpy2D(&d_snp, d_snpPitch, &geno.values[0], m * sizeof(ftype), 
 	       m * sizeof(ftype), geno_count, cudaMemcpyHostToDevice);
   
-  //! @todo this won't be coalesced.  could append to snps.
-  //cudaMalloc(&d_snptsnp);
+  //! @todo this won't be coalesced
+  cudaMalloc(&d_snptsnp, geno_count * sizeof(ftype));
+  cudaMemcpy(d_snptsnp, &SNPtSNP[0], geno_count * sizeof(ftype), 
+	     cudaMemcpyHostToDevice);
+
+  cudaMalloc(&d_snpty, geno_count * sizeof(ftype));
+  cudaMemcpy(d_snpty, &SNPty[0], geno_count * sizeof(ftype), 
+	     cudaMemcpyHostToDevice);
+
+  cudaMemcpyToSymbol(d_G, &XtXi.values[0], n * n * sizeof(ftype));
 
   gettimeofday(&tstart, NULL);
 
@@ -305,7 +313,7 @@ int main()
     // compute Xt * SNP    
     vector <double> XtSNP(geno_ind);
 
-    //! @todo check m, n, lda
+    //! @todo fix lda for incremental computation
     //! @todo can be computed incrementally between major iterations
     cblas_dgemv(CblasColMajor, 
 		CblasTrans,
@@ -338,12 +346,12 @@ int main()
     */
     
     plm<<<geno_count, 32, n * sizeof(ftype)>>>
-      (m, n, d_X, d_snp, d_snptsnp, errorSS, errorDF, 
-					    // d_G, in constant memory
-					    // d_Xty, in constant memory
-					    d_snpty, 
-					    d_f);
-
+      (m, n, d_X, d_snp, d_snpPitch, d_snptsnp, errorSS, errorDF, 
+       // d_G, in constant memory
+       // d_Xty, in constant memory
+       d_snpty, 
+       d_f);
+    
     // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
     // if V1 = 0, ignore; F is undefined
     // Store the computed value in an array

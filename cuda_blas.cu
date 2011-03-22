@@ -56,7 +56,7 @@ __device__ ftype vecRMatC(const unsigned TID,
 			  ftype *reduce){
   ftype retVal;
   for(int i = 0; i < N; i++){
-    dotRG(TID, M, x, A + M * i, reduce);
+    dotRG(TID, M, x, A + lda * i, reduce);
     if(i == TID)
       retVal = *reduce;
   }
@@ -73,7 +73,7 @@ __device__ ftype vecGMatG(const unsigned TID,
 			  ftype *reduce){
   ftype retVal;
   for(int i = 0; i < N; i++){
-    dotRG(TID, M, x[TID], A + M * i, reduce);
+    dotRG(TID, M, x[TID], A + lda * i, reduce);
     if(i == TID)
       retVal = *reduce;
   }

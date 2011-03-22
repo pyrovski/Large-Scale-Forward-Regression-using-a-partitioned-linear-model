@@ -14,6 +14,8 @@
 #include "svd.h"
 #include "cblas.h"
 
+#define iterationLimit 50
+
 #include "plm.cu"
 
 using namespace std;
@@ -275,6 +277,22 @@ int main()
   ftype *d_X, *d_snp, *d_snptsnp, *d_snpty,
     errorSS, errorDF, *d_f;
   
+  // column-major with padding
+  size_t d_XPitch;
+  cudaMallocPitch(&d_X, &d_XPitch, m * sizeof(ftype), iterationLimit);
+  
+  //! @todo the host should store growing matrices with padding
+  cudaMemcpy2D(&d_X, d_XPitch, &X.values[0], m * sizeof(ftype), 
+	       m * sizeof(ftype), iterationLimit, cudaMemcpyHostToDevice);
+  
+  size_t d_snpPitch;
+  cudaMallocPitch(&d_snp, &d_snpPitch, m, geno_count * sizeof(ftype));
+
+  cudaMemcpy2D(&d_snp, d_snpPitch, &geno.values[0],m * sizeof(ftype), 
+	       m * sizeof(ftype), geno_count, cudaMemcpyHostToDevice);
+  
+  //! @todo this won't be coalesced.  could append to snps.
+  //cudaMalloc(&d_snptsnp);
 
   gettimeofday(&tstart, NULL);
 
@@ -319,7 +337,8 @@ int main()
 	glm_data_new);
     */
     
-    plm<<<geno_count, 32, shared_size(n)>>>(m, n, d_X, d_snp, d_snptsnp, errorSS, errorDF, 
+    plm<<<geno_count, 32, n * sizeof(ftype)>>>
+      (m, n, d_X, d_snp, d_snptsnp, errorSS, errorDF, 
 					    // d_G, in constant memory
 					    // d_Xty, in constant memory
 					    d_snpty, 

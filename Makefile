@@ -7,7 +7,7 @@ OPT_FLAGS = -O3
 endif
 
 # warning: this breaks things on other architectures...
-CUDA_FLAGS=-arch sm_13
+CUDA_FLAGS=-arch sm_13 -Xptxas -v
 
 CUDA_SDK=/home/user/NVIDIA_GPU_Computing_SDK3.2
 CUDA_TK=/usr/local/cuda
@@ -28,26 +28,14 @@ LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB)
 # Set all include flags here for later use
 #INCLUDE_FLAGS = $(GSL_INCLUDE)
 
-SRCS = reference_glm.cu
-targets = $(patsubst %.cu,%,$(SRCS))
+SRCS = reference_glm.cu plm.cu cuda_blas.cu
+target = reference_glm
 
-all: $(targets)
+all: $(target)
 
 clean:
 	rm -f $(EXEC_FILES) *~ *.P *.o $(targets)
 
-# Override built-in rule for %.o from %.cpp.  Define this
-# and leave it blank!  Without this, Make will try to compile
-# directly from %.cpp to executable without using our stuff below...
-% : %.cu
-
-
-%.o : %.cu
-	$(CC) $(DBG) $(OPT_FLAGS) $(CUDA_INC) $(CUDA_FLAGS) $< -o $@ -c
-
-
-
-% : %.o
-	$(CC) -o $@ $< $(LIBS)
-
+$(target): $(SRCS)
+	$(CC) $(DBG) $(OPT_FLAGS) $(CUDA_INC) $(CUDA_FLAGS) $< -o $@ $(LIBS)
 

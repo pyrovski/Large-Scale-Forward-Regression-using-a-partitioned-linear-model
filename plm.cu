@@ -3,15 +3,18 @@
 
 #include "cuda_blas.cu"
 
+//__shared__ ftype fval; // scalar
 extern __shared__ ftype shared[];
 
 uint shared_size(uint n){
-  return 3*n + 3;
+  return n;
 }
-__constant__ ftype d_Xty[50];
+__constant__ ftype d_Xty[iterationLimit];
+
+const unsigned GPitch = (iterationLimit + 27) % 16 ? iterationLimit + 27 : (iterationLimit + 27)/16 * 16 + 16;
 
 // extra space for padding.  Could make this triangular.
-__constant__ ftype d_G[80*80];
+__constant__ ftype d_G[(iterationLimit + 27)*GPitch];
 
 __global__ void plm(// inputs
 		    const unsigned m,    // rows of X
@@ -27,11 +30,13 @@ __global__ void plm(// inputs
 		    // outputs
 		    ftype *f){
 
-  ftype *Xtsnp = shared; // n x 1
-  ftype *GtXtsnp = Xtsnp + n; // n x 1.  G is symmetric, so doesn't need a transpose
-  ftype *s = GtXtsnp + n; // scalar
-  ftype *fval = s + 1; // scalar
-  ftype *snptmy = fval + 1; // scalar
+  ftype *reduce = shared; // n x 1
+  //ftype *reduce2 = reduce + n;
+  ftype Xtsnp, GtXtsnp; // each thread stores one element of each array
+  //! @todo these might use fewer registers if kept in shared memory
+  ftype snptmy; // scalar
+  ftype fval; // scalar
+  ftype s; // scalar
 
   unsigned BID = blockIdx.x + gridDim.x * blockIdx.y;
   unsigned TID = threadIdx.x;
@@ -39,41 +44,40 @@ __global__ void plm(// inputs
 
   // (snptX)' = Xtsnp
   // don't worry about aligning first thread to 128-byte boundary; assume compute capability 1.2+
-  matVec(m, n, X, 
-	 m,  //! @todo length of column plus padding
-	 snp + BID * m, 
-	 Xtsnp); 
 
+  // Xtsnp
+  Xtsnp = matGVecG(TID, m, n, X, 
+		   m,  //! @todo length of column plus padding
+		   snp + BID * m, 
+		   reduce); 
+  
   // GtXtsnp
-  matVec(n, n, d_G, 
-	 n,  //! @todo length of column plus padding
-	 Xtsnp, GtXtsnp); 
+  GtXtsnp = vecRMatC(TID, Xtsnp, n, n, d_G, 
+		     GPitch,  //! @todo length of column plus padding
+		     reduce); 
 
   // snptsnp - snptXGXtsnp
-  dot(n, Xtsnp, GtXtsnp, s);
-  if(!TID)
-    *s = snptsnp[BID] - *s;
-  __syncthreads();
+  dotRR(TID, n, Xtsnp, GtXtsnp, reduce);
+  s = snptsnp[BID] - *reduce;
   // 1/(above)
-  if(*s > ftypeTol){
-    if(!TID)
-      *s = 1/ *s;
-    __syncthreads();
-
-    dot(n, GtXtsnp, d_Xty, snptmy);
+  if(s > ftypeTol){
+    s = (ftype)1/s;
+    
+    // snptmy
+    dotRG(TID, n, GtXtsnp, d_Xty, reduce);
+    snptmy = *reduce;
     
     if(!TID){
-      *snptmy += snpty[BID];
-      ftype modelSS = *snptmy * *snptmy * *s;
+      snptmy += snpty[BID];
+      ftype modelSS = snptmy * snptmy * s;
       ftype errorSS2 = errorSS - modelSS;
       ftype V2 = errorDF - 1;
-      *fval = modelSS / errorSS2 * V2;
+      fval = modelSS / errorSS2 * V2;
     }
     __syncthreads();
   } else {
-    if(!TID)
-      fval = 0;
-    __syncthreads();
+    fval = 0;
   }
-  f[BID] = *fval;
+  if(!TID)
+    f[BID] = fval;
 }

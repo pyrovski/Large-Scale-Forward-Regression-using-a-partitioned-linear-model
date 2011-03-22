@@ -49,11 +49,11 @@ __device__ void dotRG(const unsigned TID,
  */
 __device__ ftype vecRMatC(const unsigned TID,
 			  const ftype x,
-			 const unsigned M, 
-			 const unsigned N,
-			 const ftype *A, 
-			 const unsigned lda,
-			 ftype *reduce){
+			  const unsigned M, 
+			  const unsigned N,
+			  const ftype *A, 
+			  const unsigned lda,
+			  ftype *reduce){
   ftype retVal;
   for(int i = 0; i < N; i++){
     dotRG(TID, M, x, A + M * i, reduce);
@@ -64,12 +64,12 @@ __device__ ftype vecRMatC(const unsigned TID,
 }
 
 
-__device__ ftype matGVecG(const unsigned TID, 
+__device__ ftype vecGMatG(const unsigned TID, 
+			  const ftype *x,
 			  const unsigned M, 
 			  const unsigned N,
 			  const ftype *A, 
 			  const unsigned lda,
-			  const ftype *x,
 			  ftype *reduce){
   ftype retVal;
   for(int i = 0; i < N; i++){

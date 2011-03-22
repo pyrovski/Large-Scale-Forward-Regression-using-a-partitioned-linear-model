@@ -43,12 +43,12 @@ __global__ void plm(// inputs
   // snptsnp - snptXGXtsnp:
 
   // (snptX)' = Xtsnp
-  // don't worry about aligning first thread to 128-byte boundary; assume compute capability 1.2+
 
   // Xtsnp
-  Xtsnp = matGVecG(TID, m, n, X, 
+  Xtsnp = vecGMatG(TID, 
+		   snp + BID * m,
+		   m, n, X, 
 		   m,  //! @todo length of column plus padding
-		   snp + BID * m, 
 		   reduce); 
   
   // GtXtsnp

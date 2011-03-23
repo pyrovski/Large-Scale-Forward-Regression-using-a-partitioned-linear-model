@@ -10,7 +10,7 @@ endif
 
 # warning: this breaks things on other architectures...
 -include CUDA_SM
-CUDA_SM_VER ?= sm_20
+CUDA_SM_VER ?= sm_13
 CUDA_FLAGS+=-arch $(CUDA_SM_VER) -Xptxas -v
 # -maxrregcount=16
 -include CUDA_PATHS

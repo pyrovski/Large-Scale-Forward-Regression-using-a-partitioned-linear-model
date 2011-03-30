@@ -28,7 +28,7 @@ BLAS_LAPACK_LIB = -lf77blas -latlas -L/usr/lib/atlas/ -llapack
 #GSL_INCLUDE = /sw/include
 GSL_LIB = -lgsl
 
-LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB)
+LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB) -lcublas
 
 # Set all include flags here for later use
 #INCLUDE_FLAGS = $(GSL_INCLUDE)

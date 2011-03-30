@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cuda.h>
 #include <cutil_inline.h>
+#include <cublas.h>
+
 
 // Local project includes
 #include "fortran_matrix.h"
@@ -401,6 +403,7 @@ int main()
      d_snpty, 
      d_f);
   cudaEventRecord(stop, 0);
+  unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1);
   cutilSafeCall(cudaThreadSynchronize());
   // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
   // if V1 = 0, ignore; F is undefined

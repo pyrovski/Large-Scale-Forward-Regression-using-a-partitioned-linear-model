@@ -360,9 +360,10 @@ int main()
   cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(ftype)));
 
   //gettimeofday(&tstart, NULL);
-  cudaEvent_t start, stop;
+  cudaEvent_t start, stopKernel, stopMax;
   cudaEventCreate(&start);
-  cudaEventCreate(&stop);
+  cudaEventCreate(&stopKernel);
+  cudaEventCreate(&stopMax);
   
   
   // For each column of the geno array, set up the "X" matrix,
@@ -389,7 +390,8 @@ int main()
     
   // d_G, in constant memory
   // d_Xty, in constant memory
-  unsigned threads = nextPow2(n);
+  //unsigned threads = nextPow2(n);
+  cublasGetError();
   cudaEventRecord(start, 0);
   plm<<<geno_count, n, n * sizeof(ftype)>>>
     (m, 
@@ -402,8 +404,9 @@ int main()
      glm_data.ErrorSS, glm_data.V2, 
      d_snpty, 
      d_f);
-  cudaEventRecord(stop, 0);
+  cudaEventRecord(stopKernel, 0);
   unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1);
+  cudaEventRecord(stopMax, 0);
   cutilSafeCall(cudaThreadSynchronize());
   // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
   // if V1 = 0, ignore; F is undefined
@@ -411,14 +414,24 @@ int main()
   //Fval[i] = glm_data_new.F;
   //V2s[i] = glm_data_new.V2; 
   
+
   cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(ftype),
 			   cudaMemcpyDeviceToHost));
+  cout << "max F: " << Fval[maxFIndex] << " (" << maxFIndex << ")" << endl;
   
   {
     float computation_elapsed_time;
-    cudaEventElapsedTime(&computation_elapsed_time, start, stop);
+    cudaEventElapsedTime(&computation_elapsed_time, start, stopKernel);
     computation_elapsed_time /= 1000.0f;
     cout << "Time required for computations: "
+	 << computation_elapsed_time << " s" << endl;
+    cout << "Time per SNP: " << computation_elapsed_time / geno_count 
+	 << " s" << endl;
+
+
+    cudaEventElapsedTime(&computation_elapsed_time, stopKernel, stopMax);
+    computation_elapsed_time /= 1000.0f;
+    cout << "Time required for reduction: "
 	 << computation_elapsed_time << " s" << endl;
     cout << "Time per SNP: " << computation_elapsed_time / geno_count 
 	 << " s" << endl;

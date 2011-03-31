@@ -27,6 +27,7 @@ __global__ void plm(// inputs
 		    //const ftype *G,          // symmetric matrix. padding?
 		    //const ftype *Xty,        // n x 1 vector
 		    const ftype *snpty,        // scalar, unique to block
+		    const unsigned *snpMask,
 		    // outputs
 		    ftype *f){
   /*! @todo could compute two SNPs per thread block.  
@@ -42,6 +43,12 @@ __global__ void plm(// inputs
 
   unsigned BID = blockIdx.x + gridDim.x * blockIdx.y;
   unsigned TID = threadIdx.x;
+  if(snpMask[BID]){
+    // don't compute new F
+    if(!TID)
+      f[BID] = -1;
+    return; 
+  }
   // snptsnp - snptXGXtsnp:
 
 

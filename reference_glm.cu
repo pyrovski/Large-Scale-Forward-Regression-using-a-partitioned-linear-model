@@ -8,6 +8,7 @@
 #include <cuda.h>
 #include <cutil_inline.h>
 #include <cublas.h>
+#include <stdlib.h>
 
 
 // Local project includes
@@ -35,6 +36,9 @@ unsigned int nextPow2( unsigned int x ) {
 
 int main()
 {
+  //! @todo this should be a command line parameter
+  ftype entry_limit = 0.2;
+
   // Timing variables
   timeval tstart, tstop;
 
@@ -145,6 +149,7 @@ int main()
   //Kt(0, fixed_count+1) = 1.; // Set last entry = 1
 
   // Version B, Kt assumed a vector.
+  //! @todo assume Kt has a single non-zero element; a 1.0 at the end
   vector<double> Kt(fixed_count+2);
    Kt.back() = 1.; // Set last entry = 1
   
@@ -321,8 +326,15 @@ int main()
   }
   
   ftype *d_X, *d_snp, *d_snptsnp, *d_Xtsnp, *d_snpty,
-    *d_f; 
+    *d_f;
+  unsigned *d_snpMask;
+  vector<unsigned> snpMask(geno_count);
   
+  cutilSafeCall(cudaMalloc(&d_snpMask, geno_count * sizeof(unsigned)));
+  cutilSafeCall(cudaMemcpy(d_snpMask, &snpMask[0], 
+			   geno_count * sizeof(unsigned), 
+			   cudaMemcpyHostToDevice));
+
   // column-major with padding
   size_t d_XPitch, d_XtsnpPitch;
   cutilSafeCall(cudaMallocPitch(&d_X, &d_XPitch, m * sizeof(ftype), 
@@ -388,57 +400,84 @@ int main()
 	glm_data_new);
     */
     
-  // d_G, in constant memory
-  // d_Xty, in constant memory
-  //unsigned threads = nextPow2(n);
-  cublasGetError();
-  cudaEventRecord(start, 0);
-  plm<<<geno_count, n, n * sizeof(ftype)>>>
-    (m, 
-     //d_X, 
-     //d_snp, 
-     //d_XPitch, // also used as pitch for d_X
-     d_snptsnp, 
-     d_Xtsnp, 
-     d_XtsnpPitch, 
-     glm_data.ErrorSS, glm_data.V2, 
-     d_snpty, 
-     d_f);
-  cudaEventRecord(stopKernel, 0);
-  unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1);
-  cudaEventRecord(stopMax, 0);
-  cutilSafeCall(cudaThreadSynchronize());
-  // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
-  // if V1 = 0, ignore; F is undefined
-  // Store the computed value in an array
-  //Fval[i] = glm_data_new.F;
-  //V2s[i] = glm_data_new.V2; 
+  while(1){
+    // d_G, in constant memory
+    // d_Xty, in constant memory
+    //unsigned threads = nextPow2(n);
+
+    // clear last error
+    cublasGetError();
+    cudaEventRecord(start, 0);
+    plm<<<geno_count, n, n * sizeof(ftype)>>>
+      (m, 
+       //d_X, 
+       //d_snp, 
+       //d_XPitch, // also used as pitch for d_X
+       d_snptsnp, 
+       d_Xtsnp, 
+       d_XtsnpPitch, 
+       glm_data.ErrorSS, glm_data.V2, 
+       d_snpty, 
+       d_snpMask,
+       d_f);
+    cudaEventRecord(stopKernel, 0);
+    unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1);
+    cudaEventRecord(stopMax, 0);
+    cutilSafeCall(cudaThreadSynchronize());
+    // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
+    // if V1 = 0, ignore; F is undefined
+    // Store the computed value in an array
+    //Fval[i] = glm_data_new.F;
+    //V2s[i] = glm_data_new.V2; 
   
 
-  cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(ftype),
-			   cudaMemcpyDeviceToHost));
-  cout << "max F: " << Fval[maxFIndex] << " (" << maxFIndex << ")" << endl;
-  
-  {
-    float computation_elapsed_time;
-    cudaEventElapsedTime(&computation_elapsed_time, start, stopKernel);
-    computation_elapsed_time /= 1000.0f;
-    cout << "Time required for computations: "
-	 << computation_elapsed_time << " s" << endl;
-    cout << "Time per SNP: " << computation_elapsed_time / geno_count 
-	 << " s" << endl;
+    cutilSafeCall(cudaMemcpy(&Fval[maxFIndex], &d_f[maxFIndex], sizeof(ftype),
+			     cudaMemcpyDeviceToHost));
 
-
-    cudaEventElapsedTime(&computation_elapsed_time, stopKernel, stopMax);
-    computation_elapsed_time /= 1000.0f;
-    cout << "Time required for reduction: "
-	 << computation_elapsed_time << " s" << endl;
-    cout << "Time per SNP: " << computation_elapsed_time / geno_count 
-	 << " s" << endl;
-  }
-
-  write("Fval.dat", Fval);
+    cout << "max F: " << Fval[maxFIndex] << " (" << maxFIndex << ")" << endl;
     
+    // get p value
+    if(Fval[maxFIndex] <= 0){
+      // error
+      cout << "max F <= 0" << endl;
+      exit(1);
+    }
+
+    Pval[maxFIndex] = 1 - gsl_cdf_fdist_P(Fval[maxFIndex], 1, glm_data.V2 - 1);
+
+    if(Pval[maxFIndex] > entry_limit)
+      break;
+  
+    /*! @todo update X, geno, Xtsnp, glm_data.ErrorSS, glm_data.V2, 
+      list of chosen SNP indices
+      - for now, assume data is in-core for GPU; i.e. don't recopy SNPs 
+      for every iteration
+      - to remove SNP from geno, set mask at SNP index
+     */
+    snpMask[maxFIndex] = 1;
+    cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
+			     sizeof(unsigned), cudaMemcpyHostToDevice));
+
+    {
+      float computation_elapsed_time;
+      cudaEventElapsedTime(&computation_elapsed_time, start, stopKernel);
+      computation_elapsed_time /= 1000.0f;
+      cout << "GPU time required for computations: "
+	   << computation_elapsed_time << " s" << endl;
+      cout << "GPU time per SNP: " << computation_elapsed_time / geno_count 
+	   << " s" << endl;
+
+
+      cudaEventElapsedTime(&computation_elapsed_time, stopKernel, stopMax);
+      computation_elapsed_time /= 1000.0f;
+      cout << "GPU time required for reduction: "
+	   << computation_elapsed_time << " s" << endl;
+      cout << "GPU time per SNP: " << computation_elapsed_time / geno_count 
+	   << " s" << endl;
+    }
+  }
+  //write("Fval.dat", Fval);
+  
   return 0;
 }
 

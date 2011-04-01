@@ -54,6 +54,7 @@ void glm(const FortranMatrix &X,
 	 const double yty, 
 	 vector<double> &Xty, // updated
 	 double rX,
+	 // output
 	 GLMData& glm_data)
 {  
   int m  = X.get_n_rows(), n = X.get_n_cols();

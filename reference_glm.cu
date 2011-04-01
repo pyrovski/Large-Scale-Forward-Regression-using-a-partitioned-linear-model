@@ -409,7 +409,10 @@ int main()
        d_snpMask,
        d_f);
     cudaEventRecord(stopKernel, 0);
-    unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1);
+    
+    // cublas uses 1-based index
+    unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1) - 1;
+
     cudaEventRecord(stopMax, 0);
     cutilSafeCall(cudaThreadSynchronize());
     // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
@@ -465,12 +468,13 @@ int main()
 
     glm(X, XtXi, &XtSNP(0, maxFIndex), SNPtSNP[maxFIndex], SNPty[maxFIndex], yty, Xty, 
 	rX, glm_data);
+    XtXi.writeD("XtXi.dat");
     XtSNP.resize_retain(n+1, geno_count);
     cblas_dgemv(CblasColMajor, CblasTrans, 
-		n, geno_count, 
+		m, geno_count,
 		1.0, 
-		&XtSNP.values[0],
-		n+1,
+		&geno.values[0],
+		m,
 		&geno(0, maxFIndex),
 		1,
 		0,
@@ -487,8 +491,17 @@ int main()
 			       sizeof(ftype),
 			       geno_count,
 			       cudaMemcpyHostToDevice));
+
+    // update host X
+    //! @todo is this even used?
     X.resize_retain(m, n + 1);
-    memcpy(&X(0, n), &geno(0, maxFIndex), m);
+    memcpy(&X(0, n), &geno(0, maxFIndex), m* sizeof(ftype));
+    X.writeD("X.dat");
+    
+    // update GPU G (const mem)
+    cutilSafeCall(cudaMemcpyToSymbol(d_G, &XtXi.values[0], 
+				     (n + 1) * (n + 1) * sizeof(ftype)));
+  
     n++;
 
     {

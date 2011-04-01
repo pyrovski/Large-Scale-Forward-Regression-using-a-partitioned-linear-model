@@ -47,14 +47,12 @@ struct GLMData
 // the code a good deal cleaner (but not really any faster when Kt is
 // a 1-by-N matrix) than the more general case where Kt is a matrix.
 void glm(const FortranMatrix &X, 
-	 const FortranMatrix &XtX, 
-	 const FortranMatrix &XtXi, 
-	 const vector<double> &XtSNP,
+	 FortranMatrix &XtXi, // updated
+	 const double *XtSNP,
 	 const double SNPtSNP, 
 	 const double SNPty, 
 	 const double yty, 
-	 const vector<double> &Kt, 
-	 const vector<double> &Xty, 
+	 vector<double> &Xty, // updated
 	 double rX,
 	 GLMData& glm_data)
 {  
@@ -96,53 +94,48 @@ void glm(const FortranMatrix &X,
   S = 1.0 / S;
 
   // compute G' = (X'tX')i, X' = [X SNP]
-  // Gn = [G + S*(snptXG'*snptXG), -S*snptXG'; -S*snptXG, S]; % n + 1 x n + 1
-  FortranMatrix Gn = XtXi;
+  // XtXi = [G + S*(snptXG'*snptXG), -S*snptXG'; -S*snptXG, S]; % n + 1 x n + 1
 
   // compute G + S *(SNPtXG'*SNPtXG) (n x n)
   // = G + S * (GtXtSNP*GtXtSNP')?= to within machine precision
   /*! @todo cblas_dspr(CblasColMajor, ); ? requires packed symmetric matrix,
-    future operations using this result must also assume Gn is packed
+    future operations using this result must also assume XtXi is packed
    */
-  //cblas_dsyr(CblasColMajor, CblasUpper, n, S, &GtXtSNP[0], 1, &Gn.values[0], n);
+  //cblas_dsyr(CblasColMajor, CblasUpper, n, S, &GtXtSNP[0], 1, &XtXi.values[0], n);
   cblas_dger(CblasColMajor, n,
 	     n, S, &GtXtSNP[0], 1, &GtXtSNP[0], 1,
-	     &Gn.values[0], n);
+	     &XtXi.values[0], n);
 
-  //Gn.print("Gn before resize");
+  //XtXi.print("XtXi before resize");
   //! @todo this could be avoided by use of lda in computation of XtXi;
   // just allocate XtXi as n+1xn+1 and use lda=n+1, M = n, N = n
-  Gn.resize_retain(n + 1, n + 1);
+  XtXi.resize_retain(n + 1, n + 1);
 
-  //Gn.print("Gn after resize");
+  //XtXi.print("XtXi after resize");
 
 
-  // compute right and bottom edges of Gn
+  // compute right and bottom edges of XtXi
   // right edge
-  cblas_daxpy(n, S, &GtXtSNP[0], 1, &Gn.values[n * (n + 1)], 1);
-  cblas_dcopy(n, &Gn.values[n * (n + 1)], 1, &Gn.values[n], n + 1);
+  cblas_daxpy(n, S, &GtXtSNP[0], 1, &XtXi.values[n * (n + 1)], 1);
+  cblas_dcopy(n, &XtXi.values[n * (n + 1)], 1, &XtXi.values[n], n + 1);
 
-  // store bottom right element of Gn
-  Gn(n, n) = S;
+  // store bottom right element of XtXi
+  XtXi(n, n) = S;
  
   // Xtyn = [Xty; snpty]; % n + 1 x 1
-  vector<double> Xtyn(n+1);
-  Xtyn.assign(Xty.begin(), Xty.end()); // sets size to n
-  Xtyn.push_back(SNPty); // append 1
+  Xty.push_back(SNPty); // append 1
   
   // compute beta (n + 1 x 1)
-  // beta = Gn * Xtyn
+  // beta = XtXi * Xty
   glm_data.beta.resize(n + 1);
 
   //! @todo use cblas_dsymv()
   cblas_dgemv(CblasColMajor, CblasNoTrans, n + 1, n + 1, 1.0, 
-	      &Gn.values[0], n + 1, &Xtyn[0], 1, 0.0, &glm_data.beta[0], 1);
+	      &XtXi.values[0], n + 1, &Xty[0], 1, 0.0, &glm_data.beta[0], 1);
 
-  //! @todo beta is wrong
-  
   // Compute ErrorSS for return in the GLMData data structure
   glm_data.ErrorSS = yty - 
-    cblas_ddot(n + 1, &glm_data.beta[0], 1, &Xtyn[0], 1);
+    cblas_ddot(n + 1, &glm_data.beta[0], 1, &Xty[0], 1);
 
   // Compute the matrix-vector product, Kb = Kt * beta.
   // Note if Kt is actually a vector, Kb will be a scalar...
@@ -151,7 +144,6 @@ void glm(const FortranMatrix &X,
 
   // We need the rank of the Kt "matrix" now.  Since Kt is
   // assumed to be a vector, we can just assume it has rank 1.
-  int rK = 1;
 
   //! @todo update rX from trace
   //double trn = S * (SNPtSNP - SNPtXGXtSNP);
@@ -162,7 +154,7 @@ void glm(const FortranMatrix &X,
 
 
   // F = Kb' * inv(Kt * G * Kt') * Kb * V2 / (rK * ErrorSS);
-  glm_data.F = (1.0 / S) * Kb * Kb * glm_data.V2 / (rK * glm_data.ErrorSS);
+  glm_data.F = (1.0 / S) * Kb * Kb * glm_data.V2 / glm_data.ErrorSS;
 }
 
 

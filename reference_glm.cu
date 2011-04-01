@@ -328,7 +328,7 @@ int main()
   ftype *d_X, *d_snp, *d_snptsnp, *d_Xtsnp, *d_snpty,
     *d_f;
   unsigned *d_snpMask;
-  vector<unsigned> snpMask(geno_count);
+  vector<unsigned> snpMask(geno_count, 0);
   
   cutilSafeCall(cudaMalloc(&d_snpMask, geno_count * sizeof(unsigned)));
   cutilSafeCall(cudaMemcpy(d_snpMask, &snpMask[0], 
@@ -448,7 +448,13 @@ int main()
     if(Pval[maxFIndex] > entry_limit)
       break;
   
-    /*! @todo update X, geno, Xtsnp, glm_data.ErrorSS, glm_data.V2, 
+    /*! @todo update 
+      X,
+      Xty, (done)
+      geno, (done)
+      Xtsnp, 
+      glm_data.ErrorSS, (done)
+      glm_data.V2, (done)
       list of chosen SNP indices
       - for now, assume data is in-core for GPU; i.e. don't recopy SNPs 
       for every iteration
@@ -457,6 +463,9 @@ int main()
     snpMask[maxFIndex] = 1;
     cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
 			     sizeof(unsigned), cudaMemcpyHostToDevice));
+
+    glm(X, XtXi, &XtSNP(0, maxFIndex), SNPtSNP[maxFIndex], SNPty[maxFIndex], yty, Xty, 
+	rX, glm_data);
 
     {
       float computation_elapsed_time;

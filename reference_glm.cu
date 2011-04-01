@@ -448,7 +448,7 @@ int main()
     }
   
     /*! @todo update 
-      - X,
+      - X, (host only, done)
       - Xty, (done)
       - geno, (done)
       - Xtsnp: matrix update from n x geno_count to n+1 x geno_count,
@@ -478,9 +478,22 @@ int main()
 		n+1
 		);
     XtSNP.writeD("XtSNP.dat");
-    n++;
 
-    //! @todo copy updated XtSNP to GPU
+    //! copy updated XtSNP to GPU
+    //! @todo not working?
+    cutilSafeCall(
+		  cudaMemcpy2D(d_Xtsnp + n, 
+			       d_XtsnpPitch,
+			       &XtSNP(n, 0), 
+			       n + 1,
+			       1,
+			       geno_count,
+			       cudaMemcpyHostToDevice)
+		  );
+    
+    X.resize_retain(m, n + 1);
+    memcpy(&X(0, n), &geno(0, maxFIndex), m);
+    n++;
 
     {
       float computation_elapsed_time;

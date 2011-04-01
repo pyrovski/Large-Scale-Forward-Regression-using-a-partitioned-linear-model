@@ -325,7 +325,7 @@ int main()
 	 << computation_prep_time << " s" << endl;
   }
   
-  ftype *d_X, *d_snp, *d_snptsnp, *d_Xtsnp, *d_snpty,
+  ftype *d_snptsnp, *d_Xtsnp, *d_snpty,
     *d_f;
   unsigned *d_snpMask;
   vector<unsigned> snpMask(geno_count, 0);
@@ -336,28 +336,16 @@ int main()
 			   cudaMemcpyHostToDevice));
 
   // column-major with padding
-  size_t d_XPitch, d_XtsnpPitch;
-  cutilSafeCall(cudaMallocPitch(&d_X, &d_XPitch, m * sizeof(ftype), 
-				n + iterationLimit));
-  
-  //! @todo the host should store growing matrices with padding
-  cutilSafeCall(cudaMemcpy2D(d_X, d_XPitch, &X.values[0], m * sizeof(ftype), 
-			     m * sizeof(ftype), n, 
-			     cudaMemcpyHostToDevice));
-  
-  size_t d_snpPitch;
-  cutilSafeCall(cudaMallocPitch(&d_snp, &d_snpPitch, m * sizeof(ftype), 
-				geno_count));
-
-  cutilSafeCall(cudaMemcpy2D(d_snp, d_snpPitch, &geno.values[0], m * sizeof(ftype), 
-			     m * sizeof(ftype), geno_count, cudaMemcpyHostToDevice));
+  size_t d_XtsnpPitch;
   
   //! @todo this won't be coalesced
   cutilSafeCall(cudaMalloc(&d_snptsnp, geno_count * sizeof(ftype)));
   cutilSafeCall(cudaMemcpy(d_snptsnp, &SNPtSNP[0], geno_count * sizeof(ftype), 
 			   cudaMemcpyHostToDevice));
 
-  cutilSafeCall(cudaMallocPitch(&d_Xtsnp, &d_XtsnpPitch, n * sizeof(ftype), geno_count));
+  cutilSafeCall(cudaMallocPitch(&d_Xtsnp, &d_XtsnpPitch, 
+				(n + iterationLimit) * sizeof(ftype), 
+				geno_count));
   cutilSafeCall(cudaMemcpy2D(d_Xtsnp, d_XtsnpPitch, &XtSNP.values[0], 
 			     n * sizeof(ftype), n * sizeof(ftype), geno_count, 
 			     cudaMemcpyHostToDevice));
@@ -410,9 +398,6 @@ int main()
     cudaEventRecord(start, 0);
     plm<<<geno_count, n, n * sizeof(ftype)>>>
       (m, 
-       //d_X, 
-       //d_snp, 
-       //d_XPitch, // also used as pitch for d_X
        d_snptsnp, 
        d_Xtsnp, 
        d_XtsnpPitch, 

@@ -442,8 +442,10 @@ int main()
 
     Pval[maxFIndex] = 1 - gsl_cdf_fdist_P(Fval[maxFIndex], 1, glm_data.V2 - 1);
 
-    if(Pval[maxFIndex] > entry_limit)
+    if(Pval[maxFIndex] > entry_limit){
+      cout << "p value > entry_limit; quitting" << endl;
       break;
+    }
   
     /*! @todo update 
       - X,

@@ -15,23 +15,21 @@ __constant__ ftype d_G[(iterationLimit + 27)*(iterationLimit + 27)];
 
 __global__ void plm(// inputs
 		    const unsigned m,          // rows of X
-		    //const unsigned n,        // colums of X
-		    //const ftype *X,            // m x n matrix. padding?
-		    //const ftype *snp,        // m x 1 vector, unique to block
-		    //const unsigned XPitch,   // 
+		    //const unsigned n,        // colums of X == number of blocks
 		    const ftype *snptsnp,      // scalar, unique to block
 		    const ftype *Xtsnp,        // n x 1 vector, unique to block
 		    const unsigned XtsnpPitch, 
 		    const ftype errorSS,       // scalar
 		    const unsigned errorDF,       // scalar
-		    //const ftype *G,          // symmetric matrix. padding?
-		    //const ftype *Xty,        // n x 1 vector
+		    //const ftype *G,          // symmetric matrix in const mem
+		    //const ftype *Xty,        // n x 1 vector in const mem
 		    const ftype *snpty,        // scalar, unique to block
-		    const unsigned *snpMask,
+		    const unsigned *snpMask,   // n x 1 vector
 		    // outputs
 		    ftype *f){
   /*! @todo could compute two SNPs per thread block.  
-    This would ease the limitation of 8 thread blocks/MP for SM 1.3 devices.
+    This would ease the limitation of 8 thread blocks/MP for SM 1.3 devices,
+    but might need some thread padding for warps.
    */
 
   ftype *reduce = shared; // n x 1

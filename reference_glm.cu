@@ -9,6 +9,7 @@
 #include <cutil_inline.h>
 #include <cublas.h>
 #include <stdlib.h>
+#include <sstream>
 
 
 // Local project includes
@@ -327,6 +328,7 @@ int main()
   
   ftype *d_snptsnp, *d_Xtsnp, *d_snpty,
     *d_f;
+  //! @todo could use d_f also as a mask
   unsigned *d_snpMask;
   vector<unsigned> snpMask(geno_count, 0);
   
@@ -388,6 +390,7 @@ int main()
 	glm_data_new);
     */
     
+  unsigned iteration = 0;
   while(1){
     // d_G, in constant memory
     // d_Xty, in constant memory
@@ -415,16 +418,26 @@ int main()
     //Fval[i] = glm_data_new.F;
     //V2s[i] = glm_data_new.V2; 
   
-
+#ifndef _DEBUG
     cutilSafeCall(cudaMemcpy(&Fval[maxFIndex], &d_f[maxFIndex], sizeof(ftype),
 			     cudaMemcpyDeviceToHost));
+#else
+    cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(ftype),
+			     cudaMemcpyDeviceToHost));
+    {
+      stringstream ss;
+      ss << "Fval_" << iteration << ".dat";
+      writeD(ss.str(), Fval);
+    }
 
     cout << "max F: " << Fval[maxFIndex] << " (" << maxFIndex << ")" << endl;
+#endif
+
     
     // get p value
     if(Fval[maxFIndex] <= 0){
       // error
-      cout << "max F <= 0" << endl;
+      cout << "error: max F <= 0" << endl;
       exit(1);
     }
 
@@ -485,8 +498,8 @@ int main()
       cout << "GPU time per SNP: " << computation_elapsed_time / geno_count 
 	   << " s" << endl;
     }
-  }
-  //write("Fval.dat", Fval);
+    iteration++;
+  } // while(1)
   
   return 0;
 }

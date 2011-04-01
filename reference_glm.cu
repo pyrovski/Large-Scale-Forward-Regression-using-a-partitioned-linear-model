@@ -449,16 +449,16 @@ int main()
       break;
   
     /*! @todo update 
-      X,
-      Xty, (done)
-      geno, (done)
-      Xtsnp, 
-      glm_data.ErrorSS, (done)
-      glm_data.V2, (done)
-      list of chosen SNP indices
-      - for now, assume data is in-core for GPU; i.e. don't recopy SNPs 
-      for every iteration
-      - to remove SNP from geno, set mask at SNP index
+      - X,
+      - Xty, (done)
+      - geno, (done)
+      - Xtsnp: matrix update from n x geno_count to n+1 x geno_count,
+      - consists of appending (chosen SNP)' * geno = a new row
+      - glm_data.ErrorSS, (done)
+      - glm_data.V2, (done)
+      - list of chosen SNP indices:
+      Assume data is in-core for GPU; i.e. don't recopy SNPs at each iteration.
+      To remove SNP from geno, set mask at SNP index.
      */
     snpMask[maxFIndex] = 1;
     cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
@@ -466,6 +466,22 @@ int main()
 
     glm(X, XtXi, &XtSNP(0, maxFIndex), SNPtSNP[maxFIndex], SNPty[maxFIndex], yty, Xty, 
 	rX, glm_data);
+    XtSNP.resize_retain(n+1, geno_count);
+    cblas_dgemv(CblasColMajor, CblasTrans, 
+		n, geno_count, 
+		1.0, 
+		&XtSNP.values[0],
+		n+1,
+		&geno(0, maxFIndex),
+		1,
+		0,
+		&XtSNP(n, 0),
+		n+1
+		);
+    XtSNP.writeD("XtSNP.dat");
+    n++;
+
+    //! @todo copy updated XtSNP to GPU
 
     {
       float computation_elapsed_time;

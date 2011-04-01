@@ -480,17 +480,13 @@ int main()
     XtSNP.writeD("XtSNP.dat");
 
     //! copy updated XtSNP to GPU
-    //! @todo not working?
-    cutilSafeCall(
-		  cudaMemcpy2D(d_Xtsnp + n, 
+    cutilSafeCall(cudaMemcpy2D(d_Xtsnp + n, 
 			       d_XtsnpPitch,
 			       &XtSNP(n, 0), 
-			       n + 1,
-			       1,
+			       (n + 1) * sizeof(ftype),
+			       sizeof(ftype),
 			       geno_count,
-			       cudaMemcpyHostToDevice)
-		  );
-    
+			       cudaMemcpyHostToDevice));
     X.resize_retain(m, n + 1);
     memcpy(&X(0, n), &geno(0, maxFIndex), m);
     n++;

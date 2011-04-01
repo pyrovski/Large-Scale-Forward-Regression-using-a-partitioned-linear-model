@@ -430,9 +430,8 @@ int main()
       writeD(ss.str(), Fval);
     }
 
-    cout << "max F: " << Fval[maxFIndex] << " (" << maxFIndex << ")" << endl;
 #endif
-
+    cout << "max F: " << Fval[maxFIndex] << " (" << maxFIndex << ")" << endl;
     
     // get p value
     if(Fval[maxFIndex] <= 0){

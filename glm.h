@@ -117,7 +117,7 @@ void glm(const FortranMatrix &X,
 
   // compute right and bottom edges of XtXi
   // right edge
-  cblas_daxpy(n, S, &GtXtSNP[0], 1, &XtXi.values[n * (n + 1)], 1);
+  cblas_daxpy(n, -S, &GtXtSNP[0], 1, &XtXi.values[n * (n + 1)], 1);
   cblas_dcopy(n, &XtXi.values[n * (n + 1)], 1, &XtXi.values[n], n + 1);
 
   // store bottom right element of XtXi

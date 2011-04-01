@@ -291,7 +291,7 @@ int main()
 	      &XtSNP.values[0],
 	      n
 	      );
-  XtSNP.writeD("Xtsnp.dat");
+  XtSNP.writeD("XtSNP.dat");
 
   vector<double> SNPtSNP(geno_count), SNPty(geno_count);
   //SNPty[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);

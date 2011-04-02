@@ -75,14 +75,34 @@ __global__ void plm(// inputs
     
     // snptmy
     dotRG(TID, blockDim.x, GtXtsnp, d_Xty, reduce);
-    snptmy = *reduce;
+    snptmy = -*reduce;
     
     if(!TID){
+#ifdef _DEBUG
+#if __CUDA_ARCH__ >= 200
+      if(BID < 2){
+	printf("b%u\tt%u\tsnptXGXty: %le\n", BID, TID, snptmy);
+	printf("b%u\tt%u\tsnpty: %le\n", BID, TID, snpty[BID]);
+      }
+#endif
+#endif
       snptmy += snpty[BID];
       ftype modelSS = snptmy * snptmy * s;
       ftype errorSS2 = errorSS - modelSS;
-      ftype V2 = errorDF - 1;
+      unsigned V2 = errorDF - 1;
       f[BID] = modelSS / errorSS2 * V2;
+#ifdef _DEBUG
+  #if __CUDA_ARCH__ >= 200
+  if(BID < 2){
+
+    printf("b%u\tt%u\tmodelSS: %le\n", BID, TID, modelSS);
+    printf("b%u\tt%u\tnew errorSS: %le\n", BID, TID, errorSS2);
+    printf("b%u\tt%u\tnew V2: %u\n", BID, TID, V2);
+    printf("b%u\tt%u\tf: %le\n", BID, TID, f[BID]);
+  }
+  #endif
+#endif
+
     }
     return;
   } else {

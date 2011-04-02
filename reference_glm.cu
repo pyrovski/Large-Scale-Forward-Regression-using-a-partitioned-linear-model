@@ -503,7 +503,8 @@ int main()
 				     (n + 1) * (n + 1) * sizeof(ftype)));
 
     // update GPU Xty (const mem)
-    cutilSafeCall(cudaMemcpyToSymbol(d_Xty + n, &Xty[n], sizeof(ftype)));
+    // call fails unless we update the whole thing
+    cutilSafeCall(cudaMemcpyToSymbol(d_Xty, &Xty[0], (n + 1) * sizeof(ftype)));
   
   
     n++;

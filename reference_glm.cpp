@@ -380,7 +380,7 @@ int main()
     
     // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
     // if V1 = 0, ignore; F is undefined
-    getMaxF();
+    getMaxF(Fval, maxFIndex, d_f);
     cout << "max F: " << Fval[maxFIndex] << " (" << maxFIndex << ")" << endl;
     
     // get p value

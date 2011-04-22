@@ -330,7 +330,10 @@ int main()
   // column-major with padding
   size_t d_XtsnpPitch;
   
-  copyToDevice();
+  copyToDevice(geno_count, n, 
+	       d_snptsnp, d_Xtsnp, d_XtsnpPitch, d_snpty, d_snpMask, d_f,
+	       SNPtSNP, XtSNP, 
+	       SNPty, Xty, XtXi, snpMask);
   
   // For each column of the geno array, set up the "X" matrix,
   // call the GLM routine, and store the computed p value.  Note

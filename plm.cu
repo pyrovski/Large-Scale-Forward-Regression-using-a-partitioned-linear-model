@@ -6,6 +6,8 @@
 
 #include "cuda_blas.cu"
 
+#include "plm.h"
+
 //__shared__ ftype fval; // scalar
 extern __shared__ ftype shared[];
 
@@ -117,8 +119,10 @@ __global__ void plm(// inputs
 
 cudaEvent_t start, stopKernel, stopMax;
 
-unsigned plm_GPU(unsigned, unsigned, unsigned, unsigned, ftype*, ftype*, unsigned, ftype,
-	unsigned, ftype*, unsigned*, ftype*){
+unsigned plm_GPU(unsigned geno_count, unsigned blockSize, unsigned sharedSize, 
+		 unsigned m, ftype* d_snptsnp, ftype* d_Xtsnp, 
+		 unsigned d_XtsnpPitch, ftype ErrorSS, unsigned V2, 
+		 ftype* d_snpty, unsigned* d_snpMask, ftype* d_f){
     cublasGetError();
     cudaEventRecord(start, 0);
     //plm<<<>>>();
@@ -130,7 +134,20 @@ unsigned plm_GPU(unsigned, unsigned, unsigned, unsigned, ftype*, ftype*, unsigne
     return maxFIndex;
 }
 
-int copyToDevice(){
+/*!
+  should only be called once
+ */
+void copyToDevice(unsigned geno_count, const unsigned n, 
+		 ftype *&d_snptsnp, ftype *&d_Xtsnp, unsigned &d_XtsnpPitch, 
+		 ftype *&d_snpty, unsigned *&d_snpMask, ftype *&d_f,
+		 const vector<double> &SNPtSNP, const FortranMatrix &XtSNP,
+		 const vector<double> &SNPty,
+		 const vector<double> &Xty, const FortranMatrix &XtXi, 
+		 const vector<unsigned> &snpMask){
+  cudaEventCreate(&start);
+  cudaEventCreate(&stopKernel);
+  cudaEventCreate(&stopMax);
+
   cutilSafeCall(cudaMalloc(&d_snpMask, geno_count * sizeof(unsigned)));
   cutilSafeCall(cudaMemcpy(d_snpMask, &snpMask[0], 
 			   geno_count * sizeof(unsigned), 
@@ -158,18 +175,18 @@ int copyToDevice(){
   
   cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(ftype)));
 
-  //gettimeofday(&tstart, NULL);
-  cudaEventCreate(&start);
-  cudaEventCreate(&stopKernel);
-  cudaEventCreate(&stopMax);
-  return 0;
 }
 
-int copyFromDevice(){
-  return 0;
+void copyFromDevice(){
 }
 
-int copyUpdateToDevice(){
+void copyUpdateToDevice(unsigned geno_count, unsigned n,
+		       unsigned *d_snpMask, 
+		       unsigned maxFIndex, ftype *d_Xtsnp, 
+		       unsigned d_XtsnpPitch,
+		       const vector<unsigned> &snpMask,
+		       const vector<double> &XtSNP, const FortranMatrix &XtXi,
+		       const vector<double> &Xty){
     cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
 			     sizeof(unsigned), cudaMemcpyHostToDevice));
 
@@ -193,16 +210,18 @@ int copyUpdateToDevice(){
 }
 
 float getGPUCompTime(){
-  return cudaEventElapsedTime(&computation_elapsed_time, start, stopKernel) /
-    1000.0f;
+  float computation_elapsed_time;
+  cudaEventElapsedTime(&computation_elapsed_time, start, stopKernel);
+  return computation_elapsed_time / 1000.0f;
 }
 
 float getGPUMaxTime(){
-  return cudaEventElapsedTime(&computation_elapsed_time, stopKernel, stopMax) /
-    1000.0f;
+  float computation_elapsed_time;
+  cudaEventElapsedTime(&computation_elapsed_time, stopKernel, stopMax);
+  return computation_elapsed_time / 1000.0f;
 }
 
-int getMaxF(){
+void getMaxF(vector<double> &Fval, unsigned maxFIndex, ftype *d_f){
 #ifndef _DEBUG
     cutilSafeCall(cudaMemcpy(&Fval[maxFIndex], &d_f[maxFIndex], sizeof(ftype),
 			     cudaMemcpyDeviceToHost));
@@ -216,5 +235,4 @@ int getMaxF(){
     }
 
 #endif
-
 }

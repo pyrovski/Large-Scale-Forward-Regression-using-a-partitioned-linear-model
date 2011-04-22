@@ -432,7 +432,6 @@ int main()
 
 
     // update host X
-    //! @todo is this even used?
     X.resize_retain(m, n + 1);
     memcpy(&X(0, n), &geno(0, maxFIndex), m* sizeof(ftype));
     X.writeD("X.dat");

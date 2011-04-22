@@ -142,13 +142,13 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize, unsigned sharedSize,
     cutilSafeCall(cudaThreadSynchronize());
     // cublas uses 1-based index
     unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1);
+    cudaEventRecord(stopMax, 0);
     if(!maxFIndex){
       cerr << "maxFIndex <= 0!" << endl;
       throw(1);
     }
     maxFIndex -= 1;
 
-    cudaEventRecord(stopMax, 0);
     return maxFIndex;
 }
 

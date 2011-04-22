@@ -361,10 +361,10 @@ int main()
   while(1){
     // d_G, in constant memory
     // d_Xty, in constant memory
-    //unsigned threads = nextPow2(n);
-
-    // clear last error
-    unsigned maxFIndex = plm_GPU(geno_count, n, n * sizeof(ftype), 
+    
+    unsigned maxFIndex;
+    try{
+      maxFIndex = plm_GPU(geno_count, n, n * sizeof(ftype), 
 	m ,        
 	d_snptsnp, 
 	d_Xtsnp, 
@@ -373,7 +373,9 @@ int main()
 	d_snpty, 
 	d_snpMask,
 	d_f);
-    
+    } catch(int e){
+      exit(e);
+    }
     
     
     //cutilSafeCall(cudaThreadSynchronize());

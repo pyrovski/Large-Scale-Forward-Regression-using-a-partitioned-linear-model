@@ -2,6 +2,7 @@
 #include <cutil_inline.h>
 #include <cublas.h>
 #include <sstream>
+#include <iostream>
 
 #include "type.h"
 
@@ -124,13 +125,28 @@ cudaEvent_t start, stopKernel, stopMax;
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, unsigned sharedSize, 
 		 unsigned m, ftype* d_snptsnp, ftype* d_Xtsnp, 
 		 unsigned d_XtsnpPitch, ftype ErrorSS, unsigned V2, 
-		 ftype* d_snpty, unsigned* d_snpMask, ftype* d_f){
+		 ftype* d_snpty, unsigned* d_snpMask, ftype* d_f) throw(int)
+{
     cublasGetError();
     cudaEventRecord(start, 0);
-    //plm<<<>>>();
+    plm<<<geno_count, blockSize, blockSize * sizeof(ftype)>>>
+      (m ,        
+       d_snptsnp, 
+       d_Xtsnp, 
+       d_XtsnpPitch, 
+       ErrorSS, V2, 
+       d_snpty, 
+       d_snpMask,
+       d_f);
     cudaEventRecord(stopKernel, 0);
+    cutilSafeCall(cudaThreadSynchronize());
     // cublas uses 1-based index
-    unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1) - 1;
+    unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1);
+    if(!maxFIndex){
+      cerr << "maxFIndex <= 0!" << endl;
+      throw(1);
+    }
+    maxFIndex -= 1;
 
     cudaEventRecord(stopMax, 0);
     return maxFIndex;

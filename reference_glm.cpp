@@ -5,11 +5,9 @@
 #include <vector>
 #include <limits>
 #include <algorithm>
-#include <cuda.h>
-#include <cutil_inline.h>
-#include <cublas.h>
 #include <stdlib.h>
 #include <sstream>
+#include <mpi.h>
 
 
 // Local project includes
@@ -18,10 +16,11 @@
 #include "GetPot"
 #include "svd.h"
 #include "cblas.h"
+#include "type.h"
+#include "tvUtil.h"
+#include "plm.h"
 
 #define iterationLimit 50
-
-#include "plm.cu"
 
 using namespace std;
 
@@ -33,6 +32,63 @@ unsigned int nextPow2( unsigned int x ) {
     x |= x >> 8;
     x |= x >> 16;
     return ++x;
+}
+
+int readInputs(string path, string fixed_filename, string geno_filename, 
+	       string y_filename,
+	       FortranMatrix &fixed, FortranMatrix &geno, vector<double> &y){
+  // Read the "fixed" array from file
+  {
+    // Open "fixed" file for reading
+    string filename = path + "/" + fixed_filename;
+    ifstream fixed_file(filename.c_str());
+
+    if (fixed_file){
+      // Loop over all rows and columns, set entries in the fixed matrix
+      for (unsigned i=0; i<fixed.get_n_rows(); ++i)
+	for (unsigned j=0; j<fixed.get_n_cols(); ++j)
+	  fixed_file >> fixed(i,j);
+    } else {
+      cout << "Failed to open file: " << fixed_file << "!!" << endl;
+      return 1;
+    }
+  }
+
+  // Read the geno array from file
+
+  {
+    // Open "fixed" file for reading
+    ifstream geno_file((path + "/" + geno_filename).c_str());
+    
+    if (geno_file){
+      // Loop over all rows and columns, set entries in the matrix
+      for (unsigned i=0; i<geno.get_n_rows(); ++i)
+	for (unsigned j=0; j<geno.get_n_cols(); ++j)
+	  geno_file >> geno(i,j);
+    } else {
+      cout << "Failed to open file!!" << endl;
+      return 1;
+    }
+  }
+  
+  
+  // Read the y-array from file.  Currently stored as a vector since that
+  // is how it is passed to the glm function, but could be changed to a
+  // FortranMatrix with one column...
+
+  {
+    // Open "fixed" file for reading
+    ifstream y_file((path + "/" + y_filename).c_str());
+
+    if (y_file){
+      // Loop over all rows and columns, set entries in the matrix
+      for (unsigned i=0; i<y.size(); ++i)
+	y_file >> y[i];
+    } else {
+      cout << "Failed to open file!!" << endl;
+      return 1;
+    }
+  }
 }
 
 int main()
@@ -77,71 +133,11 @@ int main()
   // Begin timing the file IO for all 3 files
   gettimeofday(&tstart, NULL);
 
-  
-  // Read the "fixed" array from file
-  {
-    // Open "fixed" file for reading
-    string filename = path + "/" + fixed_filename;
-    ifstream fixed_file(filename.c_str());
-
-    if (fixed_file){
-      // Loop over all rows and columns, set entries in the fixed matrix
-      // double val=99;
-      for (unsigned i=0; i<fixed.get_n_rows(); ++i)
-	for (unsigned j=0; j<fixed.get_n_cols(); ++j)
-	  fixed_file >> fixed(i,j);
-    } else {
-      cout << "Failed to open file: " << fixed_file << "!!" << endl;
-      return 1;
-    }
-  }
-
-  // Read the geno array from file
-
-  {
-    // Open "fixed" file for reading
-    ifstream geno_file((path + "/" + geno_filename).c_str());
-    
-    if (geno_file){
-      // Loop over all rows and columns, set entries in the matrix
-      for (unsigned i=0; i<geno.get_n_rows(); ++i)
-	for (unsigned j=0; j<geno.get_n_cols(); ++j)
-	  geno_file >> geno(i,j);
-    } else {
-      cout << "Failed to open file!!" << endl;
-      return 1;
-    }
-  }
-  
-  
-  // Read the y-array from file.  Currently stored as a vector since that
-  // is how it is passed to the glm function, but could be changed to a
-  // FortranMatrix with one column...
-
-  {
-    // Open "fixed" file for reading
-    ifstream y_file((path + "/" + y_filename).c_str());
-
-    if (y_file){
-	// Loop over all rows and columns, set entries in the matrix
-	for (unsigned i=0; i<y.size(); ++i)
-	  y_file >> y[i];
-    } else {
-      cout << "Failed to open file!!" << endl;
-      return 1;
-    }
-  }
+  readInputs(path, fixed_filename, geno_filename, y_filename, fixed, geno, y);
   
   gettimeofday(&tstop, NULL);
   
-  {
-    // Compute time taken for IO
-    const double io_elapsed_time = 
-      (double)(tstop.tv_sec  - tstart.tv_sec) +
-      (tstop.tv_usec - tstart.tv_usec)*1.e-6;
-    
-    cout << "Time required for I/O: " << io_elapsed_time << " s." << endl;
-  }
+  cout << "Time required for I/O: " << tvDouble(tstop - tstart) << " s" << endl;
   
   // Version A, Kt a general matrix.
   // Create the Kt matrix.  It has 1 row and fixed_count+2 columns.
@@ -331,42 +327,10 @@ int main()
   //! @todo could use d_f also as a mask
   unsigned *d_snpMask;
   vector<unsigned> snpMask(geno_count, 0);
-  
-  cutilSafeCall(cudaMalloc(&d_snpMask, geno_count * sizeof(unsigned)));
-  cutilSafeCall(cudaMemcpy(d_snpMask, &snpMask[0], 
-			   geno_count * sizeof(unsigned), 
-			   cudaMemcpyHostToDevice));
-
   // column-major with padding
   size_t d_XtsnpPitch;
   
-  //! @todo this won't be coalesced
-  cutilSafeCall(cudaMalloc(&d_snptsnp, geno_count * sizeof(ftype)));
-  cutilSafeCall(cudaMemcpy(d_snptsnp, &SNPtSNP[0], geno_count * sizeof(ftype), 
-			   cudaMemcpyHostToDevice));
-
-  cutilSafeCall(cudaMallocPitch(&d_Xtsnp, &d_XtsnpPitch, 
-				(n + iterationLimit) * sizeof(ftype), 
-				geno_count));
-  cutilSafeCall(cudaMemcpy2D(d_Xtsnp, d_XtsnpPitch, &XtSNP.values[0], 
-			     n * sizeof(ftype), n * sizeof(ftype), geno_count, 
-			     cudaMemcpyHostToDevice));
-  
-  cutilSafeCall(cudaMalloc(&d_snpty, geno_count * sizeof(ftype)));
-  cutilSafeCall(cudaMemcpy(d_snpty, &SNPty[0], geno_count * sizeof(ftype), 
-			   cudaMemcpyHostToDevice));
-  
-  cutilSafeCall(cudaMemcpyToSymbol(d_G, &XtXi.values[0], n * n * sizeof(ftype)));
-  cutilSafeCall(cudaMemcpyToSymbol(d_Xty, &Xty[0], n * sizeof(ftype)));
-  
-  cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(ftype)));
-
-  //gettimeofday(&tstart, NULL);
-  cudaEvent_t start, stopKernel, stopMax;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stopKernel);
-  cudaEventCreate(&stopMax);
-  
+  copyToDevice();
   
   // For each column of the geno array, set up the "X" matrix,
   // call the GLM routine, and store the computed p value.  Note
@@ -397,43 +361,23 @@ int main()
     //unsigned threads = nextPow2(n);
 
     // clear last error
-    cublasGetError();
-    cudaEventRecord(start, 0);
-    plm<<<geno_count, n, n * sizeof(ftype)>>>
-      (m, 
-       d_snptsnp, 
-       d_Xtsnp, 
-       d_XtsnpPitch, 
-       glm_data.ErrorSS, glm_data.V2, 
-       d_snpty, 
-       d_snpMask,
-       d_f);
-    cudaEventRecord(stopKernel, 0);
+    unsigned maxFIndex = plm_GPU(geno_count, n, n * sizeof(ftype), 
+	m ,        
+	d_snptsnp, 
+	d_Xtsnp, 
+	d_XtsnpPitch, 
+	glm_data.ErrorSS, glm_data.V2, 
+	d_snpty, 
+	d_snpMask,
+	d_f);
     
-    // cublas uses 1-based index
-    unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1) - 1;
-
-    cudaEventRecord(stopMax, 0);
-    cutilSafeCall(cudaThreadSynchronize());
+    
+    
+    //cutilSafeCall(cudaThreadSynchronize());
+    
     // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
     // if V1 = 0, ignore; F is undefined
-    // Store the computed value in an array
-    //Fval[i] = glm_data_new.F;
-    //V2s[i] = glm_data_new.V2; 
-  
-#ifndef _DEBUG
-    cutilSafeCall(cudaMemcpy(&Fval[maxFIndex], &d_f[maxFIndex], sizeof(ftype),
-			     cudaMemcpyDeviceToHost));
-#else
-    cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(ftype),
-			     cudaMemcpyDeviceToHost));
-    {
-      stringstream ss;
-      ss << "Fval_" << iteration << ".dat";
-      writeD(ss.str(), Fval);
-    }
-
-#endif
+    getMaxF();
     cout << "max F: " << Fval[maxFIndex] << " (" << maxFIndex << ")" << endl;
     
     // get p value
@@ -463,8 +407,6 @@ int main()
       To remove SNP from geno, set mask at SNP index.
      */
     snpMask[maxFIndex] = 1;
-    cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
-			     sizeof(unsigned), cudaMemcpyHostToDevice));
 
     glm(X, XtXi, &XtSNP(0, maxFIndex), SNPtSNP[maxFIndex], SNPty[maxFIndex], yty, Xty, 
 	rX, glm_data);
@@ -483,14 +425,6 @@ int main()
 		);
     XtSNP.writeD("XtSNP.dat");
 
-    //! copy updated XtSNP to GPU
-    cutilSafeCall(cudaMemcpy2D(d_Xtsnp + n, 
-			       d_XtsnpPitch,
-			       &XtSNP(n, 0), 
-			       (n + 1) * sizeof(ftype),
-			       sizeof(ftype),
-			       geno_count,
-			       cudaMemcpyHostToDevice));
 
     // update host X
     //! @todo is this even used?
@@ -498,32 +432,20 @@ int main()
     memcpy(&X(0, n), &geno(0, maxFIndex), m* sizeof(ftype));
     X.writeD("X.dat");
     
-    // update GPU G (const mem)
-    cutilSafeCall(cudaMemcpyToSymbol(d_G, &XtXi.values[0], 
-				     (n + 1) * (n + 1) * sizeof(ftype)));
-
-    // update GPU Xty (const mem)
-    // call fails unless we update the whole thing
-    cutilSafeCall(cudaMemcpyToSymbol(d_Xty, &Xty[0], (n + 1) * sizeof(ftype)));
-  
+    copyUpdateToDevice();
   
     n++;
 
     {
-      float computation_elapsed_time;
-      cudaEventElapsedTime(&computation_elapsed_time, start, stopKernel);
-      computation_elapsed_time /= 1000.0f;
       cout << "GPU time required for computations: "
-	   << computation_elapsed_time << " s" << endl;
-      cout << "GPU time per SNP: " << computation_elapsed_time / geno_count 
+	   << getGPUCompTime() << " s" << endl;
+      cout << "GPU time per SNP: " << getGPUCompTime() / geno_count 
 	   << " s" << endl;
 
 
-      cudaEventElapsedTime(&computation_elapsed_time, stopKernel, stopMax);
-      computation_elapsed_time /= 1000.0f;
       cout << "GPU time required for reduction: "
-	   << computation_elapsed_time << " s" << endl;
-      cout << "GPU time per SNP: " << computation_elapsed_time / geno_count 
+	   << getGPUMaxTime() << " s" << endl;
+      cout << "GPU time per SNP: " << getGPUMaxTime() / geno_count 
 	   << " s" << endl;
     }
     iteration++;

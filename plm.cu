@@ -1,4 +1,7 @@
 #include <cuda.h>
+#include <cutil_inline.h>
+#include <cublas.h>
+
 #include "type.h"
 
 #include "cuda_blas.cu"
@@ -110,4 +113,108 @@ __global__ void plm(// inputs
       f[BID] = -1;
     return;
   }
+}
+
+cudaEvent_t start, stopKernel, stopMax;
+
+unsigned plm_GPU(unsigned, unsigned, unsigned, unsigned, ftype*, ftype*, unsigned, ftype,
+	unsigned, ftype*, unsigned*, ftype*){
+    cublasGetError();
+    cudaEventRecord(start, 0);
+    //plm<<<>>>();
+    cudaEventRecord(stopKernel, 0);
+    // cublas uses 1-based index
+    unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1) - 1;
+
+    cudaEventRecord(stopMax, 0);
+    return maxFIndex;
+}
+
+int copyToDevice(){
+  cutilSafeCall(cudaMalloc(&d_snpMask, geno_count * sizeof(unsigned)));
+  cutilSafeCall(cudaMemcpy(d_snpMask, &snpMask[0], 
+			   geno_count * sizeof(unsigned), 
+			   cudaMemcpyHostToDevice));
+
+  
+  //! @todo this won't be coalesced
+  cutilSafeCall(cudaMalloc(&d_snptsnp, geno_count * sizeof(ftype)));
+  cutilSafeCall(cudaMemcpy(d_snptsnp, &SNPtSNP[0], geno_count * sizeof(ftype), 
+			   cudaMemcpyHostToDevice));
+
+  cutilSafeCall(cudaMallocPitch(&d_Xtsnp, &d_XtsnpPitch, 
+				(n + iterationLimit) * sizeof(ftype), 
+				geno_count));
+  cutilSafeCall(cudaMemcpy2D(d_Xtsnp, d_XtsnpPitch, &XtSNP.values[0], 
+			     n * sizeof(ftype), n * sizeof(ftype), geno_count, 
+			     cudaMemcpyHostToDevice));
+  
+  cutilSafeCall(cudaMalloc(&d_snpty, geno_count * sizeof(ftype)));
+  cutilSafeCall(cudaMemcpy(d_snpty, &SNPty[0], geno_count * sizeof(ftype), 
+			   cudaMemcpyHostToDevice));
+  
+  cutilSafeCall(cudaMemcpyToSymbol(d_G, &XtXi.values[0], n * n * sizeof(ftype)));
+  cutilSafeCall(cudaMemcpyToSymbol(d_Xty, &Xty[0], n * sizeof(ftype)));
+  
+  cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(ftype)));
+
+  //gettimeofday(&tstart, NULL);
+  cudaEventCreate(&start);
+  cudaEventCreate(&stopKernel);
+  cudaEventCreate(&stopMax);
+  return 0;
+}
+
+int copyFromDevice(){
+  return 0;
+}
+
+int copyUpdateToDevice(){
+    cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
+			     sizeof(unsigned), cudaMemcpyHostToDevice));
+
+    //! copy updated XtSNP to GPU
+    cutilSafeCall(cudaMemcpy2D(d_Xtsnp + n, 
+			       d_XtsnpPitch,
+			       &XtSNP(n, 0), 
+			       (n + 1) * sizeof(ftype),
+			       sizeof(ftype),
+			       geno_count,
+			       cudaMemcpyHostToDevice));
+
+    // update GPU G (const mem)
+    cutilSafeCall(cudaMemcpyToSymbol(d_G, &XtXi.values[0], 
+				     (n + 1) * (n + 1) * sizeof(ftype)));
+
+    // update GPU Xty (const mem)
+    // call fails unless we update the whole thing
+    cutilSafeCall(cudaMemcpyToSymbol(d_Xty, &Xty[0], (n + 1) * sizeof(ftype)));
+
+}
+
+float getGPUCompTime(){
+  return cudaEventElapsedTime(&computation_elapsed_time, start, stopKernel) /
+    1000.0f;
+}
+
+float getGPUMaxTime(){
+  return cudaEventElapsedTime(&computation_elapsed_time, stopKernel, stopMax) /
+    1000.0f;
+}
+
+int getMaxF(){
+#ifndef _DEBUG
+    cutilSafeCall(cudaMemcpy(&Fval[maxFIndex], &d_f[maxFIndex], sizeof(ftype),
+			     cudaMemcpyDeviceToHost));
+#else
+    cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(ftype),
+			     cudaMemcpyDeviceToHost));
+    {
+      stringstream ss;
+      ss << "Fval_" << iteration << ".dat";
+      writeD(ss.str(), Fval);
+    }
+
+#endif
+
 }

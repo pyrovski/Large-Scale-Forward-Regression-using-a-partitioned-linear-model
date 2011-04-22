@@ -16,14 +16,19 @@ geno_count, n, n * sizeof(ftype),
 */
 
 void copyToDevice(const unsigned geno_count, const unsigned n, 
-		 ftype *&d_snptsnp, ftype *&d_Xtsnp, unsigned &d_XtsnpPitch, 
+		 ftype *&d_snptsnp, ftype *&d_Xtsnp, size_t &d_XtsnpPitch, 
 		 ftype *&d_snpty, unsigned *&d_snpMask, ftype *&d_f,
 		 const vector<double> &SNPtSNP, const FortranMatrix &XtSNP,
 		 const vector<double> &SNPty,
 		 const vector<double> &Xty, const FortranMatrix &XtXi, 
 		 const vector<unsigned> &snpMask);
-void copyFromDevice();
-void copyUpdateToDevice();
+void copyUpdateToDevice(unsigned geno_count, unsigned n,
+		       unsigned *d_snpMask, 
+		       unsigned maxFIndex, ftype *d_Xtsnp, 
+		       size_t d_XtsnpPitch,
+		       const vector<unsigned> &snpMask,
+		       const FortranMatrix &XtSNP, const FortranMatrix &XtXi,
+		       const vector<double> &Xty);
 float getGPUCompTime();
 float getGPUMaxTime();
 void getMaxF();

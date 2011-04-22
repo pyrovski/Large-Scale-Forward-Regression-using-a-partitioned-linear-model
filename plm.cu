@@ -138,7 +138,7 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize, unsigned sharedSize,
   should only be called once
  */
 void copyToDevice(unsigned geno_count, const unsigned n, 
-		 ftype *&d_snptsnp, ftype *&d_Xtsnp, unsigned &d_XtsnpPitch, 
+		 ftype *&d_snptsnp, ftype *&d_Xtsnp, size_t &d_XtsnpPitch, 
 		 ftype *&d_snpty, unsigned *&d_snpMask, ftype *&d_f,
 		 const vector<double> &SNPtSNP, const FortranMatrix &XtSNP,
 		 const vector<double> &SNPty,
@@ -177,15 +177,12 @@ void copyToDevice(unsigned geno_count, const unsigned n,
 
 }
 
-void copyFromDevice(){
-}
-
 void copyUpdateToDevice(unsigned geno_count, unsigned n,
 		       unsigned *d_snpMask, 
 		       unsigned maxFIndex, ftype *d_Xtsnp, 
-		       unsigned d_XtsnpPitch,
+		       size_t d_XtsnpPitch,
 		       const vector<unsigned> &snpMask,
-		       const vector<double> &XtSNP, const FortranMatrix &XtXi,
+		       FortranMatrix &XtSNP, const FortranMatrix &XtXi,
 		       const vector<double> &Xty){
     cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
 			     sizeof(unsigned), cudaMemcpyHostToDevice));
@@ -193,7 +190,7 @@ void copyUpdateToDevice(unsigned geno_count, unsigned n,
     //! copy updated XtSNP to GPU
     cutilSafeCall(cudaMemcpy2D(d_Xtsnp + n, 
 			       d_XtsnpPitch,
-			       &XtSNP(n, 0), 
+			       &XtSNP(n, (unsigned)0), 
 			       (n + 1) * sizeof(ftype),
 			       sizeof(ftype),
 			       geno_count,

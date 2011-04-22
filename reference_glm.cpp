@@ -435,7 +435,8 @@ int main()
     memcpy(&X(0, n), &geno(0, maxFIndex), m* sizeof(ftype));
     X.writeD("X.dat");
     
-    copyUpdateToDevice();
+    copyUpdateToDevice(geno_count, n, d_snpMask, maxFIndex, d_Xtsnp, 
+		       d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);
   
     n++;
 

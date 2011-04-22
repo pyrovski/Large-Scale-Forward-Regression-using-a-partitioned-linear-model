@@ -31,4 +31,5 @@ void copyUpdateToDevice(unsigned geno_count, unsigned n,
 		       const std::vector<double> &Xty);
 float getGPUCompTime();
 float getGPUMaxTime();
-void getMaxF(std::vector<double> &Fval, unsigned maxFIndex, ftype *d_f);
+void getMaxF(unsigned iteration, unsigned geno_count, std::vector<double> &Fval, 
+	     unsigned maxFIndex, ftype *d_f);

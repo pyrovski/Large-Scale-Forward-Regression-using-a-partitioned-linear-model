@@ -1,6 +1,7 @@
 #include <cuda.h>
 #include <cutil_inline.h>
 #include <cublas.h>
+#include <sstream>
 
 #include "type.h"
 
@@ -219,7 +220,8 @@ float getGPUMaxTime(){
   return computation_elapsed_time / 1000.0f;
 }
 
-void getMaxF(vector<double> &Fval, unsigned maxFIndex, ftype *d_f){
+void getMaxF(unsigned iteration, unsigned geno_count, vector<double> &Fval, 
+	     unsigned maxFIndex, ftype *d_f){
 #ifndef _DEBUG
     cutilSafeCall(cudaMemcpy(&Fval[maxFIndex], &d_f[maxFIndex], sizeof(ftype),
 			     cudaMemcpyDeviceToHost));

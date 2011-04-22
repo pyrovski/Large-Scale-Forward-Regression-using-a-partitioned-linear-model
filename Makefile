@@ -21,7 +21,7 @@ CUDA_INC=-I$(CUDA_SDK)/C/common/inc -I$(CUDA_TK)/include
 CC = $(CUDA_TK)/bin/nvcc
 
 # The location (and name) of the BLAS/Lapack libraries
-BLAS_LAPACK_LIB = -lf77blas -latlas -L/usr/lib/atlas/ -llapack
+BLAS_LAPACK_LIB = -llapack
 # You should not need to edit anything below this line...
 
 # Location of GSL header files and libraries

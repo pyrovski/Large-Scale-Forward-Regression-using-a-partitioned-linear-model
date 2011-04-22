@@ -91,90 +91,7 @@ int readInputs(string path, string fixed_filename, string geno_filename,
   }
 }
 
-int main()
-{
-  //! @todo this should be a command line parameter
-  ftype entry_limit = 0.2;
-
-  // Timing variables
-  timeval tstart, tstop;
-
-  // Create input file object.  Put the path to your data files here!
-  GetPot input_file("reference_glm.in");
-  
-  // The path on my system to the location of the data files.  Don't forget the trailing
-  // slash here, as this will be prepended to the filename below
-  string path = "./"; // default path is the current directory.
-  path = input_file("path", path.c_str());
-  
-  // File containing the "population structure".  It is a 4892-by-26 matrix
-  string fixed_filename = "fixed.effects.nam.sorted.filtered.dat";
-
-  // File containing the genotypes.  It is a 4892-by-79 matrix.
-  string geno_filename = "imputed.marker.chr10.sorted.filtered.dat";
-
-  // File containing the phenotypes.  It is a 4892-by-1 matrix.  The file is
-  // arranged in a single column.
-  string y_filename = "residuals.chr10.sorted.dat";
-
-  // In Matlab, these sizes are inferred from the data.  In C++, we hard-code them
-  // to make reading the data simpler...
-  unsigned pop_ind = 4892, fixed_count = 26; // rows, columns of the fixed array
-  unsigned geno_ind = 4892, geno_count = 79; // rows, columns of the geno array
-  unsigned y_ind = 4892;//, y_count = 1;        // rows, columns of the y vector
-
-  const unsigned m = geno_ind;
-
-  // Matrix objects for storing the input data
-  FortranMatrix fixed(pop_ind, fixed_count);
-  FortranMatrix geno(geno_ind, geno_count);
-  vector<double> y(y_ind);
-
-  // Begin timing the file IO for all 3 files
-  gettimeofday(&tstart, NULL);
-
-  readInputs(path, fixed_filename, geno_filename, y_filename, fixed, geno, y);
-  
-  gettimeofday(&tstop, NULL);
-  
-  cout << "Time required for I/O: " << tvDouble(tstop - tstart) << " s" << endl;
-  
-  // Version A, Kt a general matrix.
-  // Create the Kt matrix.  It has 1 row and fixed_count+2 columns.
-  // The entries of Kt are all zero except for the last entry, which is 1.
-  //FortranMatrix Kt(1,fixed_count+2);
-  //Kt(0, fixed_count+1) = 1.; // Set last entry = 1
-
-  // Version B, Kt assumed a vector.
-  //! @todo assume Kt has a single non-zero element; a 1.0 at the end
-  vector<double> Kt(fixed_count+2);
-   Kt.back() = 1.; // Set last entry = 1
-  
-  // An array to hold the results of the GLM calculations
-  vector<double> Pval(geno_count);
-  vector<double> Fval(geno_count);
-  vector<double> V2s(geno_count);
-  
-  // Initialize the X-matrix.  The first column is all ones, the next
-  // fixed_count columns are equal to the fixed matrix, and the last
-  // column (which changes) is the i'th column of the geno array.
-  unsigned n = fixed_count + 1;
-  FortranMatrix X(geno_ind/*4892*/, n/*27*/);
-  FortranMatrix XtX;
-  vector<double> S;
-  FortranMatrix U, Vt, XtXi;
-
-  GLMData glm_data, glm_data_new;
-  vector<double> beta;
-  vector<double> Xty;
-  unsigned rX;
-  double tol;
-  double yty;
-  vector<double> SNPtSNP(geno_count), SNPty(geno_count);;
-  
-  // Begin timing the computations
-  gettimeofday(&tstart, NULL);
-
+void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, vector<double> &y, FortranMatrix &U, vector<double> &S, FortranMatrix &Vt, unsigned &rX, vector<double> &beta, unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, GLMData &glm_data, unsigned &geno_ind, unsigned &geno_count, const unsigned &m, FortranMatrix &geno, FortranMatrix &XtSNP, vector<double> &SNPty, vector<double> &SNPtSNP){
   // Fill first column of X with 1's
   for (unsigned i=0; i<X.get_n_rows(); ++i)
     X(i,0) = 1.;
@@ -273,7 +190,6 @@ int main()
   glm_data.V2 = geno_ind - rX;
 
   
-  FortranMatrix XtSNP(n, geno_count);
     // compute Xt * SNP    
 
     //! @todo fix lda for incremental computation
@@ -316,6 +232,98 @@ int main()
     SNPtSNP[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
 				&geno.values[i*geno_ind], 1);
   }
+
+
+}
+
+int main()
+{
+  //! @todo this should be a command line parameter
+  ftype entry_limit = 0.2;
+
+  // Timing variables
+  timeval tstart, tstop;
+
+  // Create input file object.  Put the path to your data files here!
+  GetPot input_file("reference_glm.in");
+  
+  // The path on my system to the location of the data files.  Don't forget the trailing
+  // slash here, as this will be prepended to the filename below
+  string path = "./"; // default path is the current directory.
+  path = input_file("path", path.c_str());
+  
+  // File containing the "population structure".  It is a 4892-by-26 matrix
+  string fixed_filename = "fixed.effects.nam.sorted.filtered.dat";
+
+  // File containing the genotypes.  It is a 4892-by-79 matrix.
+  string geno_filename = "imputed.marker.chr10.sorted.filtered.dat";
+
+  // File containing the phenotypes.  It is a 4892-by-1 matrix.  The file is
+  // arranged in a single column.
+  string y_filename = "residuals.chr10.sorted.dat";
+
+  // In Matlab, these sizes are inferred from the data.  In C++, we hard-code them
+  // to make reading the data simpler...
+  unsigned pop_ind = 4892, fixed_count = 26; // rows, columns of the fixed array
+  unsigned geno_ind = 4892, geno_count = 79; // rows, columns of the geno array
+  unsigned y_ind = 4892;//, y_count = 1;        // rows, columns of the y vector
+
+  const unsigned m = geno_ind;
+
+  // Matrix objects for storing the input data
+  FortranMatrix fixed(pop_ind, fixed_count);
+  FortranMatrix geno(geno_ind, geno_count);
+  vector<double> y(y_ind);
+
+  // Begin timing the file IO for all 3 files
+  gettimeofday(&tstart, NULL);
+
+  readInputs(path, fixed_filename, geno_filename, y_filename, fixed, geno, y);
+  
+  gettimeofday(&tstop, NULL);
+  
+  cout << "Time required for I/O: " << tvDouble(tstop - tstart) << " s" << endl;
+  
+  // Version A, Kt a general matrix.
+  // Create the Kt matrix.  It has 1 row and fixed_count+2 columns.
+  // The entries of Kt are all zero except for the last entry, which is 1.
+  //FortranMatrix Kt(1,fixed_count+2);
+  //Kt(0, fixed_count+1) = 1.; // Set last entry = 1
+
+  // Version B, Kt assumed a vector.
+  //! @todo assume Kt has a single non-zero element; a 1.0 at the end
+  vector<double> Kt(fixed_count+2);
+   Kt.back() = 1.; // Set last entry = 1
+  
+  // An array to hold the results of the GLM calculations
+  vector<double> Pval(geno_count);
+  vector<double> Fval(geno_count);
+  vector<double> V2s(geno_count);
+  
+  // Initialize the X-matrix.  The first column is all ones, the next
+  // fixed_count columns are equal to the fixed matrix, and the last
+  // column (which changes) is the i'th column of the geno array.
+  unsigned n = fixed_count + 1;
+  FortranMatrix X(geno_ind/*4892*/, n/*27*/);
+  FortranMatrix XtX;
+  vector<double> S;
+  FortranMatrix U, Vt, XtXi;
+
+  GLMData glm_data, glm_data_new;
+  vector<double> beta;
+  vector<double> Xty;
+  unsigned rX;
+  double tol;
+  double yty;
+  vector<double> SNPtSNP(geno_count), SNPty(geno_count);;
+  FortranMatrix XtSNP(n, geno_count);
+  
+  // Begin timing the computations
+  gettimeofday(&tstart, NULL);
+
+  compPrepare(X, fixed, fixed_count, XtX, Xty, y, U, S, Vt, rX, beta, n, tol, XtXi, 
+	      yty, glm_data, geno_ind, geno_count, m, geno, XtSNP, SNPty, 
+	      SNPtSNP);
 
   gettimeofday(&tstop, NULL);
   

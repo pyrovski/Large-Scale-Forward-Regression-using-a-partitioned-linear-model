@@ -2,12 +2,13 @@
 #define __fortran_matrix_h__
 
 #include <string>
+#include <vector>
 
 class FortranMatrix
 {
 public:
   // Constructor, by default, an empty matrix is constructed
-  FortranMatrix(unsigned nr, unsigned nc);
+  FortranMatrix(unsigned nr = 0, unsigned nc = 0);
 
   void add(const FortranMatrix &rhs);
 

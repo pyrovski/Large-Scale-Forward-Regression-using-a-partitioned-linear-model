@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <sstream>
 #include <mpi.h>
-
+#include <gsl/gsl_cdf.h>
 
 // Local project includes
 #include "fortran_matrix.h"

@@ -8,6 +8,7 @@
 
 #include "plm.h"
 
+using namespace std;
 //__shared__ ftype fval; // scalar
 extern __shared__ ftype shared[];
 

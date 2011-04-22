@@ -20,7 +20,7 @@ using namespace std;
 // it will be more efficient to fill this matrix column-by-column...
 
   // Constructor, by default, an empty matrix is constructed
-  FortranMatrix::FortranMatrix(unsigned nr=0, unsigned nc=0) : n_rows(nr), n_cols(nc), values(nr*nc) {}
+  FortranMatrix::FortranMatrix(unsigned nr, unsigned nc) : n_rows(nr), n_cols(nc), values(nr*nc) {}
 
 const FortranMatrix & FortranMatrix::operator = (const FortranMatrix &rhs){
     this->values = rhs.values;

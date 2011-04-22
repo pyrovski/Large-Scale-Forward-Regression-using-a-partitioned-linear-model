@@ -35,9 +35,9 @@ LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB) -lcublas $(CUDA_LIBS)
 # Set all include flags here for later use
 #INCLUDE_FLAGS = $(GSL_INCLUDE)
 
-CPU_SRC = reference_glm.cpp tvUtil.cpp fortran_matrix.cpp glm.cpp
-GPU_SRC = plm.cu cuda_blas.cu
-HEADERS= type.h fortran_matrix.h print_matrix.h glm.h plm.h fortran_matrix.h
+CPU_SRC = reference_glm.cpp tvUtil.cpp fortran_matrix.cpp glm.cpp print_matrix.cpp svd.cpp
+GPU_SRC = plm.cu
+HEADERS= type.h fortran_matrix.h print_matrix.h glm.h plm.h fortran_matrix.h print_matrix.h svd.h cuda_blas.cu
 SRC=$(CPU_SRC) $(GPU_SRC)
 target = reference_glm
 objects = $(patsubst %.cpp,%.o,$(CPU_SRC)) $(patsubst %.cu,%.o,$(GPU_SRC))

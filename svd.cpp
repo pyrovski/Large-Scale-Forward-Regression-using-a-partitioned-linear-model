@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "svd.h"
 
 // Use this routine to create the U, S, and V^T matrices.  The results
@@ -287,7 +288,7 @@ int svd_apply(/*in */ FortranMatrix& U,
 int svd_solve(FortranMatrix& A,
 	      std::vector<double>& x, // solution
 	      const std::vector<double>& b, // rhs
-	      double tol=)
+	      double tol)
 {
   // SVD components
   std::vector<double> S;

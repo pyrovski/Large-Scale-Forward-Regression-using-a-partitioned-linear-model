@@ -236,13 +236,48 @@ void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, F
 
 }
 
-int main()
+void compUpdate(vector<unsigned> &snpMask, unsigned &maxFIndex, FortranMatrix &X, 
+		FortranMatrix &XtXi, FortranMatrix &XtSNP, 
+		vector<double> &SNPtSNP, vector<double> &SNPty, double &yty,
+		vector<double> &Xty, unsigned &rX, GLMData &glm_data,
+		unsigned &n, unsigned &geno_count, const unsigned &m, 
+		FortranMatrix &geno){
+    snpMask[maxFIndex] = 1;
+
+    glm(X, XtXi, &XtSNP(0, maxFIndex), SNPtSNP[maxFIndex], SNPty[maxFIndex], yty, Xty, 
+	rX, glm_data);
+    XtXi.writeD("XtXi.dat");
+    XtSNP.resize_retain(n+1, geno_count);
+    cblas_dgemv(CblasColMajor, CblasTrans, 
+		m, geno_count,
+		1.0, 
+		&geno.values[0],
+		m,
+		&geno(0, maxFIndex),
+		1,
+		0,
+		&XtSNP(n, 0),
+		n+1
+		);
+    XtSNP.writeD("XtSNP.dat");
+
+
+    // update host X
+    X.resize_retain(m, n + 1);
+    memcpy(&X(0, n), &geno(0, maxFIndex), m* sizeof(ftype));
+    X.writeD("X.dat");
+
+}
+
+int main(int argc, char **argv)
 {
   //! @todo this should be a command line parameter
   ftype entry_limit = 0.2;
 
   // Timing variables
   timeval tstart, tstop;
+
+  //! @todo list of input files should be command line parameter
 
   // Create input file object.  Put the path to your data files here!
   GetPot input_file("reference_glm.in");
@@ -277,9 +312,7 @@ int main()
 
   // Begin timing the file IO for all 3 files
   gettimeofday(&tstart, NULL);
-
   readInputs(path, fixed_filename, geno_filename, y_filename, fixed, geno, y);
-  
   gettimeofday(&tstop, NULL);
   
   cout << "Time required for I/O: " << tvDouble(tstop - tstart) << " s" << endl;
@@ -385,9 +418,6 @@ int main()
       exit(e);
     }
     
-    
-    //cutilSafeCall(cudaThreadSynchronize());
-    
     // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
     // if V1 = 0, ignore; F is undefined
     getMaxF(iteration, geno_count, Fval, maxFIndex, d_f);
@@ -407,7 +437,7 @@ int main()
       break;
     }
   
-    /*! @todo update 
+    /*! update 
       - X, (host only, done)
       - Xty, (done)
       - geno, (done)
@@ -419,30 +449,7 @@ int main()
       Assume data is in-core for GPU; i.e. don't recopy SNPs at each iteration.
       To remove SNP from geno, set mask at SNP index.
      */
-    snpMask[maxFIndex] = 1;
-
-    glm(X, XtXi, &XtSNP(0, maxFIndex), SNPtSNP[maxFIndex], SNPty[maxFIndex], yty, Xty, 
-	rX, glm_data);
-    XtXi.writeD("XtXi.dat");
-    XtSNP.resize_retain(n+1, geno_count);
-    cblas_dgemv(CblasColMajor, CblasTrans, 
-		m, geno_count,
-		1.0, 
-		&geno.values[0],
-		m,
-		&geno(0, maxFIndex),
-		1,
-		0,
-		&XtSNP(n, 0),
-		n+1
-		);
-    XtSNP.writeD("XtSNP.dat");
-
-
-    // update host X
-    X.resize_retain(m, n + 1);
-    memcpy(&X(0, n), &geno(0, maxFIndex), m* sizeof(ftype));
-    X.writeD("X.dat");
+    compUpdate(snpMask, maxFIndex, X, XtXi, XtSNP, SNPtSNP, SNPty, yty, Xty, rX, glm_data, n , geno_count, m, geno);
     
     copyUpdateToDevice(geno_count, n, d_snpMask, maxFIndex, d_Xtsnp, 
 		       d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);

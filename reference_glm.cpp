@@ -160,6 +160,20 @@ int main()
   // column (which changes) is the i'th column of the geno array.
   unsigned n = fixed_count + 1;
   FortranMatrix X(geno_ind/*4892*/, n/*27*/);
+  FortranMatrix XtX;
+  vector<double> S;
+  FortranMatrix U, Vt, XtXi;
+
+  GLMData glm_data, glm_data_new;
+  vector<double> beta;
+  vector<double> Xty;
+  unsigned rX;
+  double tol;
+  double yty;
+  vector<double> SNPtSNP(geno_count), SNPty(geno_count);;
+  
+  // Begin timing the computations
+  gettimeofday(&tstart, NULL);
 
   // Fill first column of X with 1's
   for (unsigned i=0; i<X.get_n_rows(); ++i)
@@ -170,9 +184,6 @@ int main()
 	 fixed_count * X.get_n_rows() * sizeof(double));
 
   
-  // Begin timing the computations
-  gettimeofday(&tstart, NULL);
-
   /*! precompute
     XtX
     XtXi
@@ -183,19 +194,14 @@ int main()
     SNPtSNP
    */
   
-  FortranMatrix XtX = matmat(X, X, true, false); 
+  XtX = matmat(X, X, true, false); 
   XtX.writeD("XtX.dat");
 
   // Solve (X^T * X)*beta = X^T*y for beta.  Note that X and X^T * X
   // have the same rank.
 
   // Initialize SVD components, A = U * S * V^T
-  vector<double> S;
-  FortranMatrix U, Vt, XtXi;
-
-  GLMData glm_data, glm_data_new;
-  vector<double> beta;
-  vector<double> Xty = matvec(X, y, /*transX=*/true);
+  Xty = matvec(X, y, /*transX=*/true);
   
   writeD("Xty.dat", Xty);
 
@@ -205,7 +211,7 @@ int main()
   writeD("S.dat", S);
 
   Vt.writeD("Vt.dat");
-  unsigned rX = svd_apply(U, S, Vt, /*result=*/beta, Xty);
+  rX = svd_apply(U, S, Vt, /*result=*/beta, Xty);
 
   writeD("beta.dat", beta);
 
@@ -223,7 +229,7 @@ int main()
   double maxS = 0.0;
   for(unsigned i = 0; i < n; i++)
     maxS = max(maxS, S[i]); // compute norm(XtX, 2) = max(S)
-  double tol = n * numeric_limits<double>::epsilon() * maxS;
+  tol = n * numeric_limits<double>::epsilon() * maxS;
   for(unsigned i = 0; i < n; i++)
     if(S[i])
       if(S[i] > tol)
@@ -258,7 +264,7 @@ int main()
   XtXi.writeD("XtXi.dat");
 
   // Compute the matrix-vector product, XTy := X' * y.  
-  double yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
+  yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
 
   //! @todo compute initial V2 = m - rX, SSE = yty - beta' * Xty
     
@@ -289,7 +295,6 @@ int main()
 	      );
   XtSNP.writeD("XtSNP.dat");
 
-  vector<double> SNPtSNP(geno_count), SNPty(geno_count);
   //SNPty[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
   cblas_dgemv(CblasColMajor,
 	      CblasTrans,
@@ -314,13 +319,8 @@ int main()
 
   gettimeofday(&tstop, NULL);
   
-  {
-    const double computation_prep_time = 
-      (tstop.tv_sec  - tstart.tv_sec) +
-      (tstop.tv_usec - tstart.tv_usec)*1.e-6;
-    cout << "Time required for computation prep: "
-	 << computation_prep_time << " s" << endl;
-  }
+  cout << "Time required for computation prep: "
+       << tvDouble(tstop - tstart) << " s" << endl;
   
   ftype *d_snptsnp, *d_Xtsnp, *d_snpty,
     *d_f;

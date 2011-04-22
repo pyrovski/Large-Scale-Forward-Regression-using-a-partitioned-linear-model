@@ -242,31 +242,30 @@ void compUpdate(vector<unsigned> &snpMask, unsigned &maxFIndex, FortranMatrix &X
 		vector<double> &Xty, unsigned &rX, GLMData &glm_data,
 		unsigned &n, unsigned &geno_count, const unsigned &m, 
 		FortranMatrix &geno){
-    snpMask[maxFIndex] = 1;
+  snpMask[maxFIndex] = 1;
 
-    glm(X, XtXi, &XtSNP(0, maxFIndex), SNPtSNP[maxFIndex], SNPty[maxFIndex], yty, Xty, 
-	rX, glm_data);
-    XtXi.writeD("XtXi.dat");
-    XtSNP.resize_retain(n+1, geno_count);
-    cblas_dgemv(CblasColMajor, CblasTrans, 
-		m, geno_count,
-		1.0, 
-		&geno.values[0],
-		m,
-		&geno(0, maxFIndex),
-		1,
-		0,
-		&XtSNP(n, 0),
-		n+1
-		);
-    XtSNP.writeD("XtSNP.dat");
+  glm(X, XtXi, &XtSNP(0, maxFIndex), SNPtSNP[maxFIndex], SNPty[maxFIndex], yty, Xty, 
+      rX, glm_data);
+  XtXi.writeD("XtXi.dat");
+  XtSNP.resize_retain(n+1, geno_count);
+  cblas_dgemv(CblasColMajor, CblasTrans, 
+	      m, geno_count,
+	      1.0, 
+	      &geno.values[0],
+	      m,
+	      &geno(0, maxFIndex),
+	      1,
+	      0,
+	      &XtSNP(n, 0),
+	      n+1
+	      );
+  XtSNP.writeD("XtSNP.dat");
 
 
-    // update host X
-    X.resize_retain(m, n + 1);
-    memcpy(&X(0, n), &geno(0, maxFIndex), m* sizeof(ftype));
-    X.writeD("X.dat");
-
+  // update host X
+  X.resize_retain(m, n + 1);
+  memcpy(&X(0, n), &geno(0, maxFIndex), m* sizeof(ftype));
+  X.writeD("X.dat");
 }
 
 int main(int argc, char **argv)
@@ -461,7 +460,6 @@ int main(int argc, char **argv)
 	   << getGPUCompTime() << " s" << endl;
       cout << "GPU time per SNP: " << getGPUCompTime() / geno_count 
 	   << " s" << endl;
-
 
       cout << "GPU time required for reduction: "
 	   << getGPUMaxTime() << " s" << endl;

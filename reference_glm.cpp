@@ -66,28 +66,40 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
     string filename = path + "/" + fixed_filename;
     ifstream fixed_file;
     fixed_file.open(filename.c_str(), ios::binary | ios::in);
-
-    if (fixed_file){
-      // Loop over all rows and columns, set entries in the fixed matrix
-      for (unsigned i=0; i<fixed.get_n_rows(); ++i)
-	for (unsigned j=0; j<fixed.get_n_cols(); ++j)
-	  fixed_file >> fixed(i,j);
-    } else {
-      cout << "Failed to open file: " << fixed_file << "!!" << endl;
-      return 1;
+    if (!fixed_file){
+      cerr << "Failed to open fixed file: " << endl;
+      MPI_Abort(MPI_COMM_WORLD, 1);
     }
-  }
-
+    
+    fixed_file.read((char*)&fixed.values[0], fixed.values.size() * sizeof(double));
+    uint64_t temp = fixed.get_n_rows();
+    fixed.n_rows = fixed.n_cols;
+    fixed.n_cols = temp;
+    fixed.transpose_self();
+    for(unsigned row = 0; row < fixed.get_n_rows(); row++)
+      for(unsigned col = 0; col < fixed.get_n_cols(); col++)
+	if(fixed(row, col))
+	  cout << row << " " << col << endl;
+    fixed.writeD("fixed.dat");
+  }    
   // Read the geno array from file
   /* each MPI rank reads a section of size
      total size / number of ranks
-   */
+  */
   {
 
     // Open geno file for reading
-    FILE *geno_file = fopen(geno_filename.c_str(), "r");
+    string filename = path + "/" + geno_filename;
+    FILE *geno_file = fopen(filename.c_str(), "r");
+    if(!geno_file){
+      cerr << "failed to open geno file" << endl;
+      MPI_Abort(MPI_COMM_WORLD, 1);
+    }
 
-    fseeko(geno_file, myOffset, SEEK_SET);
+    if(fseeko(geno_file, myOffset, SEEK_SET)){
+      cerr << "seek failed" << endl;
+      MPI_Abort(MPI_COMM_WORLD, 1);
+    }
     
     uint64_t readCount = 0, left = mySize / sizeof(double);
     while(left){
@@ -105,7 +117,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
       left -= status;
       readCount += status;
     }
-    
+    geno.writeD("geno.dat");
   }
   
   
@@ -120,14 +132,13 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
     ifstream y_file;
     y_file.open((path + "/" + y_filename).c_str(), ios::binary | ios::in);
 
-    if (y_file){
-      // Loop over all rows and columns, set entries in the matrix
-      for (unsigned i=0; i<y.size(); ++i)
-	y_file >> y[i];
-    } else {
-      cout << "Failed to open file!!" << endl;
-      return 1;
+    if (!y_file){
+      cerr << "Failed to open file: " << endl;
+      MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    
+    y_file.read((char*)&y[0], y.size() * sizeof(double));
+    writeD("y.dat", y);
   }
 }
 

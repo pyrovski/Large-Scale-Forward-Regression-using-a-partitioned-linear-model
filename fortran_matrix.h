@@ -57,7 +57,6 @@ public:
   // Users have direct access to the array of values
   std::vector<double> values;
   
-private: 
   uint64_t n_rows, n_cols;
 };
 

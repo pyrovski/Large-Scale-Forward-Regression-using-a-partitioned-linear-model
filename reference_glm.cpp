@@ -1,5 +1,7 @@
 /*! @todo
-  change input format to binary, or possibly zipped binary
+  - change input format to binary, or possibly zipped binary
+  - get size of GPU RAM at run time
+  - use GPU RAM size to estimate how many SNPs can be processed at a time
  */
 
 // System header files
@@ -26,7 +28,21 @@
 
 #define iterationLimit 50
 
+const uint64_t readSize = 1024 * 1024 * 32;
+const uint64_t readLength = readSize / sizeof(double);
+
+
 using namespace std;
+
+/*!
+  divide total by ranks such that ranks * result >= total
+ */
+uint64_t adjust(uint64_t total, unsigned ranks){
+  uint64_t result = total / ranks;
+  if(total % ranks)
+    result++;
+  return result;
+}
 
 unsigned int nextPow2( unsigned int x ) {
     --x;
@@ -38,14 +54,18 @@ unsigned int nextPow2( unsigned int x ) {
     return ++x;
 }
 
-int readInputs(int id, int numProcs, string path, string fixed_filename, string geno_filename, 
+int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path, 
+	       string fixed_filename, 
+	       string geno_filename, 
 	       string y_filename,
 	       FortranMatrix &fixed, FortranMatrix &geno, vector<double> &y){
-  // Read the "fixed" array from file
+  // Read the "fixed" array from file.
+  // assume this is small.
   {
     // Open "fixed" file for reading
     string filename = path + "/" + fixed_filename;
-    ifstream fixed_file(filename.c_str());
+    ifstream fixed_file;
+    fixed_file.open(filename.c_str(), ios::binary | ios::in);
 
     if (fixed_file){
       // Loop over all rows and columns, set entries in the fixed matrix
@@ -59,20 +79,33 @@ int readInputs(int id, int numProcs, string path, string fixed_filename, string 
   }
 
   // Read the geno array from file
-
+  /* each MPI rank reads a section of size
+     total size / number of ranks
+   */
   {
-    // Open "fixed" file for reading
-    ifstream geno_file((path + "/" + geno_filename).c_str());
+
+    // Open geno file for reading
+    FILE *geno_file = fopen(geno_filename.c_str(), "r");
+
+    fseeko(geno_file, myOffset, SEEK_SET);
     
-    if (geno_file){
-      // Loop over all rows and columns, set entries in the matrix
-      for (unsigned i=0; i<geno.get_n_rows(); ++i)
-	for (unsigned j=0; j<geno.get_n_cols(); ++j)
-	  geno_file >> geno(i,j);
-    } else {
-      cout << "Failed to open file!!" << endl;
-      return 1;
+    uint64_t readCount = 0, left = mySize / sizeof(double);
+    while(left){
+      size_t status = fread(&geno.values[readCount], sizeof(double), 
+			    min(readLength, left), 
+			    geno_file);
+      if(status != min(readLength, left)){
+	cerr << "read failed on id " << id << endl;
+	if(feof(geno_file))
+	  cerr << id << " eof" << endl;
+	else if(ferror(geno_file))
+	  cerr << id << " " << ferror(geno_file) << endl;
+	MPI_Abort(MPI_COMM_WORLD, 1);
+      }
+      left -= status;
+      readCount += status;
     }
+    
   }
   
   
@@ -80,9 +113,12 @@ int readInputs(int id, int numProcs, string path, string fixed_filename, string 
   // is how it is passed to the glm function, but could be changed to a
   // FortranMatrix with one column...
 
+  // assume this is small
+
   {
-    // Open "fixed" file for reading
-    ifstream y_file((path + "/" + y_filename).c_str());
+    // Open y file for reading
+    ifstream y_file;
+    y_file.open((path + "/" + y_filename).c_str(), ios::binary | ios::in);
 
     if (y_file){
       // Loop over all rows and columns, set entries in the matrix
@@ -359,14 +395,23 @@ int main(int argc, char **argv)
 
   const unsigned m = geno_ind;
 
+  uint64_t totalSize = geno_count * geno_ind * sizeof(double);
+  uint64_t perRankLength = adjust(geno_count, numProcs) * 
+    geno_ind;
+  uint64_t perRankSize =  perRankLength * sizeof(double);    
+  uint64_t myOffset = id * perRankSize;
+  uint64_t mySize = myOffset + perRankSize <= totalSize ?
+    perRankSize : totalSize - myOffset;
+  uint64_t mySNPs = mySize / sizeof(double) / geno_ind;
+
   // Matrix objects for storing the input data
   FortranMatrix fixed(geno_ind, fixed_count);
-  FortranMatrix geno(geno_ind, geno_count);
+  FortranMatrix geno(geno_ind, mySNPs);
   vector<double> y(geno_ind);
 
   // Begin timing the file IO for all 3 files
   gettimeofday(&tstart, NULL);
-  readInputs(id, numProcs, path, fixed_filename, geno_filename, y_filename, fixed, geno, y);
+  readInputs(id, myOffset, mySize, path, fixed_filename, geno_filename, y_filename, fixed, geno, y);
   gettimeofday(&tstop, NULL);
   
   cout << "Time required for I/O: " << tvDouble(tstop - tstart) << " s" << endl;

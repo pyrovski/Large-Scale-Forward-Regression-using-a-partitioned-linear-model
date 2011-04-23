@@ -3,19 +3,20 @@
 
 #include <string>
 #include <vector>
+#include <stdint.h>
 
 class FortranMatrix
 {
 public:
   // Constructor, by default, an empty matrix is constructed
-  FortranMatrix(unsigned nr = 0, unsigned nc = 0);
+  FortranMatrix(uint64_t nr = 0, uint64_t nc = 0);
 
   void add(const FortranMatrix &rhs);
 
   const FortranMatrix & operator = (const FortranMatrix &rhs);
   
   // Returns a writable reference to the (i,j) entry of the matrix
-  inline double& operator()(unsigned i, unsigned j)
+  inline double& operator()(uint64_t i, uint64_t j)
   {
     return values[i + n_rows*j];
   }
@@ -32,21 +33,21 @@ public:
 
   // Change this matix to have new_n_rows rows and new_n_cols columns
   // Do not rely on any previous values in the matrix for this routine.
-  void resize(unsigned new_n_rows, unsigned new_n_cols);
+  void resize(uint64_t new_n_rows, uint64_t new_n_cols);
 
   // retain old values in correct coordinates
-  void resize_retain(unsigned new_n_rows, unsigned new_n_cols);
+  void resize_retain(uint64_t new_n_rows, uint64_t new_n_cols);
 
   // Return a writable reference to the number of rows/cols of the matrix.
   // You should only change this if you know what you are doing and have also
   // changed the "values" array in a consistent manner.
-  unsigned& get_n_rows();
-  unsigned& get_n_cols();
+  uint64_t& get_n_rows();
+  uint64_t& get_n_cols();
 
   // Const version of the above, just returns a copy of the number of
   // rows/cols, does not allow anything to be modified.
-  inline unsigned get_n_rows() const { return n_rows; }
-  inline unsigned get_n_cols() const { return n_cols; }
+  inline uint64_t get_n_rows() const { return n_rows; }
+  inline uint64_t get_n_cols() const { return n_cols; }
 
 
   //
@@ -57,7 +58,7 @@ public:
   std::vector<double> values;
   
 private: 
-  unsigned n_rows, n_cols;
+  uint64_t n_rows, n_cols;
 };
 
 void writeD(std::string filename, const std::vector<double> &v);

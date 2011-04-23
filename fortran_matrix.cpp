@@ -20,7 +20,7 @@ using namespace std;
 // it will be more efficient to fill this matrix column-by-column...
 
   // Constructor, by default, an empty matrix is constructed
-  FortranMatrix::FortranMatrix(unsigned nr, unsigned nc) : n_rows(nr), n_cols(nc), values(nr*nc) {}
+  FortranMatrix::FortranMatrix(uint64_t nr, uint64_t nc) : n_rows(nr), n_cols(nc), values(nr*nc) {}
 
 const FortranMatrix & FortranMatrix::operator = (const FortranMatrix &rhs){
     this->values = rhs.values;
@@ -34,8 +34,8 @@ const FortranMatrix & FortranMatrix::operator = (const FortranMatrix &rhs){
       cerr << "invalid matrix dimensions" << endl;
       exit(1);
     }
-    for(unsigned col = 0; col < n_cols; col++)
-      for(unsigned row = 0; row < n_rows; row++)
+    for(uint64_t col = 0; col < n_cols; col++)
+      for(uint64_t row = 0; row < n_rows; row++)
 	values[row + n_rows * col] += rhs.values[row + n_rows * col];
   }
 
@@ -76,8 +76,8 @@ const FortranMatrix & FortranMatrix::operator = (const FortranMatrix &rhs){
   {
     std::vector<double> transpose(n_cols*n_rows);
 
-    for (unsigned int j=0; j<n_cols; ++j)
-      for (unsigned int i=0; i<n_rows; ++i)
+    for (uint64_t j=0; j<n_cols; ++j)
+      for (uint64_t i=0; i<n_rows; ++i)
 	{
 	  // transpose(j,i) = values(i,j)
 	  // The new matrix is still column major, but has
@@ -93,7 +93,7 @@ const FortranMatrix & FortranMatrix::operator = (const FortranMatrix &rhs){
 
   // Change this matix to have new_n_rows rows and new_n_cols columns
   // Do not rely on any previous values in the matrix for this routine.
-  void FortranMatrix::resize(unsigned new_n_rows, unsigned new_n_cols)
+  void FortranMatrix::resize(uint64_t new_n_rows, uint64_t new_n_cols)
   {
     n_rows = new_n_rows;
     n_cols = new_n_cols;
@@ -101,8 +101,8 @@ const FortranMatrix & FortranMatrix::operator = (const FortranMatrix &rhs){
   }
   
   // retain old values in correct coordinates
-  void FortranMatrix::resize_retain(unsigned new_n_rows, unsigned new_n_cols){
-    unsigned old_n_rows = n_rows, old_n_cols = n_cols;
+  void FortranMatrix::resize_retain(uint64_t new_n_rows, uint64_t new_n_cols){
+    uint64_t old_n_rows = n_rows, old_n_cols = n_cols;
     if(new_n_rows < old_n_rows || new_n_cols < old_n_cols){
       cerr << "invalid resize; fixme" << endl;
       exit(1);
@@ -111,13 +111,13 @@ const FortranMatrix & FortranMatrix::operator = (const FortranMatrix &rhs){
     
     this->resize(new_n_rows, new_n_cols);
     // first column is already in the right place
-    for(unsigned col = old_n_cols - 1; col > 0; col--){
+    for(uint64_t col = old_n_cols - 1; col > 0; col--){
       //! @todo this could be faster; memmove uses temporary storage
       memmove(&values[new_n_rows * col], &values[old_n_rows * col], old_n_rows * sizeof(double));
       /*
       double *base = &values[old_n_rows * col];
       double *dest = &values[new_n_rows * col];
-      for(unsigned row = old_n_rows - 1; row >= 0; row--)
+      for(uint64_t row = old_n_rows - 1; row >= 0; row--)
 	dest[row] = base[row];
       */
       // clear newly resized space (rest of column)
@@ -132,8 +132,8 @@ const FortranMatrix & FortranMatrix::operator = (const FortranMatrix &rhs){
   // Return a writable reference to the number of rows/cols of the matrix.
   // You should only change this if you know what you are doing and have also
   // changed the "values" array in a consistent manner.
-  unsigned& FortranMatrix::get_n_rows() { return n_rows; }
-  unsigned& FortranMatrix::get_n_cols() { return n_cols; }
+  uint64_t& FortranMatrix::get_n_rows() { return n_rows; }
+  uint64_t& FortranMatrix::get_n_cols() { return n_cols; }
 
   //
   // Data

@@ -1,3 +1,7 @@
+/*! @todo
+  change input format to binary, or possibly zipped binary
+ */
+
 // System header files
 #include <sys/time.h>
 #include <string>
@@ -34,7 +38,7 @@ unsigned int nextPow2( unsigned int x ) {
     return ++x;
 }
 
-int readInputs(string path, string fixed_filename, string geno_filename, 
+int readInputs(int id, int numProcs, string path, string fixed_filename, string geno_filename, 
 	       string y_filename,
 	       FortranMatrix &fixed, FortranMatrix &geno, vector<double> &y){
   // Read the "fixed" array from file
@@ -362,7 +366,7 @@ int main(int argc, char **argv)
 
   // Begin timing the file IO for all 3 files
   gettimeofday(&tstart, NULL);
-  readInputs(path, fixed_filename, geno_filename, y_filename, fixed, geno, y);
+  readInputs(id, numProcs, path, fixed_filename, geno_filename, y_filename, fixed, geno, y);
   gettimeofday(&tstop, NULL);
   
   cout << "Time required for I/O: " << tvDouble(tstop - tstart) << " s" << endl;

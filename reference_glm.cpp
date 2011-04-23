@@ -102,6 +102,11 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
     }
     
     uint64_t readCount = 0, left = mySize / sizeof(double);
+    double *array = (double*)malloc(readSize);
+    /*! @todo convert from row-major format on disk to 
+       column-major format in RAM
+       - for now, just assume column-major on disk
+     */
     while(left){
       size_t status = fread(&geno.values[readCount], sizeof(double), 
 			    min(readLength, left), 
@@ -118,6 +123,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
       readCount += status;
     }
     geno.writeD("geno.dat");
+    free(array);
   }
   
   
@@ -422,7 +428,8 @@ int main(int argc, char **argv)
 
   // Begin timing the file IO for all 3 files
   gettimeofday(&tstart, NULL);
-  readInputs(id, myOffset, mySize, path, fixed_filename, geno_filename, y_filename, fixed, geno, y);
+  readInputs(id, myOffset, mySize, path, fixed_filename, geno_filename, 
+	     y_filename, fixed, geno, y);
   gettimeofday(&tstop, NULL);
   
   cout << "Time required for I/O: " << tvDouble(tstop - tstart) << " s" << endl;

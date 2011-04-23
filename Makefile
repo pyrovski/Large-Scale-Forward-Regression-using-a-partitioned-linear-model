@@ -41,7 +41,9 @@ HEADERS= type.h fortran_matrix.h print_matrix.h glm.h plm.h fortran_matrix.h pri
 SRC=$(CPU_SRC) $(GPU_SRC)
 target = reference_glm
 objects = $(patsubst %.cpp,%.o,$(CPU_SRC)) $(patsubst %.cu,%.o,$(GPU_SRC))
-all: $(target)
+all: $(target) convertToBinary
+
+convertToBinary: convertToBinary.o
 
 clean:
 	rm -f $(EXEC_FILES) *~ *.P *.o $(target)

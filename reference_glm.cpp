@@ -268,6 +268,62 @@ void compUpdate(vector<unsigned> &snpMask, unsigned &maxFIndex, FortranMatrix &X
   X.writeD("X.dat");
 }
 
+void getInputs(string &path, string &fixed_filename, string &geno_filename, 
+	       string &y_filename, unsigned &fixed_count, unsigned &geno_ind,
+	       unsigned &geno_count, int id){
+  GetPot input_file("reference_glm.in");
+  
+  path = input_file("path", path.c_str());
+  
+  // File containing the "population structure".  It is a 4892-by-26 matrix
+  fixed_filename = input_file("fixed_filename", "");
+  if(fixed_filename == ""){
+    if(!id)
+      cerr << "invalid fixed_filename in input file" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+
+  // File containing the genotypes.  It is a 4892-by-79 matrix.
+  geno_filename = input_file("geno_filename", "");
+  if(geno_filename == ""){
+    if(!id)
+      cerr << "invalid geno_filename in input file" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+
+  // File containing the phenotypes.  It is a 4892-by-1 matrix.  The file is
+  // arranged in a single column.
+  y_filename = input_file("y_filename", "");
+  if(y_filename == ""){
+    if(!id)
+      cerr << "invalid y_filename in input file" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+
+  // In Matlab, these sizes are inferred from the data.  In C++, we hard-code them
+  // to make reading the data simpler...
+  fixed_count = input_file("fixed_count", 0); // rows, columns of the fixed array
+  if(fixed_count == 0){
+    if(!id)
+      cerr << "invalid fixed_count in input file" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  
+  geno_ind = input_file("geno_ind", 0);
+  geno_count = input_file("geno_count", 0); // rows, columns of the geno array
+  if(geno_count == 0){
+    if(!id)
+      cerr << "invalid geno_count in input file" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  if(geno_ind == 0){
+    if(!id)
+      cerr << "invalid geno_ind in input file" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+
+}
+
 int main(int argc, char **argv)
 {
   int id, numProcs;
@@ -284,59 +340,18 @@ int main(int argc, char **argv)
   //! @todo list of input files should be command line parameter
 
   // Create input file object.  Put the path to your data files here!
-  GetPot input_file("reference_glm.in");
-  
   // The path on my system to the location of the data files.  Don't forget the trailing
   // slash here, as this will be prepended to the filename below
   string path = "./"; // default path is the current directory.
-  path = input_file("path", path.c_str());
+  string fixed_filename;
+  string geno_filename;
+  string y_filename;
+  unsigned fixed_count;
+  unsigned geno_ind,
+    geno_count; // rows, columns of the geno array
   
-  // File containing the "population structure".  It is a 4892-by-26 matrix
-  string fixed_filename = input_file("fixed_filename", "");
-  if(fixed_filename == ""){
-    if(!id)
-      cerr << "invalid fixed_filename in input file" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
-
-  // File containing the genotypes.  It is a 4892-by-79 matrix.
-  string geno_filename = input_file("geno_filename", "");
-  if(geno_filename == ""){
-    if(!id)
-      cerr << "invalid geno_filename in input file" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
-
-  // File containing the phenotypes.  It is a 4892-by-1 matrix.  The file is
-  // arranged in a single column.
-  string y_filename = input_file("y_filename", "");
-  if(y_filename == ""){
-    if(!id)
-      cerr << "invalid y_filename in input file" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
-
-  // In Matlab, these sizes are inferred from the data.  In C++, we hard-code them
-  // to make reading the data simpler...
-  unsigned fixed_count = input_file("fixed_count", 0); // rows, columns of the fixed array
-  if(fixed_count == 0){
-    if(!id)
-      cerr << "invalid fixed_count in input file" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
-  
-  unsigned geno_ind = input_file("geno_ind", 0), 
-    geno_count = input_file("geno_count", 0); // rows, columns of the geno array
-  if(geno_count == 0){
-    if(!id)
-      cerr << "invalid geno_count in input file" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
-  if(geno_ind == 0){
-    if(!id)
-      cerr << "invalid geno_ind in input file" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
+  getInputs(path, fixed_filename, geno_filename, y_filename, fixed_count, 
+	    geno_ind, geno_count, id);
 
   const unsigned m = geno_ind;
 

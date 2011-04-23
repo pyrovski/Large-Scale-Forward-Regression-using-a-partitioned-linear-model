@@ -270,6 +270,11 @@ void compUpdate(vector<unsigned> &snpMask, unsigned &maxFIndex, FortranMatrix &X
 
 int main(int argc, char **argv)
 {
+  int id, numProcs;
+  MPI_Init(&argc, &argv);
+  MPI_Comm_size(MPI_COMM_WORLD, &numProcs);
+  MPI_Comm_rank(MPI_COMM_WORLD, &id);
+  
   //! @todo this should be a command line parameter
   ftype entry_limit = 0.2;
 
@@ -287,27 +292,58 @@ int main(int argc, char **argv)
   path = input_file("path", path.c_str());
   
   // File containing the "population structure".  It is a 4892-by-26 matrix
-  string fixed_filename = "fixed.effects.nam.sorted.filtered.dat";
+  string fixed_filename = input_file("fixed_filename", "");
+  if(fixed_filename == ""){
+    if(!id)
+      cerr << "invalid fixed_filename in input file" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
   // File containing the genotypes.  It is a 4892-by-79 matrix.
-  string geno_filename = "imputed.marker.chr10.sorted.filtered.dat";
+  string geno_filename = input_file("geno_filename", "");
+  if(geno_filename == ""){
+    if(!id)
+      cerr << "invalid geno_filename in input file" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
   // File containing the phenotypes.  It is a 4892-by-1 matrix.  The file is
   // arranged in a single column.
-  string y_filename = "residuals.chr10.sorted.dat";
+  string y_filename = input_file("y_filename", "");
+  if(y_filename == ""){
+    if(!id)
+      cerr << "invalid y_filename in input file" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
   // In Matlab, these sizes are inferred from the data.  In C++, we hard-code them
   // to make reading the data simpler...
-  unsigned pop_ind = 4892, fixed_count = 26; // rows, columns of the fixed array
-  unsigned geno_ind = 4892, geno_count = 79; // rows, columns of the geno array
-  unsigned y_ind = 4892;//, y_count = 1;        // rows, columns of the y vector
+  unsigned fixed_count = input_file("fixed_count", 0); // rows, columns of the fixed array
+  if(fixed_count == 0){
+    if(!id)
+      cerr << "invalid fixed_count in input file" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  
+  unsigned geno_ind = input_file("geno_ind", 0), 
+    geno_count = input_file("geno_count", 0); // rows, columns of the geno array
+  if(geno_count == 0){
+    if(!id)
+      cerr << "invalid geno_count in input file" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  if(geno_ind == 0){
+    if(!id)
+      cerr << "invalid geno_ind in input file" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
   const unsigned m = geno_ind;
 
   // Matrix objects for storing the input data
-  FortranMatrix fixed(pop_ind, fixed_count);
+  FortranMatrix fixed(geno_ind, fixed_count);
   FortranMatrix geno(geno_ind, geno_count);
-  vector<double> y(y_ind);
+  vector<double> y(geno_ind);
 
   // Begin timing the file IO for all 3 files
   gettimeofday(&tstart, NULL);
@@ -468,7 +504,8 @@ int main(int argc, char **argv)
     }
     iteration++;
   } // while(1)
-  
+
+  MPI_Finalize();
   return 0;
 }
 

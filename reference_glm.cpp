@@ -1,7 +1,7 @@
 /*! @todo
-  - change input format to binary, or possibly zipped binary
   - get size of GPU RAM at run time
   - use GPU RAM size to estimate how many SNPs can be processed at a time
+  - list of input files should be command line parameter
  */
 
 // System header files
@@ -118,7 +118,13 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
       left -= status;
       readCount += status;
     }
-    geno.writeD("geno.dat");
+#ifdef _DEBUG
+    {
+      stringstream ss;
+      ss << "geno_" << id << ".dat";
+      geno.writeD(ss.str());
+    }
+#endif
     free(array);
   }
   
@@ -144,7 +150,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
   }
 }
 
-void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, vector<double> &y, FortranMatrix &U, vector<double> &S, FortranMatrix &Vt, unsigned &rX, vector<double> &beta, unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, GLMData &glm_data, unsigned &geno_ind, uint64_t &geno_count, const unsigned &m, FortranMatrix &geno, FortranMatrix &XtSNP, vector<double> &SNPty, vector<double> &SNPtSNP){
+void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, vector<double> &y, FortranMatrix &U, vector<double> &S, FortranMatrix &Vt, unsigned &rX, vector<double> &beta, unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, GLMData &glm_data, unsigned &geno_ind, uint64_t &mySNPs, const unsigned &m, FortranMatrix &geno, FortranMatrix &XtSNP, vector<double> &SNPty, vector<double> &SNPtSNP){
   // Fill first column of X with 1's
   for (unsigned i=0; i<X.get_n_rows(); ++i)
     X(i,0) = 1.;
@@ -165,6 +171,7 @@ void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, F
    */
   
   XtX = matmat(X, X, true, false); 
+
   XtX.writeD("XtX.dat");
 
   // Solve (X^T * X)*beta = X^T*y for beta.  Note that X and X^T * X
@@ -173,6 +180,7 @@ void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, F
   // Initialize SVD components, A = U * S * V^T
   Xty = matvec(X, y, /*transX=*/true);
   
+  XtX.writeD("XtX.dat");
   writeD("Xty.dat", Xty);
 
   // Create the SVD of X^T * X 
@@ -251,7 +259,7 @@ void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, F
 	      CblasTrans,
 	      CblasNoTrans,
 	      n, 
-	      geno_count,
+	      mySNPs,
 	      geno_ind,
 	      1.0,
 	      &X.values[0],
@@ -268,7 +276,7 @@ void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, F
   cblas_dgemv(CblasColMajor,
 	      CblasTrans,
 	      m,
-	      geno_count,
+	      mySNPs,
 	      1.0,
 	      &geno.values[0],
 	      m,
@@ -280,7 +288,7 @@ void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, F
 	      );
   writeD("SNPty.dat", SNPty);
   
-  for (uint64_t i=0; i<geno_count; ++i){
+  for (uint64_t i=0; i<mySNPs; ++i){
     //! these will never change for each SNP, so they could be moved out of all loops
     SNPtSNP[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
 				&geno.values[i*geno_ind], 1);
@@ -329,6 +337,8 @@ void compUpdate(FortranMatrix &X,
 void getInputs(string &path, string &fixed_filename, string &geno_filename, 
 	       string &y_filename, unsigned &fixed_count, unsigned &geno_ind,
 	       uint64_t &geno_count, int id){
+
+  // Create input file object.  Put the path to your data files here!
   GetPot input_file("reference_glm.in");
   
   path = input_file("path", path.c_str());
@@ -395,9 +405,6 @@ int main(int argc, char **argv)
   // Timing variables
   timeval tstart, tstop;
 
-  //! @todo list of input files should be command line parameter
-
-  // Create input file object.  Put the path to your data files here!
   // The path on my system to the location of the data files.  Don't forget the trailing
   // slash here, as this will be prepended to the filename below
   string path = "./"; // default path is the current directory.
@@ -421,6 +428,13 @@ int main(int argc, char **argv)
   uint64_t mySize = myOffset + perRankSize <= totalSize ?
     perRankSize : totalSize - myOffset;
   uint64_t mySNPs = mySize / sizeof(double) / geno_ind;
+  uint64_t myStartSNP = id * perRankSNPs;
+
+#ifdef _DEBUG
+  cout << "id " << id << " has SNPs " << 
+    myStartSNP << "-" << 
+    myStartSNP + mySNPs - 1 << endl;
+#endif
 
   // Matrix objects for storing the input data
   FortranMatrix fixed(geno_ind, fixed_count);
@@ -439,16 +453,8 @@ int main(int argc, char **argv)
   
   cout << "Time required for I/O: " << tvDouble(tstop - tstart) << " s" << endl;
   
-  // Version A, Kt a general matrix.
-  // Create the Kt matrix.  It has 1 row and fixed_count+2 columns.
-  // The entries of Kt are all zero except for the last entry, which is 1.
-  //FortranMatrix Kt(1,fixed_count+2);
-  //Kt(0, fixed_count+1) = 1.; // Set last entry = 1
-
   // Version B, Kt assumed a vector.
-  //! @todo assume Kt has a single non-zero element; a 1.0 at the end
-  vector<double> Kt(fixed_count+2);
-  Kt.back() = 1.; // Set last entry = 1
+  //! assume Kt has a single non-zero element; a 1.0 at the end
   
   // An array to hold the results of the GLM calculations
   double Pval;
@@ -521,6 +527,7 @@ int main(int argc, char **argv)
     */
     
   unsigned iteration = 0;
+  double GPUCompTime = 0, GPUMaxTime = 0;
   while(1){
     // d_G, in constant memory
     // d_Xty, in constant memory
@@ -538,23 +545,27 @@ int main(int argc, char **argv)
 	d_snpMask,
 	d_f);
     } catch(int e){
-      exit(e);
+      MPI_Abort(MPI_COMM_WORLD, e);
     }
     
     // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
     // if V1 = 0, ignore; F is undefined
-    getMaxF(iteration, mySNPs, Fval, localMaxFIndex, d_f);
-    cout << "id " << id << " max F: " << Fval[localMaxFIndex] << " (" << 
+    getMaxF(id, iteration, mySNPs, Fval, localMaxFIndex, d_f);
+    cout << "iteration " << iteration << " id " << id <<  
+      " max F: " << Fval[localMaxFIndex] << " (" << 
       localMaxFIndex << ")" << endl;
 
     if(Fval[localMaxFIndex] <= 0){
-      cerr << "error: max F <= 0" << endl;
+      cerr << "error: max F <= 0: " << Fval[localMaxFIndex] << endl;
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     // get max F value
     MPI_Allreduce(&Fval[localMaxFIndex], &globalMaxF, 1, MPI_DOUBLE, MPI_MAX,
 		  MPI_COMM_WORLD);
+
+    if(!id)
+      cout << "iteration " << iteration << " global max F: " << globalMaxF << endl;
 
     // get p value
     Pval = 1 - gsl_cdf_fdist_P(globalMaxF, 1, glm_data.V2 - 1);
@@ -576,6 +587,10 @@ int main(int argc, char **argv)
       MPI_Allreduce(&tempInt, &globalMinRankMaxF, 1, MPI_INT, MPI_MIN, 
 		    MPI_COMM_WORLD);
     }
+
+    if(!id)
+      cout << "iteration " << iteration << " global max F on rank " << 
+	globalMinRankMaxF << endl;
 
     if(id == globalMinRankMaxF){
       // I have the max F value
@@ -632,17 +647,20 @@ int main(int argc, char **argv)
   
     n++;
 
-    {
-      cout << "GPU time required for computations: "
-	   << getGPUCompTime() << " s" << endl;
-      cout << "GPU time per SNP: " << getGPUCompTime() / mySNPs 
-	   << " s" << endl;
+    GPUCompTime += getGPUCompTime();
+    GPUMaxTime += getGPUMaxTime();
+    /*
+    cout << "GPU time required for computations: "
+	 << getGPUCompTime() << " s" << endl;
+    cout << "GPU time per SNP: " << getGPUCompTime() / mySNPs 
+	 << " s" << endl;
+    
+    cout << "GPU time required for reduction: "
+	 << getGPUMaxTime() << " s" << endl;
+    cout << "GPU time per SNP: " << getGPUMaxTime() / mySNPs 
+	 << " s" << endl;
+    */
 
-      cout << "GPU time required for reduction: "
-	   << getGPUMaxTime() << " s" << endl;
-      cout << "GPU time per SNP: " << getGPUMaxTime() / mySNPs 
-	   << " s" << endl;
-    }
     iteration++;
   } // while(1)
 

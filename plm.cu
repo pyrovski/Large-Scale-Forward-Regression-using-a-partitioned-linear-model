@@ -236,7 +236,8 @@ float getGPUMaxTime(){
   return computation_elapsed_time / 1000.0f;
 }
 
-void getMaxF(unsigned iteration, unsigned geno_count, vector<double> &Fval, 
+void getMaxF(unsigned id, unsigned iteration, unsigned geno_count, 
+	     vector<double> &Fval, 
 	     unsigned maxFIndex, ftype *d_f){
 #ifndef _DEBUG
     cutilSafeCall(cudaMemcpy(&Fval[maxFIndex], &d_f[maxFIndex], sizeof(ftype),
@@ -246,7 +247,7 @@ void getMaxF(unsigned iteration, unsigned geno_count, vector<double> &Fval,
 			     cudaMemcpyDeviceToHost));
     {
       stringstream ss;
-      ss << "Fval_" << iteration << ".dat";
+      ss << "Fval_" << iteration << "_" << id << ".dat";
       writeD(ss.str(), Fval);
     }
 

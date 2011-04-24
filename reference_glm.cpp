@@ -144,7 +144,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
   }
 }
 
-void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, vector<double> &y, FortranMatrix &U, vector<double> &S, FortranMatrix &Vt, unsigned &rX, vector<double> &beta, unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, GLMData &glm_data, unsigned &geno_ind, unsigned &geno_count, const unsigned &m, FortranMatrix &geno, FortranMatrix &XtSNP, vector<double> &SNPty, vector<double> &SNPtSNP){
+void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, vector<double> &y, FortranMatrix &U, vector<double> &S, FortranMatrix &Vt, unsigned &rX, vector<double> &beta, unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, GLMData &glm_data, unsigned &geno_ind, uint64_t &geno_count, const unsigned &m, FortranMatrix &geno, FortranMatrix &XtSNP, vector<double> &SNPty, vector<double> &SNPtSNP){
   // Fill first column of X with 1's
   for (unsigned i=0; i<X.get_n_rows(); ++i)
     X(i,0) = 1.;
@@ -280,7 +280,7 @@ void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, F
 	      );
   writeD("SNPty.dat", SNPty);
   
-  for (unsigned i=0; i<geno_count; ++i){
+  for (uint64_t i=0; i<geno_count; ++i){
     //! these will never change for each SNP, so they could be moved out of all loops
     SNPtSNP[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
 				&geno.values[i*geno_ind], 1);
@@ -328,7 +328,7 @@ void compUpdate(FortranMatrix &X,
 
 void getInputs(string &path, string &fixed_filename, string &geno_filename, 
 	       string &y_filename, unsigned &fixed_count, unsigned &geno_ind,
-	       unsigned &geno_count, int id){
+	       uint64_t &geno_count, int id){
   GetPot input_file("reference_glm.in");
   
   path = input_file("path", path.c_str());
@@ -405,8 +405,8 @@ int main(int argc, char **argv)
   string geno_filename;
   string y_filename;
   unsigned fixed_count;
-  uint64_t geno_ind,
-    geno_count; // rows, columns of the geno array
+  unsigned geno_ind; //rows 
+  uint64_t geno_count; // columns of the geno array
   
   getInputs(path, fixed_filename, geno_filename, y_filename, fixed_count, 
 	    geno_ind, geno_count, id);
@@ -415,7 +415,7 @@ int main(int argc, char **argv)
 
   uint64_t totalSize = geno_count * geno_ind * sizeof(double);
   uint64_t perRankSNPs = adjust(geno_count, numProcs);
-  uint64_t perRankLength = perRankGeno * geno_ind;
+  uint64_t perRankLength = perRankSNPs * geno_ind;
   uint64_t perRankSize =  perRankLength * sizeof(double);    
   uint64_t myOffset = id * perRankSize;
   uint64_t mySize = myOffset + perRankSize <= totalSize ?
@@ -624,7 +624,8 @@ int main(int argc, char **argv)
       Assume data is in-core for GPU; i.e. don't recopy SNPs at each iteration.
       To remove SNP from geno, set mask at SNP index.
      */
-    compUpdate(snpMask, localMaxFIndex, X, XtXi, XtSNP, SNPtSNP, SNPty, yty, Xty, rX, glm_data, n , mySNPs, m, geno);
+    compUpdate(X, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, m, geno,
+	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty);
     
     copyUpdateToDevice(mySNPs, n, d_snpMask, localMaxFIndex, d_Xtsnp, 
 		       d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);

@@ -61,6 +61,7 @@ public:
 };
 
 void writeD(std::string filename, const std::vector<double> &v);
+void writeD(std::string filename, const double *v, unsigned length);
 void write(std::string filename, const std::vector<double> &v);
 
 FortranMatrix matmat(const FortranMatrix& A, const FortranMatrix& B,

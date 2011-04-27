@@ -260,8 +260,13 @@ std::vector<double> matvec(const FortranMatrix& A, const std::vector<double>& x,
 void writeD(string filename, const vector<double> &v){
   write_matrix(filename.c_str(), v.size(), 1, &v[0], 1);
 }
+void writeD(string filename, const double *v, unsigned length){
+  write_matrix(filename.c_str(), length, 1, &v[0], 1);
+}
 #else
 void writeD(string filename, const vector<double> &v){
+}
+void writeD(string filename, const double *v, unsigned length){
 }
 #endif
 void write(string filename, const vector<double> &v){

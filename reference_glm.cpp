@@ -380,18 +380,6 @@ void compUpdate(unsigned id, unsigned iteration,
   }
 #endif
 
-  /*
-  // update host X
-  X.resize_retain(m, n + 1);
-  memcpy(&X(0, n), nextSNP, m* sizeof(ftype));
-#ifdef _DEBUG
-  if(!id){
-    stringstream ss;
-    ss << "XtSNP_" << iteration << "p.dat";
-    XtSNP.writeD(ss.str());
-  }
-#endif
-  */
 }
 
 void getInputs(string &path, string &fixed_filename, string &geno_filename, 
@@ -619,8 +607,9 @@ int main(int argc, char **argv)
     // if V1 = 0, ignore; F is undefined
     getMaxF(id, iteration, mySNPs, Fval, localMaxFIndex, d_f);
     cout << "iteration " << iteration << " id " << id <<  
-      " max F: " << Fval[localMaxFIndex] << " (" << 
-      localMaxFIndex << ")" << endl;
+      " max F: " << Fval[localMaxFIndex] 
+	 << " (local 0-index " << localMaxFIndex 
+	 << ", global 0-index " << myStartSNP + localMaxFIndex << ")" << endl;
 
     if(Fval[localMaxFIndex] <= 0){
       cerr << "error: max F <= 0: " << Fval[localMaxFIndex] << endl;
@@ -695,6 +684,20 @@ int main(int argc, char **argv)
     MPI_Bcast(&nextSNPty, 1, MPI_DOUBLE, globalMinRankMaxF,
 	      MPI_COMM_WORLD);
     
+#ifdef _DEBUG
+    {
+      stringstream ssSNP, ssXtSNP, ssSNPtSNP, ssSNPty;
+      ssSNP << "nextSNP_" << id << "_" << iteration << ".dat";
+      ssXtSNP << "nextXtSNP_" << id << "_" << iteration << ".dat";
+      ssSNPtSNP << "nextSNPtSNP_" << id << "_" << iteration << ".dat";
+      ssSNPty << "nextSNPty_" << id << "_" << iteration << ".dat";
+      writeD(ssSNP.str(), nextSNP, geno_ind);
+      writeD(ssXtSNP.str(), nextXtSNP, n);
+      writeD(ssSNPtSNP.str(), &nextSNPtSNP, 1);
+      writeD(ssSNPty.str(), &nextSNPty, 1);
+    }
+#endif
+
     /*! update 
       - X, (host only, done)
       - Xty, (done)

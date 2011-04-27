@@ -348,9 +348,16 @@ void compUpdate(unsigned id, unsigned iteration,
 #ifdef _DEBUG
   if(!id)
     {
-      stringstream ss;
-      ss << "XtXi_" << iteration << "p.dat";
-      XtXi.writeD(ss.str());
+      {
+	stringstream ss;
+	ss << "XtXi_" << iteration << "p.dat";
+	XtXi.writeD(ss.str());
+      }
+      {
+	stringstream ss;
+	ss << "Xty_" << iteration << "p.dat";
+	writeD(ss.str(), Xty);
+      }
     }
 #endif
   XtSNP.resize_retain(n+1, mySNPs);

@@ -81,13 +81,9 @@ void glm(unsigned id, unsigned iteration,
 	     n, S, &GtXtSNP[0], 1, &GtXtSNP[0], 1,
 	     &XtXi.values[0], n);
 
-  //XtXi.print("XtXi before resize");
   //! @todo this could be avoided by use of lda in computation of XtXi;
   // just allocate XtXi as n+1xn+1 and use lda=n+1, M = n, N = n
   XtXi.resize_retain(n + 1, n + 1);
-
-  //XtXi.print("XtXi after resize");
-
 
   // compute right and bottom edges of XtXi
   // right edge
@@ -99,13 +95,6 @@ void glm(unsigned id, unsigned iteration,
  
   // Xtyn = [Xty; snpty]; % n + 1 x 1
   Xty.push_back(SNPty); // append 1
-#ifdef _DEBUG
-  if(!id){
-    stringstream ss;
-    ss << "Xty_" << iteration << "p.dat";
-    writeD(ss.str(), Xty);
-  }
-#endif  
 
   // compute beta (n + 1 x 1)
   // beta = XtXi * Xty

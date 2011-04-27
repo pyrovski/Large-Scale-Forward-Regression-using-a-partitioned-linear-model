@@ -37,7 +37,8 @@ struct GLMData
 // This version of the glm function assumes Kt is a vector.  It makes
 // the code a good deal cleaner (but not really any faster when Kt is
 // a 1-by-N matrix) than the more general case where Kt is a matrix.
-void glm(const FortranMatrix &X, 
+void glm(unsigned id, unsigned iteration, 
+	 const FortranMatrix &X, 
 	 FortranMatrix &XtXi, // updated
 	 const double *XtSNP,
 	 const double SNPtSNP, 

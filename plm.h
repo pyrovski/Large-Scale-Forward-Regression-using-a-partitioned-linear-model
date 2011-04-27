@@ -1,6 +1,8 @@
 #include "type.h"
 #include "fortran_matrix.h"
-#define iterationLimit 50
+
+#define iterationLimit 2
+
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, unsigned sharedSize, 
 		 unsigned m, ftype* d_snptsnp, ftype* d_Xtsnp, 
 		 unsigned d_XtsnpPitch, ftype ErrorSS, unsigned V2, 

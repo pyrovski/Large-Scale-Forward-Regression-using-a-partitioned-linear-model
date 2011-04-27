@@ -1,5 +1,6 @@
 #include <gsl/gsl_cdf.h> 
 #include <cblas.h>
+#include <sstream>
 
 #include "glm.h"
 
@@ -11,7 +12,8 @@ using namespace std;
 // This version of the glm function assumes Kt is a vector.  It makes
 // the code a good deal cleaner (but not really any faster when Kt is
 // a 1-by-N matrix) than the more general case where Kt is a matrix.
-void glm(const FortranMatrix &X, 
+void glm(unsigned id, unsigned iteration,
+	 const FortranMatrix &X, 
 	 FortranMatrix &XtXi, // updated
 	 const double *XtSNP,
 	 const double SNPtSNP, 
@@ -42,8 +44,13 @@ void glm(const FortranMatrix &X,
 	      0.0,
 	      &GtXtSNP[0],
 	      1);
-
-  writeD("GtXtSNP.dat", GtXtSNP);
+#ifdef _DEBUG
+  if(!id){
+    stringstream ss;
+    ss << "GtXtSNP_" << iteration << "p.dat";
+    writeD(ss.str(), GtXtSNP);
+  }
+#endif
 
 
   // compute SNPtXGXtSNP (scalar)
@@ -90,7 +97,14 @@ void glm(const FortranMatrix &X,
  
   // Xtyn = [Xty; snpty]; % n + 1 x 1
   Xty.push_back(SNPty); // append 1
-  
+#ifdef _DEBUG
+  if(!id){
+    stringstream ss;
+    ss << "Xty_" << iteration << "p.dat";
+    writeD(ss.str(), Xty);
+  }
+#endif  
+
   // compute beta (n + 1 x 1)
   // beta = XtXi * Xty
   glm_data.beta.resize(n + 1);

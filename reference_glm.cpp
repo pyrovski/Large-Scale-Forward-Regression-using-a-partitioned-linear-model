@@ -26,8 +26,6 @@
 #include "tvUtil.h"
 #include "plm.h"
 
-#define iterationLimit 50
-
 const uint64_t readSize = 1024 * 1024 * 32;
 const uint64_t readLength = readSize / sizeof(double);
 
@@ -146,11 +144,20 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
     }
     
     y_file.read((char*)&y[0], y.size() * sizeof(double));
-    writeD("y.dat", y);
+    if(!id)
+      writeD("y.dat", y);
   }
 }
 
-void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, vector<double> &y, FortranMatrix &U, vector<double> &S, FortranMatrix &Vt, unsigned &rX, vector<double> &beta, unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, GLMData &glm_data, unsigned &geno_ind, uint64_t &mySNPs, const unsigned &m, FortranMatrix &geno, FortranMatrix &XtSNP, vector<double> &SNPty, vector<double> &SNPtSNP){
+void compPrepare(unsigned id, unsigned iteration, FortranMatrix &X, 
+		 FortranMatrix &fixed, 
+		 unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, 
+		 vector<double> &y, FortranMatrix &U, vector<double> &S, 
+		 FortranMatrix &Vt, unsigned &rX, vector<double> &beta, 
+		 unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, 
+		 GLMData &glm_data, unsigned &geno_ind, uint64_t &mySNPs, 
+		 const unsigned &m, FortranMatrix &geno, FortranMatrix &XtSNP, 
+		 vector<double> &SNPty, vector<double> &SNPtSNP){
   // Fill first column of X with 1's
   for (unsigned i=0; i<X.get_n_rows(); ++i)
     X(i,0) = 1.;
@@ -171,27 +178,28 @@ void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, F
    */
   
   XtX = matmat(X, X, true, false); 
-
-  XtX.writeD("XtX.dat");
-
+  
   // Solve (X^T * X)*beta = X^T*y for beta.  Note that X and X^T * X
   // have the same rank.
 
   // Initialize SVD components, A = U * S * V^T
   Xty = matvec(X, y, /*transX=*/true);
   
-  XtX.writeD("XtX.dat");
-  writeD("Xty.dat", Xty);
-
   // Create the SVD of X^T * X 
   svd_create(XtX, U, S, Vt);
-  U.writeD("U.dat");
-  writeD("S.dat", S);
 
-  Vt.writeD("Vt.dat");
   rX = svd_apply(U, S, Vt, /*result=*/beta, Xty);
 
-  writeD("beta.dat", beta);
+  if(!id){
+    XtX.writeD("XtX.dat");
+
+    writeD("Xty_0.dat", Xty);
+
+    U.writeD("U.dat");
+    writeD("S.dat", S);
+    Vt.writeD("Vt.dat");
+    writeD("beta.dat", beta);
+  }
 
   // XtXi = V * S^-1 * Ut
   // S^-1 = 1./S, where S > tol
@@ -238,8 +246,14 @@ void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, F
 	      0.0,
 	      &XtXi.values[0],
 	      n);
-
-  XtXi.writeD("XtXi.dat");
+#ifdef _DEBUG
+  if(!id)
+    {
+      stringstream ss;
+      ss << "XtXi_" << iteration << ".dat";
+      XtXi.writeD(ss.str());
+    }
+#endif
 
   // Compute the matrix-vector product, XTy := X' * y.  
   yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
@@ -270,7 +284,13 @@ void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, F
 	      &XtSNP.values[0],
 	      n
 	      );
-  XtSNP.writeD("XtSNP.dat");
+#ifdef _DEBUG
+  {
+    stringstream ss;
+    ss << "XtSNP_" << iteration << "p_" << id << ".dat";
+    XtSNP.writeD(ss.str());
+  }
+#endif
 
   //SNPty[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
   cblas_dgemv(CblasColMajor,
@@ -286,7 +306,13 @@ void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, F
 	      &SNPty[0],
 	      1
 	      );
-  writeD("SNPty.dat", SNPty);
+#ifdef _DEBUG
+  {
+    stringstream ss;
+    ss << "SNPty_" << id << ".dat";
+    writeD(ss.str(), SNPty);
+  }
+#endif
   
   for (uint64_t i=0; i<mySNPs; ++i){
     //! these will never change for each SNP, so they could be moved out of all loops
@@ -297,7 +323,7 @@ void compPrepare(FortranMatrix &X, FortranMatrix &fixed, unsigned fixed_count, F
 
 }
 
-void compUpdate(FortranMatrix &X, 
+void compUpdate(unsigned id, unsigned iteration, FortranMatrix &X, 
 		FortranMatrix &XtXi, FortranMatrix &XtSNP, 
 		const double &yty,
 		vector<double> &Xty, const unsigned &rX, GLMData &glm_data,
@@ -310,9 +336,16 @@ void compUpdate(FortranMatrix &X,
 
   // update XtXi, Xty
   // output glm_data
-  glm(X, XtXi, nextXtSNP, nextSNPtSNP, nextSNPty, yty, Xty, 
+  glm(id, iteration, X, XtXi, nextXtSNP, nextSNPtSNP, nextSNPty, yty, Xty, 
       rX, glm_data);
-  XtXi.writeD("XtXi.dat");
+#ifdef _DEBUG
+  if(!id)
+    {
+      stringstream ss;
+      ss << "XtXi_" << iteration << "p.dat";
+      XtXi.writeD(ss.str());
+    }
+#endif
   XtSNP.resize_retain(n+1, mySNPs);
   cblas_dgemv(CblasColMajor, CblasTrans, 
 	      m, mySNPs,
@@ -325,13 +358,25 @@ void compUpdate(FortranMatrix &X,
 	      &XtSNP(n, 0),
 	      n+1
 	      );
-  XtSNP.writeD("XtSNP.dat");
+#ifdef _DEBUG
+  {
+    stringstream ss;
+    ss << "XtSNP_" << iteration << "p_" << id << ".dat";
+    XtSNP.writeD(ss.str());
+  }
+#endif
 
 
   // update host X
   X.resize_retain(m, n + 1);
   memcpy(&X(0, n), nextSNP, m* sizeof(ftype));
-  X.writeD("X.dat");
+#ifdef _DEBUG
+  if(!id){
+    stringstream ss;
+    ss << "XtSNP_" << iteration << "p.dat";
+    XtSNP.writeD(ss.str());
+  }
+#endif
 }
 
 void getInputs(string &path, string &fixed_filename, string &geno_filename, 
@@ -482,7 +527,8 @@ int main(int argc, char **argv)
   // Begin timing the computations
   gettimeofday(&tstart, NULL);
 
-  compPrepare(X, fixed, fixed_count, XtX, Xty, y, U, S, Vt, rX, beta, n, tol, XtXi, 
+  compPrepare(id, 0, X, fixed, fixed_count, XtX, Xty, y, U, S, Vt, rX, 
+	      beta, n, tol, XtXi, 
 	      yty, glm_data, geno_ind, mySNPs, m, geno, XtSNP, SNPty, 
 	      SNPtSNP);
 
@@ -532,6 +578,13 @@ int main(int argc, char **argv)
     // d_G, in constant memory
     // d_Xty, in constant memory
     
+    if(iteration >= iterationLimit){
+      if(!id)
+	cout << "iteration limit (" << iterationLimit << ") reached" << endl;
+      MPI_Finalize();
+      return 0;
+    }
+
     unsigned localMaxFIndex;
     double globalMaxF;
     try{
@@ -571,8 +624,9 @@ int main(int argc, char **argv)
     Pval = 1 - gsl_cdf_fdist_P(globalMaxF, 1, glm_data.V2 - 1);
 
     if(Pval > entry_limit){
-      cout << "p value (" << Pval << ") > entry_limit (" << entry_limit 
-	   << "); quitting" << endl;
+      if(!id)
+	cout << "p value (" << Pval << ") > entry_limit (" << entry_limit 
+	     << "); quitting" << endl;
       MPI_Finalize();
       return 0;
     }
@@ -639,7 +693,8 @@ int main(int argc, char **argv)
       Assume data is in-core for GPU; i.e. don't recopy SNPs at each iteration.
       To remove SNP from geno, set mask at SNP index.
      */
-    compUpdate(X, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, m, geno,
+    compUpdate(id, iteration, X, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, m, 
+	       geno, 
 	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty);
     
     copyUpdateToDevice(mySNPs, n, d_snpMask, localMaxFIndex, d_Xtsnp, 

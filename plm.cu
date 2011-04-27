@@ -10,6 +10,8 @@
 
 #include "plm.h"
 
+#define printBIDs 1
+
 using namespace std;
 //__shared__ ftype fval; // scalar
 extern __shared__ ftype shared[];
@@ -68,7 +70,7 @@ __global__ void plm(// inputs
   s = snptsnp[BID] - *reduce;
 #ifdef _DEBUG
   #if __CUDA_ARCH__ >= 200
-  if(BID < 2){
+  if(BID < printBIDs){
     printf("b%u\tt%u\tXtsnp: %le\n", BID, TID, Xtsnp[BID * XtsnpPitch/sizeof(ftype) + TID]);
     printf("b%u\tt%u\tGtXtsnp: %le\n", BID, TID, GtXtsnp);
     if(!TID){
@@ -88,7 +90,7 @@ __global__ void plm(// inputs
     if(!TID){
 #ifdef _DEBUG
 #if __CUDA_ARCH__ >= 200
-      if(BID < 2){
+      if(BID < printBIDs){
 	printf("b%u\tt%u\tsnptXGXty: %le\n", BID, TID, snptmy);
 	printf("b%u\tt%u\tsnpty: %le\n", BID, TID, snpty[BID]);
       }
@@ -101,7 +103,7 @@ __global__ void plm(// inputs
       f[BID] = modelSS / errorSS2 * V2;
 #ifdef _DEBUG
   #if __CUDA_ARCH__ >= 200
-  if(BID < 2){
+  if(BID < printBIDs){
 
     printf("b%u\tt%u\tmodelSS: %le\n", BID, TID, modelSS);
     printf("b%u\tt%u\tnew errorSS: %le\n", BID, TID, errorSS2);

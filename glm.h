@@ -38,7 +38,7 @@ struct GLMData
 // the code a good deal cleaner (but not really any faster when Kt is
 // a 1-by-N matrix) than the more general case where Kt is a matrix.
 void glm(unsigned id, unsigned iteration, 
-	 const FortranMatrix &X, 
+	 int n,
 	 FortranMatrix &XtXi, // updated
 	 const double *XtSNP,
 	 const double SNPtSNP, 

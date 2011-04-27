@@ -149,7 +149,8 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
   }
 }
 
-void compPrepare(unsigned id, unsigned iteration, FortranMatrix &X, 
+void compPrepare(unsigned id, unsigned iteration, 
+		 //FortranMatrix &X, 
 		 FortranMatrix &fixed, 
 		 unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, 
 		 vector<double> &y, FortranMatrix &U, vector<double> &S, 
@@ -158,7 +159,12 @@ void compPrepare(unsigned id, unsigned iteration, FortranMatrix &X,
 		 GLMData &glm_data, unsigned &geno_ind, uint64_t &mySNPs, 
 		 const unsigned &m, FortranMatrix &geno, FortranMatrix &XtSNP, 
 		 vector<double> &SNPty, vector<double> &SNPtSNP){
+
+  FortranMatrix X(geno_ind/*4892*/, n/*27*/);
+
   // Fill first column of X with 1's
+
+
   for (unsigned i=0; i<X.get_n_rows(); ++i)
     X(i,0) = 1.;
 
@@ -323,7 +329,8 @@ void compPrepare(unsigned id, unsigned iteration, FortranMatrix &X,
 
 }
 
-void compUpdate(unsigned id, unsigned iteration, FortranMatrix &X, 
+void compUpdate(unsigned id, unsigned iteration, 
+		//FortranMatrix &X, 
 		FortranMatrix &XtXi, FortranMatrix &XtSNP, 
 		const double &yty,
 		vector<double> &Xty, const unsigned &rX, GLMData &glm_data,
@@ -336,7 +343,7 @@ void compUpdate(unsigned id, unsigned iteration, FortranMatrix &X,
 
   // update XtXi, Xty
   // output glm_data
-  glm(id, iteration, X, XtXi, nextXtSNP, nextSNPtSNP, nextSNPty, yty, Xty, 
+  glm(id, iteration, n, XtXi, nextXtSNP, nextSNPtSNP, nextSNPty, yty, Xty, 
       rX, glm_data);
 #ifdef _DEBUG
   if(!id)
@@ -366,7 +373,7 @@ void compUpdate(unsigned id, unsigned iteration, FortranMatrix &X,
   }
 #endif
 
-
+  /*
   // update host X
   X.resize_retain(m, n + 1);
   memcpy(&X(0, n), nextSNP, m* sizeof(ftype));
@@ -377,6 +384,7 @@ void compUpdate(unsigned id, unsigned iteration, FortranMatrix &X,
     XtSNP.writeD(ss.str());
   }
 #endif
+  */
 }
 
 void getInputs(string &path, string &fixed_filename, string &geno_filename, 
@@ -510,7 +518,6 @@ int main(int argc, char **argv)
   // fixed_count columns are equal to the fixed matrix, and the last
   // column (which changes) is the i'th column of the geno array.
   unsigned n = fixed_count + 1;
-  FortranMatrix X(geno_ind/*4892*/, n/*27*/);
   FortranMatrix XtX;
   vector<double> S;
   FortranMatrix U, Vt, XtXi;
@@ -527,7 +534,7 @@ int main(int argc, char **argv)
   // Begin timing the computations
   gettimeofday(&tstart, NULL);
 
-  compPrepare(id, 0, X, fixed, fixed_count, XtX, Xty, y, U, S, Vt, rX, 
+  compPrepare(id, 0, fixed, fixed_count, XtX, Xty, y, U, S, Vt, rX, 
 	      beta, n, tol, XtXi, 
 	      yty, glm_data, geno_ind, mySNPs, m, geno, XtSNP, SNPty, 
 	      SNPtSNP);
@@ -693,7 +700,7 @@ int main(int argc, char **argv)
       Assume data is in-core for GPU; i.e. don't recopy SNPs at each iteration.
       To remove SNP from geno, set mask at SNP index.
      */
-    compUpdate(id, iteration, X, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, m, 
+    compUpdate(id, iteration, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, m, 
 	       geno, 
 	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty);
     

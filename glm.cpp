@@ -13,7 +13,7 @@ using namespace std;
 // the code a good deal cleaner (but not really any faster when Kt is
 // a 1-by-N matrix) than the more general case where Kt is a matrix.
 void glm(unsigned id, unsigned iteration,
-	 const FortranMatrix &X, 
+	 int n,
 	 FortranMatrix &XtXi, // updated
 	 const double *XtSNP,
 	 const double SNPtSNP, 
@@ -24,7 +24,9 @@ void glm(unsigned id, unsigned iteration,
 	 // output
 	 GLMData& glm_data)
 {  
-  int m  = X.get_n_rows(), n = X.get_n_cols();
+  //int 
+    //m  = X.get_n_rows(),
+    //n = X.get_n_cols();
   //int V1 = 1; // Kt is assumed to be a row vector in this version
 
   // G = XtXi
@@ -130,7 +132,7 @@ void glm(unsigned id, unsigned iteration,
   rX++;
 
   // Compute "V2" now that we know rX == rank(X) == rank(X^T X)
-  glm_data.V2 = m - rX;
+  glm_data.V2--;
 
 
   // F = Kb' * inv(Kt * G * Kt') * Kb * V2 / (rK * ErrorSS);

@@ -625,7 +625,11 @@ int main(int argc, char **argv)
       return 0;
     }
 
-    unsigned localMaxFIndex;
+    /*! @todo this will need more bits when running more than 2^32 SNPs 
+      on a single CPU process
+    */
+    int localMaxFIndex;
+
     double globalMaxF;
     try{
       localMaxFIndex = plm_GPU(mySNPs, n, 
@@ -695,11 +699,15 @@ int main(int argc, char **argv)
       nextSNPty = SNPty[localMaxFIndex];
       nextSNPtSNP = SNPtSNP[localMaxFIndex];
       snpMask[localMaxFIndex] = 1;
-
+#ifdef _DEBUG
+      cout << "iteration " << iteration << " id " << id 
+	   << " masking index " << localMaxFIndex << endl;
+#endif
     }else{
       // receive SNP which yielded max F value
       nextSNP = &incomingSNP[0];
       nextXtSNP = &incomingXtSNP[0];
+      localMaxFIndex = -1;
     }
 
     /*
@@ -752,8 +760,8 @@ int main(int argc, char **argv)
 	       geno, 
 	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty);
     
-    copyUpdateToDevice(mySNPs, n, d_snpMask, localMaxFIndex, d_Xtsnp, 
-		       d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);
+    copyUpdateToDevice(id, iteration, mySNPs, n, d_snpMask, localMaxFIndex, 
+		       d_Xtsnp, d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);
   
     n++;
 

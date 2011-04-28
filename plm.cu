@@ -8,6 +8,12 @@
 
 #include "plm.h"
 
+#ifdef _DEBUG
+#if __CUDA_ARCH__ >= 200
+//#define printGPU
+#endif
+#endif
+
 __device__ int printBIDs(unsigned BID){
   return(BID == 0 || BID == 40);
 }
@@ -70,8 +76,7 @@ __global__ void plm(// inputs
   // snptsnp - snptXGXtsnp
   dotRG(TID, blockDim.x, GtXtsnp, Xtsnp + BID * XtsnpPitch/sizeof(double), reduce);
   s = snptsnp[BID] - *reduce;
-#ifdef _DEBUG
-  #if __CUDA_ARCH__ >= 200
+#ifdef printGPU
   if(printBIDs(BID)){
     printf("b%03u\tt%03u\tXtsnp: %1.10le\n", BID, TID, Xtsnp[BID * XtsnpPitch/sizeof(double) + TID]);
     printf("b%03u\tt%03u\tGtXtsnp: %1.10le\n", BID, TID, GtXtsnp);
@@ -81,7 +86,6 @@ __global__ void plm(// inputs
       printf("b%03u\tt%03u\ts: %1.10le\n", BID, TID, s);
     }
   }
-  #endif
 #endif
   // 1/(above)
   if(s > doubleTol){
@@ -92,21 +96,18 @@ __global__ void plm(// inputs
     snptmy = -*reduce;
     
     if(!TID){
-#ifdef _DEBUG
-#if __CUDA_ARCH__ >= 200
+#ifdef printGPU
       if(printBIDs(BID)){
 	printf("b%03u\tt%03u\tsnptXGXty: %1.10le\n", BID, TID, snptmy);
 	printf("b%03u\tt%03u\tsnpty: %1.10le\n", BID, TID, snpty[BID]);
       }
-#endif
 #endif
       snptmy += snpty[BID];
       double modelSS = snptmy * snptmy * s;
       double errorSS2 = errorSS - modelSS;
       unsigned V2 = errorDF - 1;
       f[BID] = modelSS / errorSS2 * V2;
-#ifdef _DEBUG
-  #if __CUDA_ARCH__ >= 200
+#ifdef printGPU
   if(printBIDs(BID)){
 
     printf("b%03u\tt%03u\tmodelSS: %1.10le\n", BID, TID, modelSS);
@@ -114,7 +115,6 @@ __global__ void plm(// inputs
     printf("b%03u\tt%03u\tnew V2: %u\n", BID, TID, V2);
     printf("b%03u\tt%03u\tf: %1.10le\n", BID, TID, f[BID]);
   }
-  #endif
 #endif
 
     }
@@ -201,15 +201,23 @@ void copyToDevice(unsigned geno_count, const unsigned n,
 
 }
 
-void copyUpdateToDevice(unsigned geno_count, unsigned n,
+void copyUpdateToDevice(unsigned id, unsigned iteration,  
+			unsigned geno_count, unsigned n,
 		       unsigned *d_snpMask, 
-		       unsigned maxFIndex, double *d_Xtsnp, 
+		       int maxFIndex, double *d_Xtsnp, 
 		       size_t d_XtsnpPitch,
 		       const vector<unsigned> &snpMask,
 		       FortranMatrix &XtSNP, const FortranMatrix &XtXi,
 		       const vector<double> &Xty){
+  if(maxFIndex >= 0){
+#ifdef _DEBUG
+      cout << "iteration " << iteration << " id " << id 
+	   << " masking index " << maxFIndex << " on device: " 
+	   << snpMask[maxFIndex] << endl;
+#endif
     cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
 			     sizeof(unsigned), cudaMemcpyHostToDevice));
+  }
 
     //! copy updated XtSNP to GPU
     cutilSafeCall(cudaMemcpy2D(d_Xtsnp + n, 

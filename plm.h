@@ -26,13 +26,14 @@ void copyToDevice(const unsigned geno_count, const unsigned n,
 		 const std::vector<double> &SNPty,
 		 const std::vector<double> &Xty, const FortranMatrix &XtXi, 
 		 const std::vector<unsigned> &snpMask);
-void copyUpdateToDevice(unsigned geno_count, unsigned n,
-		       unsigned *d_snpMask, 
-		       unsigned maxFIndex, ftype *d_Xtsnp, 
-		       size_t d_XtsnpPitch,
+void copyUpdateToDevice(unsigned id, unsigned iteration,
+			unsigned geno_count, unsigned n,
+			unsigned *d_snpMask, 
+			int maxFIndex, ftype *d_Xtsnp, 
+			size_t d_XtsnpPitch,
 			const std::vector<unsigned> &snpMask,
-		       FortranMatrix &XtSNP, const FortranMatrix &XtXi,
-		       const std::vector<double> &Xty);
+			FortranMatrix &XtSNP, const FortranMatrix &XtXi,
+			const std::vector<double> &Xty);
 float getGPUCompTime();
 float getGPUMaxTime();
 void getMaxF(unsigned id, unsigned iteration, unsigned geno_count, 

@@ -662,16 +662,15 @@ int main(int argc, char **argv)
     MPI_Allreduce(&Fval[localMaxFIndex], &globalMaxF, 1, MPI_DOUBLE, MPI_MAX,
 		  MPI_COMM_WORLD);
 
-    if(!id)
-      cout << "iteration " << iteration << " global max F: " << globalMaxF << endl;
 
     // get p value
     Pval = 1 - gsl_cdf_fdist_P(globalMaxF, 1, glm_data.V2 - 1);
 
     if(Pval > entry_limit){
-      if(!id)
+      if(!id){
 	cout << "p value (" << Pval << ") > entry_limit (" << entry_limit 
 	     << "); quitting" << endl;
+      }
       MPI_Finalize();
       return 0;
     }
@@ -689,7 +688,8 @@ int main(int argc, char **argv)
 
     if(!id)
       cout << "iteration " << iteration << " global max F on rank " << 
-	globalMinRankMaxF << endl;
+	globalMinRankMaxF << ": " << globalMaxF << endl;
+
 
     if(id == globalMinRankMaxF){
       // I have the max F value

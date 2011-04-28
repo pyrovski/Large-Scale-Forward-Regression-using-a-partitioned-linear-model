@@ -62,7 +62,7 @@ __global__ void plm(// inputs
   if(snpMask[BID]){
     // don't compute new F
     if(!TID)
-      f[BID] = -1;
+      f[BID] = 0;
     return; 
   }
   // snptsnp - snptXGXtsnp:
@@ -121,7 +121,7 @@ __global__ void plm(// inputs
     return;
   } else {
     if(!TID)
-      f[BID] = -1;
+      f[BID] = 0;
     return;
   }
 }
@@ -217,6 +217,18 @@ void copyUpdateToDevice(unsigned id, unsigned iteration,
 #endif
     cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
 			     sizeof(unsigned), cudaMemcpyHostToDevice));
+    unsigned maskVal;
+    cutilSafeCall(cudaMemcpy(&maskVal, d_snpMask + maxFIndex,
+			     sizeof(unsigned), cudaMemcpyDeviceToHost));
+#ifdef _DEBUG
+      cout << "iteration " << iteration << " id " << id 
+	   << " mask index " << maxFIndex << ": "
+	   << maskVal << endl;
+#endif
+      /* this doesn't help...
+    cutilSafeCall(cudaMemcpy(d_snpMask, &snpMask[0], 
+			     sizeof(unsigned) * geno_count, cudaMemcpyHostToDevice));
+      */
   }
 
     //! copy updated XtSNP to GPU

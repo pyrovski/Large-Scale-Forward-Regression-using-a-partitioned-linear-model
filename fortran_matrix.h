@@ -4,12 +4,14 @@
 #include <string>
 #include <vector>
 #include <stdint.h>
+#include <cblas.h>
 
 class FortranMatrix
 {
 public:
   // Constructor, by default, an empty matrix is constructed
-  FortranMatrix(uint64_t nr = 0, uint64_t nc = 0);
+  FortranMatrix(uint64_t nr, uint64_t nc);
+  FortranMatrix();
 
   void add(const FortranMatrix &rhs);
 
@@ -30,6 +32,7 @@ public:
   // of a non-square matrix is a non-trivial algorithm.
   // http://en.wikipedia.org/wiki/In-place_matrix_transposition
   void transpose_self();
+  void transpose_dims();
 
   // Change this matix to have new_n_rows rows and new_n_cols columns
   // Do not rely on any previous values in the matrix for this routine.
@@ -57,6 +60,7 @@ public:
   // Users have direct access to the array of values
   std::vector<double> values;
   
+ private:
   uint64_t n_rows, n_cols;
 };
 

@@ -70,9 +70,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
     }
     
     fixed_file.read((char*)&fixed.values[0], fixed.values.size() * sizeof(double));
-    uint64_t temp = fixed.get_n_rows();
-    fixed.n_rows = fixed.n_cols;
-    fixed.n_cols = temp;
+    fixed.transpose_dims();
     fixed.transpose_self();
     fixed.writeD("fixed.dat");
   }    
@@ -197,6 +195,7 @@ void compPrepare(unsigned id, unsigned iteration,
   rX = svd_apply(U, S, Vt, /*result=*/beta, Xty);
 
   if(!id){
+    X.writeD("X.dat");
     XtX.writeD("XtX.dat");
 
     writeD("Xty_0.dat", Xty);
@@ -312,19 +311,24 @@ void compPrepare(unsigned id, unsigned iteration,
 	      &SNPty[0],
 	      1
 	      );
-#ifdef _DEBUG
-  {
-    stringstream ss;
-    ss << "SNPty_" << id << ".dat";
-    writeD(ss.str(), SNPty);
-  }
-#endif
   
   for (uint64_t i=0; i<mySNPs; ++i){
     //! these will never change for each SNP, so they could be moved out of all loops
     SNPtSNP[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
 				&geno.values[i*geno_ind], 1);
   }
+#ifdef _DEBUG
+  {
+    stringstream ss;
+    ss << "SNPty_" << id << ".dat";
+    writeD(ss.str(), SNPty);
+  }
+  {
+    stringstream ss;
+    ss << "SNPtSNP_" << id << ".dat";
+    writeD(ss.str(), SNPtSNP);
+  }
+#endif
 
 
 }
@@ -513,7 +517,9 @@ int main(int argc, char **argv)
   // fixed_count columns are equal to the fixed matrix, and the last
   // column (which changes) is the i'th column of the geno array.
   unsigned n = fixed_count + 1;
-  FortranMatrix XtX;
+
+  //! have to set size here; constructor for return value doesn't work in matmat
+  FortranMatrix XtX(n, n);
   vector<double> S;
   FortranMatrix U, Vt, XtXi;
 

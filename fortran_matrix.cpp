@@ -20,7 +20,14 @@ using namespace std;
 // it will be more efficient to fill this matrix column-by-column...
 
   // Constructor, by default, an empty matrix is constructed
-  FortranMatrix::FortranMatrix(uint64_t nr, uint64_t nc) : n_rows(nr), n_cols(nc), values(nr*nc) {}
+FortranMatrix::FortranMatrix(uint64_t nr, uint64_t nc) : 
+  n_rows(nr), n_cols(nc), values(nr*nc) 
+{}
+
+
+FortranMatrix::FortranMatrix() : 
+  n_rows(0), n_cols(0), values(0) 
+{}
 
 const FortranMatrix & FortranMatrix::operator = (const FortranMatrix &rhs){
     this->values = rhs.values;
@@ -67,6 +74,10 @@ const FortranMatrix & FortranMatrix::operator = (const FortranMatrix &rhs){
 #else
   int FortranMatrix::writeD(string filename){return 0;}
 #endif
+
+void FortranMatrix::transpose_dims(){
+    std::swap(n_rows, n_cols);
+}
 
   // Replace this matrix with its transpose.  Here we simply
   // use n_rows*n_cols temporary storage.  In-place transposition
@@ -173,32 +184,34 @@ FortranMatrix matmat(const FortranMatrix& A, const FortranMatrix& B,
   // Routine actually computes C <- alpha*op( A )*op( B ) + beta*C
   double alpha = 1., beta = 0.;
   
-  FortranMatrix result(M,N);
+  FortranMatrix resultasdf;
+  resultasdf.resize(M, N);
 
   // Not sure if Fortran needs a NULL-terminated string here or if we can just
   // do the ternary operator "in place" or if it has to be a separate variable...
-  char
-    char_transA = transA ? 'T' : 'N',
-    char_transB = transB ? 'T' : 'N';
+  CBLAS_TRANSPOSE
+    cblas_transA = transA ? CblasTrans : CblasNoTrans,
+    cblas_transB = transB ? CblasTrans : CblasNoTrans;
 
   // Call BLAS routine
-  BLASgemm_(&char_transA,
-	    &char_transB,
-	    &M, // number of rows of op(A)
-	    &N, // number of cols of op(B)
-	    &K, // number of cols of op(A)
-	    &alpha,
-	    const_cast<double*>(&(A.values[0])), // Cast away const-ness, BLAS will NOT overwrite
-	    transA ? &K : &M, // leading dimension of A (see BLAS docs)
-	    const_cast<double*>(&(B.values[0])), // Cast away const-ness, BLAS will NOT overwrite
-	    transB ? &N : &K, // leading dimension of B (see BLAS docs)
-	    &beta,
-	    &(result.values[0]),
-	    &M  // at least max(1,M)
-	    );
+  cblas_dgemm(CblasColMajor,
+	      cblas_transA,
+	      cblas_transB,
+	      M, // number of rows of op(A)
+	      N, // number of cols of op(B)
+	      K, // number of cols of op(A)
+	      alpha,
+	      const_cast<double*>(&(A.values[0])), // Cast away const-ness, BLAS will NOT overwrite
+	      transA ? K : M, // leading dimension of A (see BLAS docs)
+	      const_cast<double*>(&(B.values[0])), // Cast away const-ness, BLAS will NOT overwrite
+	      transB ? N : K, // leading dimension of B (see BLAS docs)
+	      beta,
+	      &resultasdf.values[0],
+	      M  // at least max(1,M)
+	      );
 
   // Any extra copy will hopefully be removed by RVO.  
-  return result;
+  return resultasdf;
 }
 
 

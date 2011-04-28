@@ -484,7 +484,7 @@ int main(int argc, char **argv)
   MPI_Comm_rank(MPI_COMM_WORLD, &id);
   
   //! @todo this should be a command line parameter
-  ftype entry_limit = 0.2;
+  double entry_limit = 0.2;
 
   // Timing variables
   timeval tstart, tstop;
@@ -577,7 +577,7 @@ int main(int argc, char **argv)
   cout << "Time required for computation prep: "
        << tvDouble(tstop - tstart) << " s" << endl;
   
-  ftype *d_snptsnp, *d_Xtsnp, *d_snpty,
+  double *d_snptsnp, *d_Xtsnp, *d_snpty,
     *d_f;
   //! @todo could use d_f also as a mask
   unsigned *d_snpMask;
@@ -628,7 +628,7 @@ int main(int argc, char **argv)
     unsigned localMaxFIndex;
     double globalMaxF;
     try{
-      localMaxFIndex = plm_GPU(mySNPs, n, n * sizeof(ftype), 
+      localMaxFIndex = plm_GPU(mySNPs, n, n * sizeof(double), 
 	m ,        
 	d_snptsnp, 
 	d_Xtsnp, 

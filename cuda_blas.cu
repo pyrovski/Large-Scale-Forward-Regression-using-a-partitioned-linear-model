@@ -1,6 +1,6 @@
 #include "type.h"
 
-__device__ void reduceCore(const unsigned TID, unsigned N, ftype *reduce){
+__device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
   /*
   if(!TID){
     for(int i = 1; i < N; i++)
@@ -30,9 +30,9 @@ __device__ void reduceCore(const unsigned TID, unsigned N, ftype *reduce){
  */
 __device__ void dotRR(const unsigned TID,
 		    const unsigned N, 
-		    const ftype x,
-		    const ftype y,
-		    ftype *reduce){
+		    const double x,
+		    const double y,
+		    double *reduce){
 
   // compute dot product terms
   // place x*y in shared memory (reduce)
@@ -43,9 +43,9 @@ __device__ void dotRR(const unsigned TID,
 
 __device__ void dotRG(const unsigned TID,
 		      const unsigned N, 
-		      const ftype x,
-		      const ftype *y,
-		      ftype *reduce){ // assume blockDim.x elements
+		      const double x,
+		      const double *y,
+		      double *reduce){ // assume blockDim.x elements
   reduce[TID] = x * y[TID];
   __syncthreads();
   reduceCore(TID, N, reduce);
@@ -53,9 +53,9 @@ __device__ void dotRG(const unsigned TID,
 
 __device__ void dotGG(const unsigned TID,
 		      const unsigned N, 
-		      const ftype *x,
-		      const ftype *y,
-		      ftype *reduce){ // assume blockDim.x elements
+		      const double *x,
+		      const double *y,
+		      double *reduce){ // assume blockDim.x elements
   reduce[TID] = x[TID] * y[TID];
   __syncthreads();
   reduceCore(TID, N, reduce);
@@ -64,13 +64,13 @@ __device__ void dotGG(const unsigned TID,
 /*
   A is in constant memory.  A must be column-major and square.
  */
-__device__ ftype vecGMatCSq(const unsigned TID,
-			  const ftype *x,
+__device__ double vecGMatCSq(const unsigned TID,
+			  const double *x,
 			  const unsigned N,
-			  const ftype *A, 
+			  const double *A, 
 			  const unsigned lda,
-			  ftype *reduce){
-  ftype retVal;
+			  double *reduce){
+  double retVal;
   for(int i = 0; i < N; i++){
     dotGG(TID, N, x, A + lda * i, reduce);
     if(i == TID)
@@ -80,15 +80,15 @@ __device__ ftype vecGMatCSq(const unsigned TID,
 }
 
 
-__device__ ftype vecGMatG(const unsigned TID, 
-			  const ftype *x,
+__device__ double vecGMatG(const unsigned TID, 
+			  const double *x,
 			  const unsigned M, 
 			  const unsigned N,
-			  const ftype *A, 
+			  const double *A, 
 			  const unsigned lda,
-			  ftype *reduce) // reduce must be of length >= N, N <= M
+			  double *reduce) // reduce must be of length >= N, N <= M
 {
-  ftype retVal;
+  double retVal;
   for(int i = 0; i < N; i++){
     dotRG(TID, M, x[TID], A + lda * i, reduce);
     if(i == TID)

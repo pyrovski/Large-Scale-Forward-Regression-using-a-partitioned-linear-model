@@ -5,7 +5,7 @@
 // can then be used with the svd_apply routine, to solve a
 // system of equations Ax=b, or to compute the action of A^+ M on another
 // matrix M.  
-void svd_create(/*in */FortranMatrix& A,
+void svd_create(/*in */FortranMatrix A,
 		/*out*/FortranMatrix& U,
 		/*out*/std::vector<double>& S,
 		/*out*/FortranMatrix& VT)
@@ -285,7 +285,7 @@ int svd_apply(/*in */ FortranMatrix& U,
 // matrix is returned.  Use this routine if you don't need to
 // reuse the SVD for any additional vectors and don't want to manage
 // the storage of the U, S, and V^T matrices yourself...
-int svd_solve(FortranMatrix& A,
+int svd_solve(FortranMatrix A,
 	      std::vector<double>& x, // solution
 	      const std::vector<double>& b, // rhs
 	      double tol)

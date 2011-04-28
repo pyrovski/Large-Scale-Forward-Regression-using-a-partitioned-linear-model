@@ -143,8 +143,11 @@ void FortranMatrix::transpose_dims(){
   // Return a writable reference to the number of rows/cols of the matrix.
   // You should only change this if you know what you are doing and have also
   // changed the "values" array in a consistent manner.
+
+/*
   uint64_t& FortranMatrix::get_n_rows() { return n_rows; }
   uint64_t& FortranMatrix::get_n_cols() { return n_cols; }
+*/
 
   //
   // Data

@@ -44,8 +44,11 @@ public:
   // Return a writable reference to the number of rows/cols of the matrix.
   // You should only change this if you know what you are doing and have also
   // changed the "values" array in a consistent manner.
+
+  /*
   uint64_t& get_n_rows();
   uint64_t& get_n_cols();
+  */
 
   // Const version of the above, just returns a copy of the number of
   // rows/cols, does not allow anything to be modified.

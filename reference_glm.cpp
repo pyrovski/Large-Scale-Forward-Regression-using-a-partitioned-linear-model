@@ -167,7 +167,7 @@ void compPrepare(unsigned id, unsigned iteration,
     X(i,0) = 1.;
 
   // Fill next fixed_count columns with the fixed array contents
-  memcpy(&X.values[X.get_n_rows()], &fixed.values[0], 
+  memcpy(&X(0, 1), &fixed.values[0], 
 	 fixed_count * X.get_n_rows() * sizeof(double));
 
   
@@ -181,7 +181,38 @@ void compPrepare(unsigned id, unsigned iteration,
     SNPtSNP
    */
   
-  XtX = matmat(X, X, true, false); 
+  //XtX = matmat(X, X, true, false); 
+  /*!
+    construct XtX from X manually.
+   */
+  for(uint64_t col = 0; col < X.get_n_cols(); col++){
+    if(col){
+      cblas_dgemv(CblasColMajor,
+		  CblasTrans,
+		  geno_ind, 
+		  col,
+		  1.0,
+		  &X.values[0],
+		  geno_ind,
+		  &X(0, col),
+		  1,
+		  0.0,
+		  &XtX(0, col),
+		  1);
+
+      //! @todo if XtX is stored as symmetric matrix, we don't need this
+      for(uint64_t row = 0; row < col; row++)
+	XtX(col, row) = XtX(row, col);
+    }
+    XtX(col, col) = cblas_ddot(geno_ind, 
+			       &X(0, col),
+			       1,
+			       &X(0, col),
+			       1);
+  }
+
+  if(!id)
+    XtX.writeD("XtX.dat");
   
   // Solve (X^T * X)*beta = X^T*y for beta.  Note that X and X^T * X
   // have the same rank.
@@ -189,6 +220,7 @@ void compPrepare(unsigned id, unsigned iteration,
   // Initialize SVD components, A = U * S * V^T
   Xty = matvec(X, y, /*transX=*/true);
   
+  //! @todo this is altering XtX
   // Create the SVD of X^T * X 
   svd_create(XtX, U, S, Vt);
 

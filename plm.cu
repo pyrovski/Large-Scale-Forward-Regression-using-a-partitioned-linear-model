@@ -10,7 +10,9 @@
 
 #include "plm.h"
 
-#define printBIDs 1
+__device__ int printBIDs(unsigned BID){
+  return(BID == 0 || BID == 40);
+}
 
 using namespace std;
 //__shared__ ftype fval; // scalar
@@ -70,11 +72,13 @@ __global__ void plm(// inputs
   s = snptsnp[BID] - *reduce;
 #ifdef _DEBUG
   #if __CUDA_ARCH__ >= 200
-  if(BID < printBIDs){
-    printf("b%u\tt%u\tXtsnp: %le\n", BID, TID, Xtsnp[BID * XtsnpPitch/sizeof(ftype) + TID]);
-    printf("b%u\tt%u\tGtXtsnp: %le\n", BID, TID, GtXtsnp);
+  if(printBIDs(BID)){
+    printf("b%03u\tt%03u\tXtsnp: %le\n", BID, TID, Xtsnp[BID * XtsnpPitch/sizeof(ftype) + TID]);
+    printf("b%03u\tt%03u\tGtXtsnp: %le\n", BID, TID, GtXtsnp);
     if(!TID){
-      printf("b%u\tt%u\ts: %le\n", BID, TID, s);
+      printf("b%03u\tt%03u\tsnptsnp: %le\n", BID, TID, snptsnp[BID]);
+      printf("b%03u\tt%03u\tsnptXGXtsnp: %le\n", BID, TID, *reduce);
+      printf("b%03u\tt%03u\ts: %le\n", BID, TID, s);
     }
   }
   #endif
@@ -90,9 +94,9 @@ __global__ void plm(// inputs
     if(!TID){
 #ifdef _DEBUG
 #if __CUDA_ARCH__ >= 200
-      if(BID < printBIDs){
-	printf("b%u\tt%u\tsnptXGXty: %le\n", BID, TID, snptmy);
-	printf("b%u\tt%u\tsnpty: %le\n", BID, TID, snpty[BID]);
+      if(printBIDs(BID)){
+	printf("b%03u\tt%03u\tsnptXGXty: %le\n", BID, TID, snptmy);
+	printf("b%03u\tt%03u\tsnpty: %le\n", BID, TID, snpty[BID]);
       }
 #endif
 #endif
@@ -103,12 +107,12 @@ __global__ void plm(// inputs
       f[BID] = modelSS / errorSS2 * V2;
 #ifdef _DEBUG
   #if __CUDA_ARCH__ >= 200
-  if(BID < printBIDs){
+  if(printBIDs(BID)){
 
-    printf("b%u\tt%u\tmodelSS: %le\n", BID, TID, modelSS);
-    printf("b%u\tt%u\tnew errorSS: %le\n", BID, TID, errorSS2);
-    printf("b%u\tt%u\tnew V2: %u\n", BID, TID, V2);
-    printf("b%u\tt%u\tf: %le\n", BID, TID, f[BID]);
+    printf("b%03u\tt%03u\tmodelSS: %le\n", BID, TID, modelSS);
+    printf("b%03u\tt%03u\tnew errorSS: %le\n", BID, TID, errorSS2);
+    printf("b%03u\tt%03u\tnew V2: %u\n", BID, TID, V2);
+    printf("b%03u\tt%03u\tf: %le\n", BID, TID, f[BID]);
   }
   #endif
 #endif

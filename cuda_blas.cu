@@ -7,6 +7,7 @@ __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
       reduce[0] += reduce[i];
   }
   */
+  ///*
   unsigned threads;
   while(N/2){
     if(N % 2){
@@ -23,6 +24,7 @@ __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
     __syncthreads();
     N = threads;
   }
+  //*/
 }
 
 /*

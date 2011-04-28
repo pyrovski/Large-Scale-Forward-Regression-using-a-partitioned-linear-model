@@ -6,13 +6,13 @@
 
 #include "type.h"
 
-#include "cuda_blas.cu"
-
 #include "plm.h"
 
 __device__ int printBIDs(unsigned BID){
   return(BID == 0 || BID == 40);
 }
+
+#include "cuda_blas.cu"
 
 using namespace std;
 //__shared__ double fval; // scalar
@@ -68,17 +68,17 @@ __global__ void plm(// inputs
 		     reduce); 
   
   // snptsnp - snptXGXtsnp
-  dotRG(TID, blockDim.x, GtXtsnp, Xtsnp, reduce);
+  dotRG(TID, blockDim.x, GtXtsnp, Xtsnp + BID * XtsnpPitch/sizeof(double), reduce);
   s = snptsnp[BID] - *reduce;
 #ifdef _DEBUG
   #if __CUDA_ARCH__ >= 200
   if(printBIDs(BID)){
-    printf("b%03u\tt%03u\tXtsnp: %le\n", BID, TID, Xtsnp[BID * XtsnpPitch/sizeof(double) + TID]);
-    printf("b%03u\tt%03u\tGtXtsnp: %le\n", BID, TID, GtXtsnp);
+    printf("b%03u\tt%03u\tXtsnp: %1.10le\n", BID, TID, Xtsnp[BID * XtsnpPitch/sizeof(double) + TID]);
+    printf("b%03u\tt%03u\tGtXtsnp: %1.10le\n", BID, TID, GtXtsnp);
     if(!TID){
-      printf("b%03u\tt%03u\tsnptsnp: %le\n", BID, TID, snptsnp[BID]);
-      printf("b%03u\tt%03u\tsnptXGXtsnp: %le\n", BID, TID, *reduce);
-      printf("b%03u\tt%03u\ts: %le\n", BID, TID, s);
+      printf("b%03u\tt%03u\tsnptsnp: %1.10le\n", BID, TID, snptsnp[BID]);
+      printf("b%03u\tt%03u\tsnptXGXtsnp: %1.10le\n", BID, TID, *reduce);
+      printf("b%03u\tt%03u\ts: %1.10le\n", BID, TID, s);
     }
   }
   #endif
@@ -95,8 +95,8 @@ __global__ void plm(// inputs
 #ifdef _DEBUG
 #if __CUDA_ARCH__ >= 200
       if(printBIDs(BID)){
-	printf("b%03u\tt%03u\tsnptXGXty: %le\n", BID, TID, snptmy);
-	printf("b%03u\tt%03u\tsnpty: %le\n", BID, TID, snpty[BID]);
+	printf("b%03u\tt%03u\tsnptXGXty: %1.10le\n", BID, TID, snptmy);
+	printf("b%03u\tt%03u\tsnpty: %1.10le\n", BID, TID, snpty[BID]);
       }
 #endif
 #endif
@@ -109,10 +109,10 @@ __global__ void plm(// inputs
   #if __CUDA_ARCH__ >= 200
   if(printBIDs(BID)){
 
-    printf("b%03u\tt%03u\tmodelSS: %le\n", BID, TID, modelSS);
-    printf("b%03u\tt%03u\tnew errorSS: %le\n", BID, TID, errorSS2);
+    printf("b%03u\tt%03u\tmodelSS: %1.10le\n", BID, TID, modelSS);
+    printf("b%03u\tt%03u\tnew errorSS: %1.10le\n", BID, TID, errorSS2);
     printf("b%03u\tt%03u\tnew V2: %u\n", BID, TID, V2);
-    printf("b%03u\tt%03u\tf: %le\n", BID, TID, f[BID]);
+    printf("b%03u\tt%03u\tf: %1.10le\n", BID, TID, f[BID]);
   }
   #endif
 #endif
@@ -128,7 +128,7 @@ __global__ void plm(// inputs
 
 cudaEvent_t start, stopKernel, stopMax;
 
-unsigned plm_GPU(unsigned geno_count, unsigned blockSize, unsigned sharedSize, 
+unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
 		 unsigned m, double* d_snptsnp, double* d_Xtsnp, 
 		 unsigned d_XtsnpPitch, double ErrorSS, unsigned V2, 
 		 double* d_snpty, unsigned* d_snpMask, double* d_f) throw(int)

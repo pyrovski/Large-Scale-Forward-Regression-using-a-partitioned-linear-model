@@ -628,7 +628,7 @@ int main(int argc, char **argv)
     unsigned localMaxFIndex;
     double globalMaxF;
     try{
-      localMaxFIndex = plm_GPU(mySNPs, n, n * sizeof(double), 
+      localMaxFIndex = plm_GPU(mySNPs, n, 
 	m ,        
 	d_snptsnp, 
 	d_Xtsnp, 

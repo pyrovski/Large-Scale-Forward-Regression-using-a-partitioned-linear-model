@@ -8,32 +8,38 @@ OPT_FLAGS = -O3
 CUDA_FLAGS = 
 endif
 
-# warning: this breaks things on other architectures...
 -include CUDA_SM
+-include LIBRARY_PATHS
+
+# warning: this breaks things on other architectures...
 CUDA_SM_VER ?= sm_13
+
 CUDA_FLAGS+=-arch $(CUDA_SM_VER) -Xptxas -v
 # -maxrregcount=16
 -include CUDA_PATHS
 CUDA_SDK?=/home/user/NVIDIA_GPU_Computing_SDK3.2
 CUDA_TK?=/usr/local/cuda
 CUDA_INC=-I$(CUDA_SDK)/C/common/inc -I$(CUDA_TK)/include
-CUDA_LIBS=-L/usr/local/cuda/lib64 -lcudart
+CUDA_LIBS=-L$(CUDA_TK)/lib64 -lcudart
 
 GPUCC = $(CUDA_TK)/bin/nvcc
 CC=mpicxx
 
 # The location (and name) of the BLAS/Lapack libraries
-BLAS_LAPACK_LIB = -llapack
+BLAS_PATH ?= /usr
+BLAS_INCLUDE ?= -I$(BLAS_PATH)/include
+BLAS_LAPACK_LIB ?= -L$(BLAS_PATH)/lib -llapack -lf77blas -lcblas -latlas 
 # You should not need to edit anything below this line...
 
 # Location of GSL header files and libraries
-#GSL_INCLUDE = /sw/include
-GSL_LIB = -lgsl
+GSL_PATH ?= /usr/
+GSL_INCLUDE ?= -I$(GSL_PATH)/include
+GSL_LIB = -L$(GSL_PATH)/lib -lgsl
 
 LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB) -lcublas $(CUDA_LIBS)
 
 # Set all include flags here for later use
-#INCLUDE_FLAGS = $(GSL_INCLUDE)
+INCLUDES = $(CUDA_INC) $(GSL_INCLUDE) $(BLAS_INCLUDE)
 
 CPU_SRC = reference_glm.cpp tvUtil.cpp fortran_matrix.cpp glm.cpp print_matrix.cpp svd.cpp
 GPU_SRC = plm.cu
@@ -54,6 +60,6 @@ $(target): $(objects)
 	$(CC) -o $@ $^ $(LIBS)
 
 %.o:%.cpp
-	$(CC) $(DBG) $(OPT_FLAGS) $(CUDA_INC) $^ -c
+	$(CC) $(DBG) $(OPT_FLAGS) $(INCLUDES) $^ -c
 %.o:%.cu
-	$(GPUCC) $(DBG) $(OPT_FLAGS) $(CUDA_INC) $(CUDA_FLAGS) $^ -c
+	$(GPUCC) $(DBG) $(OPT_FLAGS) $(INCLUDES) $(CUDA_FLAGS) $^ -c

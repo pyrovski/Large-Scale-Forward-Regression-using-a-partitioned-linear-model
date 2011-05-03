@@ -15,13 +15,15 @@
 #include <sstream>
 #include <mpi.h>
 #include <gsl/gsl_cdf.h>
-
+extern "C"{
+#include <cblas.h>
+}
 // Local project includes
 #include "fortran_matrix.h"
 #include "glm.h"
 #include "GetPot"
 #include "svd.h"
-#include "cblas.h"
+
 #include "type.h"
 #include "tvUtil.h"
 #include "plm.h"

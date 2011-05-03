@@ -8,6 +8,10 @@
 #include <vector>
 #include <iostream>
 
+extern "C"{
+#include <cblas.h>
+}
+
 // Local project includes
 #include "fortran_matrix.h"
 #include "my_lapack_blas.h"

@@ -1,5 +1,7 @@
 #include <gsl/gsl_cdf.h> 
+extern "C"{
 #include <cblas.h>
+}
 #include <sstream>
 
 #include "glm.h"

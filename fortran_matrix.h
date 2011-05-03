@@ -4,7 +4,10 @@
 #include <string>
 #include <vector>
 #include <stdint.h>
+extern "C"{
 #include <cblas.h>
+}
+
 
 class FortranMatrix
 {

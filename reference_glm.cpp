@@ -420,12 +420,13 @@ void compUpdate(unsigned id, unsigned iteration,
 
 }
 
-void getInputs(string &path, string &fixed_filename, string &geno_filename, 
+void getInputs(string input_filename, 
+	       string &path, string &fixed_filename, string &geno_filename, 
 	       string &y_filename, unsigned &fixed_count, unsigned &geno_ind,
 	       uint64_t &geno_count, int id){
 
   // Create input file object.  Put the path to your data files here!
-  GetPot input_file("reference_glm.in");
+  GetPot input_file(input_filename.c_str());
   
   path = input_file("path", path.c_str());
   
@@ -484,6 +485,14 @@ int main(int argc, char **argv)
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &numProcs);
   MPI_Comm_rank(MPI_COMM_WORLD, &id);
+
+  if(argc < 2){
+    if(!id)
+      cout << "usage: " << argv[0] << " <input file>" << endl 
+	   << "where <input file> contains run-time settings" << endl;
+    
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
   
   //! @todo this should be a command line parameter
   double entry_limit = 0.2;
@@ -500,8 +509,9 @@ int main(int argc, char **argv)
   unsigned fixed_count;
   unsigned geno_ind; //rows 
   uint64_t geno_count; // columns of the geno array
-  
-  getInputs(path, fixed_filename, geno_filename, y_filename, fixed_count, 
+  string input_filename = argv[1];
+
+  getInputs(input_filename, path, fixed_filename, geno_filename, y_filename, fixed_count, 
 	    geno_ind, geno_count, id);
 
   const unsigned m = geno_ind;

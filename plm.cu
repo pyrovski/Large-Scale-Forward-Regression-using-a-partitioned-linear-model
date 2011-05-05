@@ -126,8 +126,7 @@ __global__ void plm(// inputs
   }
 }
 
-cudaEvent_t start, stopKernel, stopMax, startCopy, stopCopy, 
-  startCopyUpdate, stopCopyUpdate;
+cudaEvent_t start, stopKernel, stopMax;
 
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
 		 unsigned m, double* d_snptsnp, double* d_Xtsnp, 
@@ -172,12 +171,7 @@ void copyToDevice(unsigned geno_count, const unsigned n,
   cudaEventCreate(&start);
   cudaEventCreate(&stopKernel);
   cudaEventCreate(&stopMax);
-  cudaEventCreate(&startCopy);
-  cudaEventCreate(&stopCopy);
-  cudaEventCreate(&startCopyUpdate);
-  cudaEventCreate(&stopCopyUpdate);
 
-  cudaEventRecord(startCopy, 0);
   cutilSafeCall(cudaMalloc(&d_snpMask, geno_count * sizeof(unsigned)));
   cutilSafeCall(cudaMemcpy(d_snpMask, &snpMask[0], 
 			   geno_count * sizeof(unsigned), 
@@ -204,7 +198,6 @@ void copyToDevice(unsigned geno_count, const unsigned n,
   cutilSafeCall(cudaMemcpyToSymbol(d_Xty, &Xty[0], n * sizeof(double)));
   
   cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(double)));
-  cudaEventRecord(stopCopy, 0);
 }
 
 void copyUpdateToDevice(unsigned id, unsigned iteration,  
@@ -215,8 +208,6 @@ void copyUpdateToDevice(unsigned id, unsigned iteration,
 		       const vector<unsigned> &snpMask,
 		       FortranMatrix &XtSNP, const FortranMatrix &XtXi,
 		       const vector<double> &Xty){
-
-  cudaEventRecord(startCopyUpdate, 0);
 
   if(maxFIndex >= 0){
 #ifdef _DEBUG
@@ -256,8 +247,6 @@ void copyUpdateToDevice(unsigned id, unsigned iteration,
     // update GPU Xty (const mem)
     // call fails unless we update the whole thing
     cutilSafeCall(cudaMemcpyToSymbol(d_Xty, &Xty[0], (n + 1) * sizeof(double)));
-
-    cudaEventRecord(stopCopyUpdate, 0);
 }
 
 float getGPUCompTime(){
@@ -270,18 +259,6 @@ float getGPUMaxTime(){
   float computation_elapsed_time;
   cudaEventElapsedTime(&computation_elapsed_time, stopKernel, stopMax);
   return computation_elapsed_time / 1000.0f;
-}
-
-float getGPUCopyTime(){
-  float copy_elapsed_time;
-  cudaEventElapsedTime(&copy_elapsed_time, startCopy, stopCopy);
-  return copy_elapsed_time / 1000.0f;
-}
-
-float getGPUCopyUpdateTime(){
-  float copy_elapsed_time;
-  cudaEventElapsedTime(&copy_elapsed_time, startCopyUpdate, stopCopyUpdate);
-  return copy_elapsed_time / 1000.0f;
 }
 
 void getMaxF(unsigned id, unsigned iteration, unsigned geno_count, 

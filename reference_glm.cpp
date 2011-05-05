@@ -3,6 +3,7 @@
   - use GPU and host RAM size to estimate how many SNPs can be processed at a time
   -- host holds all SNPs plus derived data; currently, GPU holds only derived data
   - list of input files should be command line parameter
+  - do comp update on GPU?
  */
 
 // System header files
@@ -597,14 +598,18 @@ int main(int argc, char **argv)
   size_t d_XtsnpPitch;
   
   double GPUCompTime = 0, GPUMaxTime = 0,
-    GPUCopyTime = 0, GPUCopyUpdateTime = 0;
+    GPUCopyTime = 0, GPUCopyUpdateTime = 0,
+    CPUCompUpdateTime = 0;
   
+
+  gettimeofday(&tstart, NULL);
   copyToDevice(mySNPs, n, 
 	       d_snptsnp, d_Xtsnp, d_XtsnpPitch, d_snpty, d_snpMask, d_f,
 	       SNPtSNP, XtSNP, 
 	       SNPty, Xty, XtXi, snpMask);
+  gettimeofday(&tstop, NULL);
   
-  GPUCopyTime = getGPUCopyTime();
+  GPUCopyTime = tvDouble(tstop - tstart);
   
   cout << "id " << id 
        << " GPU copy time: "
@@ -779,37 +784,54 @@ int main(int argc, char **argv)
       Assume data is in-core for GPU; i.e. don't recopy SNPs at each iteration.
       To remove SNP from geno, set mask at SNP index.
      */
+
+    gettimeofday(&tstart, NULL);
     compUpdate(id, iteration, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, m, 
 	       geno, 
 	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty);
-    
+    gettimeofday(&tstop, NULL);
+    CPUCompUpdateTime = tvDouble(tstop - tstart);
+
+    gettimeofday(&tstart, NULL);
     copyUpdateToDevice(id, iteration, mySNPs, n, d_snpMask, localMaxFIndex, 
 		       d_Xtsnp, d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);
-  
+    gettimeofday(&tstop, NULL);
+    GPUCopyUpdateTime = tvDouble(tstop - tstart);
+    
     n++;
 
-    GPUCompTime += getGPUCompTime();
-    GPUMaxTime += getGPUMaxTime();
-    GPUCopyUpdateTime += getGPUCopyUpdateTime();
+    GPUCompTime = getGPUCompTime();
+    GPUMaxTime = getGPUMaxTime();
 
     cout << "iteration " << iteration 
 	 << " id " << id 
 	 << " GPU computation time: "
-	 << getGPUCompTime() << " s" << endl;
-    cout << "GPU time per SNP: " << getGPUCompTime() / mySNPs 
+	 << GPUCompTime << " s" << endl;
+    cout << "iteration " << iteration 
+	 << " id " << id 
+	 << " GPU computation time per SNP: "
+	 << GPUCompTime / mySNPs 
 	 << " s" << endl;
     
     cout << "iteration " << iteration 
 	 << " id " << id 
 	 << " GPU reduction time: "
-	 << getGPUMaxTime() << " s" << endl;
-    cout << "GPU time per SNP: " << getGPUMaxTime() / mySNPs 
+	 << GPUMaxTime << " s" << endl;
+    cout << "iteration " << iteration 
+	 << " id " << id 
+	 << " GPU reduction time per SNP: "
+	 << GPUMaxTime / mySNPs 
 	 << " s" << endl;
 
     cout << "iteration " << iteration 
 	 << " id " << id 
 	 << " GPU copy update time: "
-	 << getGPUCopyUpdateTime() << " s" << endl;
+	 << GPUCopyUpdateTime << " s" << endl;
+
+    cout << "iteration " << iteration 
+	 << " id " << id 
+	 << " CPU computation update time: "
+	 << CPUCompUpdateTime << " s" << endl;
 
     iteration++;
   } // while(1)

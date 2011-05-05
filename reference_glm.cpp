@@ -596,14 +596,21 @@ int main(int argc, char **argv)
   // column-major with padding
   size_t d_XtsnpPitch;
   
+  double GPUCompTime = 0, GPUMaxTime = 0,
+    GPUCopyTime = 0, GPUCopyUpdateTime = 0;
+  
   copyToDevice(mySNPs, n, 
 	       d_snptsnp, d_Xtsnp, d_XtsnpPitch, d_snpty, d_snpMask, d_f,
 	       SNPtSNP, XtSNP, 
 	       SNPty, Xty, XtXi, snpMask);
   
+  GPUCopyTime = getGPUCopyTime();
+  
   cout << "id " << id 
-       << " copy to device time: "
-       << tvDouble(tstop - tstart) << " s" << endl;
+       << " GPU copy time: "
+       << GPUCopyTime << " s" << endl;
+  cout << "GPU copy time per SNP: " << GPUCopyTime / mySNPs 
+       << " s" << endl;
 
   // For each column of the geno array, set up the "X" matrix,
   // call the GLM routine, and store the computed p value.  Note
@@ -628,8 +635,6 @@ int main(int argc, char **argv)
     */
     
   unsigned iteration = 0;
-  double GPUCompTime = 0, GPUMaxTime = 0,
-    GPUCopyTime = 0, GPUCopyUpdateTime = 0;
   while(1){
     // d_G, in constant memory
     // d_Xty, in constant memory

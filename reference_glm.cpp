@@ -647,6 +647,14 @@ int main(int argc, char **argv)
     if(iteration >= iterationLimit){
       if(!id)
 	cout << "iteration limit (" << iterationLimit << ") reached" << endl;
+      gettimeofday(&tGlobalStop, NULL);
+      
+      cout << "id " << id << " total time: " << tvDouble(tGlobalStop - tGlobalStart) 
+	   << "s" << endl;
+      cout << "id " << id << " total time per SNP per iteration: " 
+	   << tvDouble(tGlobalStop - tGlobalStart) / mySNPs / iteration
+	   << "s" << endl;
+      
       MPI_Finalize();
       return 0;
     }
@@ -837,7 +845,12 @@ int main(int argc, char **argv)
   } // while(1)
   gettimeofday(&tGlobalStop, NULL);
 
+  //! @todo this goes in a function
+
   cout << "id " << id << " total time: " << tvDouble(tGlobalStop - tGlobalStart) 
+       << "s" << endl;
+  cout << "id " << id << " total time per SNP per iteration: " 
+       << tvDouble(tGlobalStop - tGlobalStart) / mySNPs / iteration
        << "s" << endl;
 
   MPI_Finalize();

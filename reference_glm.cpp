@@ -835,6 +835,10 @@ int main(int argc, char **argv)
 
     iteration++;
   } // while(1)
+  gettimeofday(&tGlobalStop, NULL);
+
+  cout << "id " << id << " total time: " << tvDouble(tGlobalStop - tGlobalStart) 
+       << "s" << endl;
 
   MPI_Finalize();
   return 0;

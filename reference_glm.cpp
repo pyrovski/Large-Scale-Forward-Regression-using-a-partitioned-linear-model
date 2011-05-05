@@ -480,9 +480,29 @@ int main(int argc, char **argv)
   MPI_Comm_size(MPI_COMM_WORLD, &numProcs);
   MPI_Comm_rank(MPI_COMM_WORLD, &id);
 
-  if(argc < 2){
+  int opt;
+  string input_filename;
+  bool CPUOnly = false;
+  while((opt = getopt(argc, argv, "cf:")) != -1){
+    switch(opt){
+    case 'c':
+      CPUOnly = true;
+      break;
+    case 'f':
+      input_filename = optarg;
+      break;
+    default:
+      if(!id)
+	cout << "usage: " << argv[0] << "-f <input file> [-c]" << endl 
+	     << "where <input file> contains run-time settings" << endl;
+      
+      MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+  }
+
+  if(input_filename == ""){
     if(!id)
-      cout << "usage: " << argv[0] << " <input file>" << endl 
+      cout << "usage: " << argv[0] << "-f <input file> [-c]" << endl 
 	   << "where <input file> contains run-time settings" << endl;
     
     MPI_Abort(MPI_COMM_WORLD, 1);
@@ -506,7 +526,6 @@ int main(int argc, char **argv)
   unsigned fixed_count;
   unsigned geno_ind; //rows 
   uint64_t geno_count; // columns of the geno array
-  string input_filename = argv[1];
 
   getInputs(input_filename, path, fixed_filename, geno_filename, y_filename, fixed_count, 
 	    geno_ind, geno_count, id);

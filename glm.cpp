@@ -8,9 +8,6 @@ extern "C"{
 
 using namespace std;
 
-#define swap(item1, item2, itemT) (itemT = item1; item1 = item2; item2 = item1)
-
-
 // This version of the glm function assumes Kt is a vector.  It makes
 // the code a good deal cleaner (but not really any faster when Kt is
 // a 1-by-N matrix) than the more general case where Kt is a matrix.
@@ -132,22 +129,25 @@ void glm(unsigned id, unsigned iteration,
 
 void plm(
 	 // inputs
-	 const FortranMatrix &X, 
 	 const FortranMatrix &XtXi, 
-	 const vector<double> &XtSNP,
+	 const double *XtSNP,
 	 const double SNPtSNP, 
 	 const double SNPty, 
 	 const double yty, 
 	 const vector<double> &Xty, 
 	 const unsigned rX,
-	 const GLMData &glm_data,
+	 double *F,
+	 double ErrorSS,
+	 unsigned V2
+	 //const GLMData &glm_data,
 	 // output
-	 GLMData& glm_data_new
+	 //GLMData& glm_data_new
 	 )
 {
   // previous V2 in glm_data
 
-  int m  = X.get_n_rows(), n = X.get_n_cols();
+  //int m  = X.get_n_rows(), n = X.get_n_cols();
+  int n = XtXi.get_n_rows();
 
   // G = XtXi
   // compute transpose of SNPtXG: 1xn
@@ -178,8 +178,7 @@ void plm(
   double S = SNPtSNP - SNPtXGXtSNP;
   if(!S){ //! @todo if zero within tolerance
     // bad news
-    glm_data_new.F = 0.0;
-    glm_data_new.V2 = glm_data.V2;
+    *F = 0.0;
     return;
   }
 
@@ -191,7 +190,7 @@ void plm(
   SNPtMy += SNPty;
 
   double SSM = SNPtMy * SNPtMy * S;
-  glm_data_new.V2 = glm_data.V2 - 1;
-  glm_data_new.ErrorSS = glm_data.ErrorSS - SSM;
-  glm_data_new.F = glm_data_new.V2 * SSM / glm_data_new.ErrorSS;
+  V2--;
+  ErrorSS = ErrorSS - SSM;
+  *F = V2 * SSM / ErrorSS;
 }

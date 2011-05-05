@@ -1,6 +1,7 @@
 /*! @todo
   - get size of GPU RAM at run time
-  - use GPU RAM size to estimate how many SNPs can be processed at a time
+  - use GPU and host RAM size to estimate how many SNPs can be processed at a time
+  -- host holds all SNPs plus derived data; currently, GPU holds only derived data
   - list of input files should be command line parameter
  */
 
@@ -44,16 +45,6 @@ uint64_t adjust(uint64_t total, unsigned ranks){
   return result;
 }
 
-unsigned int nextPow2( unsigned int x ) {
-    --x;
-    x |= x >> 1;
-    x |= x >> 2;
-    x |= x >> 4;
-    x |= x >> 8;
-    x |= x >> 16;
-    return ++x;
-}
-
 int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path, 
 	       string fixed_filename, 
 	       string geno_filename, 
@@ -71,6 +62,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
     
+    //! assume row-major disk storage format for now
     fixed_file.read((char*)&fixed.values[0], fixed.values.size() * sizeof(double));
     fixed.transpose_dims();
     fixed.transpose_self();
@@ -147,6 +139,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
     if(!id)
       writeD("y.dat", y);
   }
+  return 0;
 }
 
 void compPrepare(unsigned id, unsigned iteration, 
@@ -497,8 +490,11 @@ int main(int argc, char **argv)
   //! @todo this should be a command line parameter
   double entry_limit = 0.2;
 
-  // Timing variables
+  // local timing
   timeval tstart, tstop;
+
+  // global timing
+  timeval tGlobalStart, tGlobalStop;
 
   // The path on my system to the location of the data files.  Don't forget the trailing
   // slash here, as this will be prepended to the filename below
@@ -542,12 +538,14 @@ int main(int argc, char **argv)
   double nextSNPtSNP, nextSNPty, *nextXtSNP = &incomingXtSNP[0];
 
   // Begin timing the file IO for all 3 files
+  gettimeofday(&tGlobalStart, NULL);
   gettimeofday(&tstart, NULL);
   readInputs(id, myOffset, mySize, path, fixed_filename, geno_filename, 
 	     y_filename, fixed, geno, y);
   gettimeofday(&tstop, NULL);
   
-  cout << "Time required for I/O: " << tvDouble(tstop - tstart) << " s" << endl;
+  cout << "id " << id 
+       << " I/O time: " << tvDouble(tstop - tstart) << " s" << endl;
   
   // Version B, Kt assumed a vector.
   //! assume Kt has a single non-zero element; a 1.0 at the end
@@ -586,7 +584,8 @@ int main(int argc, char **argv)
 
   gettimeofday(&tstop, NULL);
   
-  cout << "Time required for computation prep: "
+  cout << "id " << id 
+       << " computation prep time: "
        << tvDouble(tstop - tstart) << " s" << endl;
   
   double *d_snptsnp, *d_Xtsnp, *d_snpty,
@@ -602,6 +601,10 @@ int main(int argc, char **argv)
 	       SNPtSNP, XtSNP, 
 	       SNPty, Xty, XtXi, snpMask);
   
+  cout << "id " << id 
+       << " copy to device time: "
+       << tvDouble(tstop - tstart) << " s" << endl;
+
   // For each column of the geno array, set up the "X" matrix,
   // call the GLM routine, and store the computed p value.  Note
   // we are assuming y is a vector for now (because GLM currently expects
@@ -625,7 +628,8 @@ int main(int argc, char **argv)
     */
     
   unsigned iteration = 0;
-  double GPUCompTime = 0, GPUMaxTime = 0;
+  double GPUCompTime = 0, GPUMaxTime = 0,
+    GPUCopyTime = 0, GPUCopyUpdateTime = 0;
   while(1){
     // d_G, in constant memory
     // d_Xty, in constant memory
@@ -643,6 +647,8 @@ int main(int argc, char **argv)
     int localMaxFIndex;
 
     double globalMaxF;
+
+    // ~3.5 us per SNP on Longhorn (FX5800)
     try{
       localMaxFIndex = plm_GPU(mySNPs, n, 
 	m ,        
@@ -779,17 +785,26 @@ int main(int argc, char **argv)
 
     GPUCompTime += getGPUCompTime();
     GPUMaxTime += getGPUMaxTime();
-    /*
-    cout << "GPU time required for computations: "
+    GPUCopyUpdateTime += getGPUCopyUpdateTime();
+
+    cout << "iteration " << iteration 
+	 << " id " << id 
+	 << " GPU computation time: "
 	 << getGPUCompTime() << " s" << endl;
     cout << "GPU time per SNP: " << getGPUCompTime() / mySNPs 
 	 << " s" << endl;
     
-    cout << "GPU time required for reduction: "
+    cout << "iteration " << iteration 
+	 << " id " << id 
+	 << " GPU reduction time: "
 	 << getGPUMaxTime() << " s" << endl;
     cout << "GPU time per SNP: " << getGPUMaxTime() / mySNPs 
 	 << " s" << endl;
-    */
+
+    cout << "iteration " << iteration 
+	 << " id " << id 
+	 << " GPU copy update time: "
+	 << getGPUCopyUpdateTime() << " s" << endl;
 
     iteration++;
   } // while(1)

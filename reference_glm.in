@@ -1,5 +1,5 @@
 # The path to the data files
-path = ../statinf/GLM-Matlab/TACC_Dec_2010/data_maize_nam/
+path = /scratch/01586/gstrieme/data_maize_nam/
 fixed_filename = fixed.effects.nam.sorted.filtered.bin
 geno_filename = imputed.marker.chr10.sorted.filtered.bin
 y_filename = residuals.chr10.sorted.bin

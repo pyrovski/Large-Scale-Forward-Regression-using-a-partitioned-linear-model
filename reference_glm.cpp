@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <sstream>
+#include <iomanip>
 #include <mpi.h>
 #include <gsl/gsl_cdf.h>
 extern "C"{
@@ -32,7 +33,7 @@ extern "C"{
 
 const uint64_t readSize = 1024 * 1024 * 32;
 const uint64_t readLength = readSize / sizeof(double);
-
+unsigned verbosity = 0;
 
 using namespace std;
 
@@ -473,10 +474,43 @@ void getInputs(string input_filename,
 
 }
 
-void getMaxFGPU(unsigned id, unsigned iteration, unsigned geno_count, 
-	     std::vector<double> &Fval, unsigned maxFIndex){
+void write(const char *filename, const vector<unsigned> &list){
+  std::fstream file;
+  file.open(filename, std::fstream::out);
+  if(file.fail()){
+    std::cout << "failed to open file: " << filename << std::endl;
+    exit(1);
+  }
+  file << std::setprecision(15);
+  //file << std::scientific << std::setprecision(5);
+  //  file << std::scientific << std::setprecision(15);
+  
+  unsigned m = list.size();
+
+  for( int i = 0; i < m; i++ ) {
+    file /*<< std::setw(13)*/ << " " << list[i] << endl;
+  }
+  file.close();
 }
 
+
+void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop, 
+		     uint64_t mySNPs, unsigned iteration, unsigned id){
+  gettimeofday(&tGlobalStop, NULL);
+  
+  cout << "id " << id << " total time, not including IO: " 
+       << tvDouble(tGlobalStop - tGlobalStart) 
+       << "s" << endl;
+  cout << "id " << id << " total time (-IO) per SNP per iteration: " 
+       << tvDouble(tGlobalStop - tGlobalStart) / mySNPs / iteration
+       << "s" << endl;
+}
+
+void printUsage(char *name){
+  cout << "usage: " << name << "-f <input file> [-c] [-v <verbosity level>]" 
+       << endl 
+       << "where <input file> contains run-time settings" << endl;
+}
 
 int main(int argc, char **argv)
 {
@@ -488,7 +522,7 @@ int main(int argc, char **argv)
   int opt;
   string input_filename;
   bool CPUOnly = false;
-  while((opt = getopt(argc, argv, "cf:")) != -1){
+  while((opt = getopt(argc, argv, "cf:v:")) != -1){
     switch(opt){
     case 'c':
       CPUOnly = true;
@@ -496,10 +530,12 @@ int main(int argc, char **argv)
     case 'f':
       input_filename = optarg;
       break;
+    case 'v':
+      verbosity = atoi(optarg);
+      break;
     default:
       if(!id)
-	cout << "usage: " << argv[0] << "-f <input file> [-c]" << endl 
-	     << "where <input file> contains run-time settings" << endl;
+	printUsage(argv[0]);
       
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
@@ -562,27 +598,35 @@ int main(int argc, char **argv)
   double *nextSNP = &incomingSNP[0];
   double nextSNPtSNP, nextSNPty, *nextXtSNP = &incomingXtSNP[0];
 
-  cout << "id " << id 
-       << " reading input data..." << endl;
-
+  if(verbosity > 0)
+    cout << "id " << id 
+	 << " reading input data..." << endl;
+  
   // Begin timing the file IO for all 3 files
-  gettimeofday(&tGlobalStart, NULL);
   gettimeofday(&tstart, NULL);
   readInputs(id, myOffset, mySize, path, fixed_filename, geno_filename, 
 	     y_filename, fixed, geno, y);
   gettimeofday(&tstop, NULL);
   
-  cout << "id " << id 
-       << " I/O time: " << tvDouble(tstop - tstart) << " s" << endl;
+  if(verbosity > 0)
+    cout << "id " << id 
+	 << " I/O time: " << tvDouble(tstop - tstart) << " s" << endl;
   
+  gettimeofday(&tGlobalStart, NULL);
+
   // Version B, Kt assumed a vector.
   //! assume Kt has a single non-zero element; a 1.0 at the end
   
+  // only store global smallest P per iteration
+  vector<double> Pval(iterationLimit); 
+
+  // global indices of chosen SNPs from each iteration
+  vector<unsigned> chosenSNPs(iterationLimit);
+  vector<unsigned> chosenSNPsReduced(iterationLimit);
+
   // An array to hold the results of the GLM calculations
-  double Pval;
   vector<double> Fval(mySNPs);
-  vector<double> V2s(mySNPs);
-  
+ 
   // Initialize the X-matrix.  The first column is all ones, the next
   // fixed_count columns are equal to the fixed matrix, and the last
   // column (which changes) is the i'th column of the geno array.
@@ -612,9 +656,10 @@ int main(int argc, char **argv)
 
   gettimeofday(&tstop, NULL);
   
-  cout << "id " << id 
-       << " computation prep time: "
-       << tvDouble(tstop - tstart) << " s" << endl;
+  if(verbosity > 0)
+    cout << "id " << id 
+	 << " computation prep time: "
+	 << tvDouble(tstop - tstart) << " s" << endl;
   
   double *d_snptsnp, *d_Xtsnp, *d_snpty,
     *d_f;
@@ -639,12 +684,14 @@ int main(int argc, char **argv)
   
     GPUCopyTime = tvDouble(tstop - tstart);
   
-    cout << "id " << id 
-	 << " GPU copy time: "
-	 << GPUCopyTime << " s" << endl;
-    cout << "GPU copy time per SNP: " << GPUCopyTime / mySNPs 
-	 << " s" << endl;
-
+    if(verbosity > 0){
+      cout << "id " << id 
+	   << " GPU copy time: "
+	   << GPUCopyTime << " s" << endl;
+      cout << "GPU copy time per SNP: " << GPUCopyTime / mySNPs 
+	   << " s" << endl;
+    }
+    
   }
   // For each column of the geno array, set up the "X" matrix,
   // call the GLM routine, and store the computed p value.  Note
@@ -669,25 +716,10 @@ int main(int argc, char **argv)
     */
     
   unsigned iteration = 0;
-  while(1){
+  while(iteration < iterationLimit && Pval[iteration] < entry_limit){
     // d_G, in constant memory
     // d_Xty, in constant memory
     
-    if(iteration >= iterationLimit){
-      if(!id)
-	cout << "iteration limit (" << iterationLimit << ") reached" << endl;
-      gettimeofday(&tGlobalStop, NULL);
-      
-      cout << "id " << id << " total time: " << tvDouble(tGlobalStop - tGlobalStart) 
-	   << "s" << endl;
-      cout << "id " << id << " total time per SNP per iteration: " 
-	   << tvDouble(tGlobalStop - tGlobalStart) / mySNPs / iteration
-	   << "s" << endl;
-      
-      MPI_Finalize();
-      return 0;
-    }
-
     /*! @todo this will need more bits when running more than 2^32 SNPs 
       on a single CPU process
     */
@@ -732,12 +764,13 @@ int main(int argc, char **argv)
       ss << "Fval_" << iteration << "_" << id << ".dat";
       writeD(ss.str(), Fval);
     }
-
-    cout << "iteration " << iteration << " id " << id <<  
-      " max F: " << Fval[localMaxFIndex] 
-	 << " (local 0-index " << localMaxFIndex 
-	 << ", global 0-index " << myStartSNP + localMaxFIndex << ")" << endl;
-
+    
+    if(verbosity > 1){
+      cout << "iteration " << iteration << " id " << id <<  
+	" max F: " << Fval[localMaxFIndex] 
+	   << " (local 0-index " << localMaxFIndex 
+	   << ", global 0-index " << myStartSNP + localMaxFIndex << ")" << endl;
+    }
     if(Fval[localMaxFIndex] <= 0){
       cerr << "error: max F <= 0: " << Fval[localMaxFIndex] << endl;
       MPI_Abort(MPI_COMM_WORLD, 1);
@@ -749,15 +782,18 @@ int main(int argc, char **argv)
 
 
     // get p value
-    Pval = 1 - gsl_cdf_fdist_P(globalMaxF, 1, glm_data.V2 - 1);
+    Pval[iteration] = 1 - gsl_cdf_fdist_P(globalMaxF, 1, glm_data.V2 - 1);
 
-    if(Pval > entry_limit){
+    if(Pval[iteration] > entry_limit){
       if(!id){
-	cout << "p value (" << Pval << ") > entry_limit (" << entry_limit 
+	cout << "p value (" << Pval[iteration] << ") > entry_limit (" << entry_limit 
 	     << "); quitting" << endl;
+	
+	Pval.resize(iteration);
+	chosenSNPs.resize(iteration);
+	chosenSNPsReduced.resize(iteration);
       }
-      MPI_Finalize();
-      return 0;
+      break;
     }
 
     // determine a unique rank holding the max F value
@@ -771,10 +807,11 @@ int main(int argc, char **argv)
 		    MPI_COMM_WORLD);
     }
 
-    if(!id)
-      cout << "iteration " << iteration << " global max F on rank " << 
-	globalMinRankMaxF << ": " << globalMaxF << endl;
-
+    if(verbosity > 1){
+      if(!id)
+	cout << "iteration " << iteration << " global max F on rank " << 
+	  globalMinRankMaxF << ": " << globalMaxF << endl;
+    }
 
     if(id == globalMinRankMaxF){
       // I have the max F value
@@ -788,6 +825,7 @@ int main(int argc, char **argv)
       cout << "iteration " << iteration << " id " << id 
 	   << " masking index " << localMaxFIndex << endl;
 #endif
+      chosenSNPs[iteration] = localMaxFIndex + myStartSNP;
     }else{
       // receive SNP which yielded max F value
       nextSNP = &incomingSNP[0];
@@ -830,7 +868,6 @@ int main(int argc, char **argv)
 #endif
 
     /*! update 
-      - X, (host only, done)
       - Xty, (done)
       - geno, (done)
       - Xtsnp: matrix update from n x geno_count to n+1 x geno_count,
@@ -858,50 +895,62 @@ int main(int argc, char **argv)
       GPUCompTime = getGPUCompTime();
       GPUMaxTime = getGPUMaxTime();
 
-      cout << "iteration " << iteration 
-	   << " id " << id 
-	   << " GPU computation time: "
-	   << GPUCompTime << " s" << endl;
-      cout << "iteration " << iteration 
-	   << " id " << id 
-	   << " GPU computation time per SNP: "
-	   << GPUCompTime / mySNPs 
-	   << " s" << endl;
-    
-      cout << "iteration " << iteration 
-	   << " id " << id 
-	   << " GPU reduction time: "
-	   << GPUMaxTime << " s" << endl;
-      cout << "iteration " << iteration 
-	   << " id " << id 
-	   << " GPU reduction time per SNP: "
-	   << GPUMaxTime / mySNPs 
-	   << " s" << endl;
-
-      cout << "iteration " << iteration 
-	   << " id " << id 
-	   << " GPU copy update time: "
-	   << GPUCopyUpdateTime << " s" << endl;
+      if(verbosity > 1){
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " GPU computation time: "
+	     << GPUCompTime << " s" << endl;
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " GPU computation time per SNP: "
+	     << GPUCompTime / mySNPs 
+	     << " s" << endl;
+	
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " GPU reduction time: "
+	     << GPUMaxTime << " s" << endl;
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " GPU reduction time per SNP: "
+	     << GPUMaxTime / mySNPs 
+	     << " s" << endl;
+	
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " GPU copy update time: "
+	     << GPUCopyUpdateTime << " s" << endl;
+      }
     }
-    
-    cout << "iteration " << iteration 
-	 << " id " << id 
-	 << " CPU computation update time: "
-	 << CPUCompUpdateTime << " s" << endl;
-
+      
+    if(verbosity > 1){
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " CPU computation update time: "
+	   << CPUCompUpdateTime << " s" << endl;
+    }
     n++;
     iteration++;
   } // while(1)
-  gettimeofday(&tGlobalStop, NULL);
+  if(iteration >= iterationLimit){
+    if(!id)
+      cout << "iteration limit (" << iterationLimit << ") reached" << endl;
+  }
 
-  //! @todo this goes in a function
+  if(verbosity > 0)
+    printGlobalTime(tGlobalStart, tGlobalStop, mySNPs, iteration, id);
 
-  cout << "id " << id << " total time: " << tvDouble(tGlobalStop - tGlobalStart) 
-       << "s" << endl;
-  cout << "id " << id << " total time per SNP per iteration: " 
-       << tvDouble(tGlobalStop - tGlobalStart) / mySNPs / iteration
-       << "s" << endl;
+  // kludge to get chosen SNP indices from whichever node owns the SNPs
+  /*! @todo fix
+  MPI_Reduce(&chosenSNPs[0], &chosenSNPsReduced[0], chosenSNPs.size(), 
+	     MPI_UNSIGNED, MPI_BOR, 0, MPI_COMM_WORLD);
+  */
 
+  if(!id){
+    write("Pval.dat", Pval);
+    //write("Pindices.dat", chosenSNPs);
+  }
+  
   MPI_Finalize();
   return 0;
 }

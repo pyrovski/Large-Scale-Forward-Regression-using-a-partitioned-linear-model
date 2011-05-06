@@ -5,7 +5,7 @@ geno_filename = massive.dat
 y_filename = data_maize_nam/residuals.chr10.sorted.bin
 fixed_count = 26
 geno_ind = 4892
-geno_count = 54872
+geno_count = 100000
 
 # Local Variables:
 # mode: shell-script

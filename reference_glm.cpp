@@ -596,11 +596,12 @@ int main(int argc, char **argv)
   // Version B, Kt assumed a vector.
   //! assume Kt has a single non-zero element; a 1.0 at the end
   
+  // only store global smallest P per iteration
+  vector<double> Pval(iterationLimit); 
+
   // An array to hold the results of the GLM calculations
-  double Pval;
   vector<double> Fval(mySNPs);
-  vector<double> V2s(mySNPs);
-  
+ 
   // Initialize the X-matrix.  The first column is all ones, the next
   // fixed_count columns are equal to the fixed matrix, and the last
   // column (which changes) is the i'th column of the geno array.
@@ -690,19 +691,10 @@ int main(int argc, char **argv)
     */
     
   unsigned iteration = 0;
-  while(1){
+  while(iteration < iterationLimit && Pval[iteration] < entry_limit){
     // d_G, in constant memory
     // d_Xty, in constant memory
     
-    if(iteration >= iterationLimit){
-      if(!id)
-	cout << "iteration limit (" << iterationLimit << ") reached" << endl;
-      if(verbosity > 0)
-	printGlobalTime(tGlobalStart, tGlobalStop, mySNPs, iteration, id);
-      MPI_Finalize();
-      return 0;
-    }
-
     /*! @todo this will need more bits when running more than 2^32 SNPs 
       on a single CPU process
     */
@@ -765,19 +757,17 @@ int main(int argc, char **argv)
 
 
     // get p value
-    Pval = 1 - gsl_cdf_fdist_P(globalMaxF, 1, glm_data.V2 - 1);
+    Pval[iteration] = 1 - gsl_cdf_fdist_P(globalMaxF, 1, glm_data.V2 - 1);
 
-    if(Pval > entry_limit){
+    if(Pval[iteration] > entry_limit){
       if(!id){
-	cout << "p value (" << Pval << ") > entry_limit (" << entry_limit 
+	cout << "p value (" << Pval[iteration] << ") > entry_limit (" << entry_limit 
 	     << "); quitting" << endl;
-
-	if(verbosity > 0)
-	  printGlobalTime(tGlobalStart, tGlobalStop, mySNPs, iteration, id);
-
+	
+	Pval.resize(iteration+1);
+	
       }
-      MPI_Finalize();
-      return 0;
+      break;
     }
 
     // determine a unique rank holding the max F value
@@ -915,8 +905,16 @@ int main(int argc, char **argv)
     n++;
     iteration++;
   } // while(1)
+  if(iteration >= iterationLimit){
+    if(!id)
+      cout << "iteration limit (" << iterationLimit << ") reached" << endl;
+  }
+
   if(verbosity > 0)
     printGlobalTime(tGlobalStart, tGlobalStop, mySNPs, iteration, id);
+
+  if(!id)
+    write("Pval.dat", Pval);
   
   MPI_Finalize();
   return 0;

@@ -713,10 +713,13 @@ int main(int argc, char **argv)
       getMaxFGPU(id, iteration, mySNPs, Fval, localMaxFIndex, d_f);
     } else {
       // call CPU plm, get max F & index
-      for(uint64_t i; i < mySNPs; i++){
-	plm(XtXi, &XtSNP(0, i), SNPtSNP[i], SNPty[i], yty, Xty, rX, &Fval[i], 
-	    glm_data.ErrorSS,
-	    glm_data.V2);
+      for(uint64_t i = 0; i < mySNPs; i++){
+	if(!snpMask[i])
+	  plm(XtXi, &XtSNP(0, i), SNPtSNP[i], SNPty[i], yty, Xty, rX, &Fval[i], 
+	      glm_data.ErrorSS, glm_data.V2);
+	else{
+	  Fval[i] = 0.0;
+	}
       }
       localMaxFIndex = cblas_idamax(mySNPs, &Fval[0], 1);
     }

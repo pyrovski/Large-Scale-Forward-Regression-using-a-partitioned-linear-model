@@ -748,7 +748,7 @@ int main(int argc, char **argv)
       writeD(ss.str(), Fval);
     }
     
-    if(verbosity > 0){
+    if(verbosity > 1){
       cout << "iteration " << iteration << " id " << id <<  
 	" max F: " << Fval[localMaxFIndex] 
 	   << " (local 0-index " << localMaxFIndex 
@@ -791,7 +791,7 @@ int main(int argc, char **argv)
 		    MPI_COMM_WORLD);
     }
 
-    if(verbosity > 0){
+    if(verbosity > 1){
       if(!id)
 	cout << "iteration " << iteration << " global max F on rank " << 
 	  globalMinRankMaxF << ": " << globalMaxF << endl;
@@ -878,7 +878,7 @@ int main(int argc, char **argv)
       GPUCompTime = getGPUCompTime();
       GPUMaxTime = getGPUMaxTime();
 
-      if(verbosity > 0){
+      if(verbosity > 1){
 	cout << "iteration " << iteration 
 	     << " id " << id 
 	     << " GPU computation time: "
@@ -906,7 +906,7 @@ int main(int argc, char **argv)
       }
     }
       
-    if(verbosity > 0){
+    if(verbosity > 1){
       cout << "iteration " << iteration 
 	   << " id " << id 
 	   << " CPU computation update time: "

@@ -583,11 +583,11 @@ int main(int argc, char **argv)
   uint64_t mySNPs = mySize / sizeof(double) / geno_ind;
   uint64_t myStartSNP = id * perRankSNPs;
 
-#ifdef _DEBUG
-  cout << "id " << id << " has SNPs " << 
-    myStartSNP << "-" << 
-    myStartSNP + mySNPs - 1 << endl;
-#endif
+  if(verbosity > 2){
+    cout << "id " << id << " has SNPs " << 
+      myStartSNP << "-" << 
+      myStartSNP + mySNPs - 1 << endl;
+  }
 
   // Matrix objects for storing the input data
   FortranMatrix fixed(geno_ind, fixed_count);

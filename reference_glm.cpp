@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <sstream>
+#include <iomanip>
 #include <mpi.h>
 #include <gsl/gsl_cdf.h>
 extern "C"{
@@ -473,6 +474,26 @@ void getInputs(string input_filename,
 
 }
 
+void write(const char *filename, const vector<unsigned> &list){
+  std::fstream file;
+  file.open(filename, std::fstream::out);
+  if(file.fail()){
+    std::cout << "failed to open file: " << filename << std::endl;
+    exit(1);
+  }
+  file << std::setprecision(15);
+  //file << std::scientific << std::setprecision(5);
+  //  file << std::scientific << std::setprecision(15);
+  
+  unsigned m = list.size();
+
+  for( int i = 0; i < m; i++ ) {
+    file /*<< std::setw(13)*/ << " " << list[i] << endl;
+  }
+  file.close();
+}
+
+
 void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop, 
 		     uint64_t mySNPs, unsigned iteration, unsigned id){
   gettimeofday(&tGlobalStop, NULL);
@@ -598,6 +619,10 @@ int main(int argc, char **argv)
   
   // only store global smallest P per iteration
   vector<double> Pval(iterationLimit); 
+
+  // global indices of chosen SNPs from each iteration
+  vector<unsigned> chosenSNPs(iterationLimit);
+  vector<unsigned> chosenSNPsReduced(iterationLimit);
 
   // An array to hold the results of the GLM calculations
   vector<double> Fval(mySNPs);
@@ -764,8 +789,9 @@ int main(int argc, char **argv)
 	cout << "p value (" << Pval[iteration] << ") > entry_limit (" << entry_limit 
 	     << "); quitting" << endl;
 	
-	Pval.resize(iteration+1);
-	
+	Pval.resize(iteration);
+	chosenSNPs.resize(iteration);
+	chosenSNPsReduced.resize(iteration);
       }
       break;
     }
@@ -799,6 +825,7 @@ int main(int argc, char **argv)
       cout << "iteration " << iteration << " id " << id 
 	   << " masking index " << localMaxFIndex << endl;
 #endif
+      chosenSNPs[iteration] = localMaxFIndex + myStartSNP;
     }else{
       // receive SNP which yielded max F value
       nextSNP = &incomingSNP[0];
@@ -913,8 +940,16 @@ int main(int argc, char **argv)
   if(verbosity > 0)
     printGlobalTime(tGlobalStart, tGlobalStop, mySNPs, iteration, id);
 
-  if(!id)
+  // kludge to get chosen SNP indices from whichever node owns the SNPs
+  /*! @todo fix
+  MPI_Reduce(&chosenSNPs[0], &chosenSNPsReduced[0], chosenSNPs.size(), 
+	     MPI_UNSIGNED, MPI_BOR, 0, MPI_COMM_WORLD);
+  */
+
+  if(!id){
     write("Pval.dat", Pval);
+    //write("Pindices.dat", chosenSNPs);
+  }
   
   MPI_Finalize();
   return 0;

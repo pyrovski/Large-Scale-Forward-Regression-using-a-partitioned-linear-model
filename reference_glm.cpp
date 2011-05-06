@@ -562,6 +562,9 @@ int main(int argc, char **argv)
   double *nextSNP = &incomingSNP[0];
   double nextSNPtSNP, nextSNPty, *nextXtSNP = &incomingXtSNP[0];
 
+  cout << "id " << id 
+       << " reading input data..." << endl;
+
   // Begin timing the file IO for all 3 files
   gettimeofday(&tGlobalStart, NULL);
   gettimeofday(&tstart, NULL);

@@ -473,6 +473,11 @@ void getInputs(string input_filename,
 
 }
 
+void getMaxFGPU(unsigned id, unsigned iteration, unsigned geno_count, 
+	     std::vector<double> &Fval, unsigned maxFIndex){
+}
+
+
 int main(int argc, char **argv)
 {
   int id, numProcs;
@@ -480,9 +485,29 @@ int main(int argc, char **argv)
   MPI_Comm_size(MPI_COMM_WORLD, &numProcs);
   MPI_Comm_rank(MPI_COMM_WORLD, &id);
 
-  if(argc < 2){
+  int opt;
+  string input_filename;
+  bool CPUOnly = false;
+  while((opt = getopt(argc, argv, "cf:")) != -1){
+    switch(opt){
+    case 'c':
+      CPUOnly = true;
+      break;
+    case 'f':
+      input_filename = optarg;
+      break;
+    default:
+      if(!id)
+	cout << "usage: " << argv[0] << "-f <input file> [-c]" << endl 
+	     << "where <input file> contains run-time settings" << endl;
+      
+      MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+  }
+
+  if(input_filename == ""){
     if(!id)
-      cout << "usage: " << argv[0] << " <input file>" << endl 
+      cout << "usage: " << argv[0] << "-f <input file> [-c]" << endl 
 	   << "where <input file> contains run-time settings" << endl;
     
     MPI_Abort(MPI_COMM_WORLD, 1);
@@ -506,7 +531,6 @@ int main(int argc, char **argv)
   unsigned fixed_count;
   unsigned geno_ind; //rows 
   uint64_t geno_count; // columns of the geno array
-  string input_filename = argv[1];
 
   getInputs(input_filename, path, fixed_filename, geno_filename, y_filename, fixed_count, 
 	    geno_ind, geno_count, id);
@@ -602,21 +626,23 @@ int main(int argc, char **argv)
     CPUCompUpdateTime = 0;
   
 
-  gettimeofday(&tstart, NULL);
-  copyToDevice(mySNPs, n, 
-	       d_snptsnp, d_Xtsnp, d_XtsnpPitch, d_snpty, d_snpMask, d_f,
-	       SNPtSNP, XtSNP, 
-	       SNPty, Xty, XtXi, snpMask);
-  gettimeofday(&tstop, NULL);
+  if(!CPUOnly){
+    gettimeofday(&tstart, NULL);
+    copyToDevice(mySNPs, n, 
+		 d_snptsnp, d_Xtsnp, d_XtsnpPitch, d_snpty, d_snpMask, d_f,
+		 SNPtSNP, XtSNP, 
+		 SNPty, Xty, XtXi, snpMask);
+    gettimeofday(&tstop, NULL);
   
-  GPUCopyTime = tvDouble(tstop - tstart);
+    GPUCopyTime = tvDouble(tstop - tstart);
   
-  cout << "id " << id 
-       << " GPU copy time: "
-       << GPUCopyTime << " s" << endl;
-  cout << "GPU copy time per SNP: " << GPUCopyTime / mySNPs 
-       << " s" << endl;
+    cout << "id " << id 
+	 << " GPU copy time: "
+	 << GPUCopyTime << " s" << endl;
+    cout << "GPU copy time per SNP: " << GPUCopyTime / mySNPs 
+	 << " s" << endl;
 
+  }
   // For each column of the geno array, set up the "X" matrix,
   // call the GLM routine, and store the computed p value.  Note
   // we are assuming y is a vector for now (because GLM currently expects
@@ -666,24 +692,44 @@ int main(int argc, char **argv)
 
     double globalMaxF;
 
-    // ~3.5 us per SNP on Longhorn (FX5800)
-    try{
-      localMaxFIndex = plm_GPU(mySNPs, n, 
-	m ,        
-	d_snptsnp, 
-	d_Xtsnp, 
-	d_XtsnpPitch, 
-	glm_data.ErrorSS, glm_data.V2, 
-	d_snpty, 
-	d_snpMask,
-	d_f);
-    } catch(int e){
-      MPI_Abort(MPI_COMM_WORLD, e);
+    if(!CPUOnly){
+      // ~3.5 us per SNP on Longhorn (FX5800)
+      try{
+	localMaxFIndex = plm_GPU(mySNPs, n, 
+				 m ,        
+				 d_snptsnp, 
+				 d_Xtsnp, 
+				 d_XtsnpPitch, 
+				 glm_data.ErrorSS, glm_data.V2, 
+				 d_snpty, 
+				 d_snpMask,
+				 d_f);
+      } catch(int e){
+	MPI_Abort(MPI_COMM_WORLD, e);
+      }
+    
+      // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
+      // if V1 = 0, ignore; F is undefined
+      getMaxFGPU(id, iteration, mySNPs, Fval, localMaxFIndex, d_f);
+    } else {
+      // call CPU plm, get max F & index
+      for(uint64_t i = 0; i < mySNPs; i++){
+	if(!snpMask[i])
+	  plm(XtXi, &XtSNP(0, i), SNPtSNP[i], SNPty[i], yty, Xty, rX, &Fval[i], 
+	      glm_data.ErrorSS, glm_data.V2);
+	else{
+	  Fval[i] = 0.0;
+	}
+      }
+      localMaxFIndex = cblas_idamax(mySNPs, &Fval[0], 1);
     }
     
-    // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
-    // if V1 = 0, ignore; F is undefined
-    getMaxF(id, iteration, mySNPs, Fval, localMaxFIndex, d_f);
+    {
+      stringstream ss;
+      ss << "Fval_" << iteration << "_" << id << ".dat";
+      writeD(ss.str(), Fval);
+    }
+
     cout << "iteration " << iteration << " id " << id <<  
       " max F: " << Fval[localMaxFIndex] 
 	 << " (local 0-index " << localMaxFIndex 
@@ -800,47 +846,47 @@ int main(int argc, char **argv)
     gettimeofday(&tstop, NULL);
     CPUCompUpdateTime = tvDouble(tstop - tstart);
 
-    gettimeofday(&tstart, NULL);
-    copyUpdateToDevice(id, iteration, mySNPs, n, d_snpMask, localMaxFIndex, 
-		       d_Xtsnp, d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);
-    gettimeofday(&tstop, NULL);
-    GPUCopyUpdateTime = tvDouble(tstop - tstart);
+    if(!CPUOnly){
+      gettimeofday(&tstart, NULL);
+      copyUpdateToDevice(id, iteration, mySNPs, n, d_snpMask, localMaxFIndex, 
+			 d_Xtsnp, d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);
+      gettimeofday(&tstop, NULL);
+      GPUCopyUpdateTime = tvDouble(tstop - tstart);
+      GPUCompTime = getGPUCompTime();
+      GPUMaxTime = getGPUMaxTime();
+
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " GPU computation time: "
+	   << GPUCompTime << " s" << endl;
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " GPU computation time per SNP: "
+	   << GPUCompTime / mySNPs 
+	   << " s" << endl;
     
-    n++;
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " GPU reduction time: "
+	   << GPUMaxTime << " s" << endl;
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " GPU reduction time per SNP: "
+	   << GPUMaxTime / mySNPs 
+	   << " s" << endl;
 
-    GPUCompTime = getGPUCompTime();
-    GPUMaxTime = getGPUMaxTime();
-
-    cout << "iteration " << iteration 
-	 << " id " << id 
-	 << " GPU computation time: "
-	 << GPUCompTime << " s" << endl;
-    cout << "iteration " << iteration 
-	 << " id " << id 
-	 << " GPU computation time per SNP: "
-	 << GPUCompTime / mySNPs 
-	 << " s" << endl;
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " GPU copy update time: "
+	   << GPUCopyUpdateTime << " s" << endl;
+    }
     
-    cout << "iteration " << iteration 
-	 << " id " << id 
-	 << " GPU reduction time: "
-	 << GPUMaxTime << " s" << endl;
-    cout << "iteration " << iteration 
-	 << " id " << id 
-	 << " GPU reduction time per SNP: "
-	 << GPUMaxTime / mySNPs 
-	 << " s" << endl;
-
-    cout << "iteration " << iteration 
-	 << " id " << id 
-	 << " GPU copy update time: "
-	 << GPUCopyUpdateTime << " s" << endl;
-
     cout << "iteration " << iteration 
 	 << " id " << id 
 	 << " CPU computation update time: "
 	 << CPUCompUpdateTime << " s" << endl;
 
+    n++;
     iteration++;
   } // while(1)
   gettimeofday(&tGlobalStop, NULL);

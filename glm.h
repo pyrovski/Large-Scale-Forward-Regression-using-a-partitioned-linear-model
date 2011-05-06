@@ -52,16 +52,16 @@ void glm(unsigned id, unsigned iteration,
 
 void plm(
 	 // inputs
-	 const FortranMatrix &X, 
 	 const FortranMatrix &XtXi, 
-	 const std::vector<double> &XtSNP,
+	 const double *XtSNP,
 	 const double SNPtSNP, 
 	 const double SNPty, 
 	 const double yty, 
 	 const std::vector<double> &Xty, 
 	 const unsigned rX,
-	 const GLMData &glm_data,
-	 // output
-	 GLMData& glm_data_new);
+	 double *F,
+	 double ErrorSS,
+	 unsigned V2
+);
 
 #endif

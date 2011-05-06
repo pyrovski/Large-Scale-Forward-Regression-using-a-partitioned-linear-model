@@ -52,7 +52,7 @@ all: $(target) convertToBinary
 convertToBinary: convertToBinary.o
 
 clean:
-	rm -f $(EXEC_FILES) *~ *.P *.o $(target)
+	rm -f *~ *.P *.o $(target) convertToBinary
 
 $(target): $(objects)
 #	$(CC) $(DBG) $(OPT_FLAGS) $(CUDA_INC) $(CPU_SRC) -c 

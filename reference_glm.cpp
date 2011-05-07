@@ -583,7 +583,7 @@ int main(int argc, char **argv)
   uint64_t mySNPs = mySize / sizeof(double) / geno_ind;
   uint64_t myStartSNP = id * perRankSNPs;
 
-  if(verbosity > 2){
+  if(verbosity > 1){
     cout << "id " << id << " has SNPs " << 
       myStartSNP << "-" << 
       myStartSNP + mySNPs - 1 << endl;

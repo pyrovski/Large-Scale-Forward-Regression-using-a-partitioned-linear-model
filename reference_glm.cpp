@@ -677,7 +677,8 @@ int main(int argc, char **argv)
   if(!CPUOnly){
     gettimeofday(&tstart, NULL);
     int copyStatus = 
-      copyToDevice(id, mySNPs, n,
+      copyToDevice(id, verbosity,
+		   mySNPs, n,
 		   d_snptsnp, d_Xtsnp, d_XtsnpPitch, d_snpty, d_snpMask, d_f,
 		   SNPtSNP, XtSNP, 
 		   SNPty, Xty, XtXi, snpMask);

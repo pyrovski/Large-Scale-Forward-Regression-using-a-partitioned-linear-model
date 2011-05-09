@@ -169,7 +169,9 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
 /*!
   should only be called once
  */
-int copyToDevice(unsigned id, unsigned geno_count, const unsigned n, 
+int copyToDevice(const unsigned id, 
+		 const unsigned verbosity,
+		 const unsigned geno_count, const unsigned n, 
 		 double *&d_snptsnp, double *&d_Xtsnp, size_t &d_XtsnpPitch, 
 		 double *&d_snpty, unsigned *&d_snpMask, double *&d_f,
 		 const vector<double> &SNPtSNP, const FortranMatrix &XtSNP,
@@ -199,6 +201,10 @@ int copyToDevice(unsigned id, unsigned geno_count, const unsigned n,
   if(cudaStatus != cudaSuccess){
     cerr << "id " << id << " error in cudaSetDevice()" << endl;
     return -1;
+  }
+  if(verbosity > 1){
+    cout << "id " << id << " using GPU " << device + 1 << " of " << deviceCount
+	 << endl;
   }
   
   cutilSafeCall(cudaMallocPitch(&d_Xtsnp, &d_XtsnpPitch, 

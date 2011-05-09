@@ -146,11 +146,19 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
        d_f);
     cudaEventRecord(stopKernel, 0);
     //cutilSafeCall(cudaThreadSynchronize());
+
+    cublasStatus status = cublasGetError();
+
     // cublas uses 1-based index
-    unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1);
+    int maxFIndex = cublasIdamax(geno_count, d_f, 1);
     cudaEventRecord(stopMax, 0);
-    if(!maxFIndex){
-      cerr << "maxFIndex <= 0!" << endl;
+    status = cublasGetError();
+    if(status != CUBLAS_STATUS_SUCCESS){
+      cerr << "cublas error in cublasIdamax(): " << status << endl;
+      throw(1);
+    }
+    if(maxFIndex <= 0){
+      cerr << "maxFIndex <= 0:" << maxFIndex << endl;
       throw(1);
     }
     maxFIndex -= 1;

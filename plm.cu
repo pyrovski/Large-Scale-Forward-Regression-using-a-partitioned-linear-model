@@ -168,9 +168,6 @@ int copyToDevice(unsigned id, unsigned geno_count, const unsigned n,
 		 const vector<double> &SNPty,
 		 const vector<double> &Xty, const FortranMatrix &XtXi, 
 		 const vector<unsigned> &snpMask){
-  cudaEventCreate(&start);
-  cudaEventCreate(&stopKernel);
-  cudaEventCreate(&stopMax);
 
   uint64_t snpMaskSize = geno_count * sizeof(unsigned), 
     snptsnpSize = geno_count * sizeof(double), 
@@ -183,7 +180,9 @@ int copyToDevice(unsigned id, unsigned geno_count, const unsigned n,
   uint64_t totalSize, totalConstantSize = GSize + XtySize;
 
   cudaError_t cudaStatus;
-  int device = id % 2;
+  int deviceCount;
+  cudaGetDeviceCount(&deviceCount);
+  int device = deviceCount > 1 ? (id % 2) : 0;
   /*! @todo set device numbers from sge wayness parameter;
     for now, assume that if ID is even, use first GPU, 
     otherwise, use second GPU
@@ -243,6 +242,9 @@ int copyToDevice(unsigned id, unsigned geno_count, const unsigned n,
     cerr << "id " << id << " error in cublasInit()" << endl;
     return -1;
   }
+  cudaEventCreate(&start);
+  cudaEventCreate(&stopKernel);
+  cudaEventCreate(&stopMax);
   return 0;
 }
 

@@ -478,7 +478,7 @@ void write(const char *filename, const vector<unsigned> &list){
   std::fstream file;
   file.open(filename, std::fstream::out);
   if(file.fail()){
-    std::cout << "failed to open file: " << filename << std::endl;
+    std::cerr << "failed to open file: " << filename << std::endl;
     exit(1);
   }
   file << std::setprecision(15);

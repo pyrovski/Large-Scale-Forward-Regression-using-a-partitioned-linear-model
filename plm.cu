@@ -145,7 +145,7 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
        d_snpMask,
        d_f);
     cudaEventRecord(stopKernel, 0);
-    cutilSafeCall(cudaThreadSynchronize());
+    //cutilSafeCall(cudaThreadSynchronize());
     // cublas uses 1-based index
     unsigned maxFIndex = cublasIdamax(geno_count, d_f, 1);
     cudaEventRecord(stopMax, 0);
@@ -161,7 +161,7 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
 /*!
   should only be called once
  */
-void copyToDevice(unsigned geno_count, const unsigned n, 
+int copyToDevice(unsigned id, unsigned geno_count, const unsigned n, 
 		 double *&d_snptsnp, double *&d_Xtsnp, size_t &d_XtsnpPitch, 
 		 double *&d_snpty, unsigned *&d_snpMask, double *&d_f,
 		 const vector<double> &SNPtSNP, const FortranMatrix &XtSNP,
@@ -172,20 +172,59 @@ void copyToDevice(unsigned geno_count, const unsigned n,
   cudaEventCreate(&stopKernel);
   cudaEventCreate(&stopMax);
 
+  uint64_t snpMaskSize = geno_count * sizeof(unsigned), 
+    snptsnpSize = geno_count * sizeof(double), 
+    XtsnpSize, 
+    snptySize = geno_count * sizeof(double), 
+    GSize = (iterationLimit + n)*(iterationLimit + n) * sizeof(double), // in constant memory
+    XtySize = (iterationLimit + n), // in constant memory
+    fSize = geno_count * sizeof(double);
+
+  uint64_t totalSize, totalConstantSize = GSize + XtySize;
+
+  cudaError_t cudaStatus;
+  int device = id % 2;
+  /*! @todo set device numbers from sge wayness parameter;
+    for now, assume that if ID is even, use first GPU, 
+    otherwise, use second GPU
+  */
+  cudaStatus = cudaSetDevice(device);
+  if(cudaStatus != cudaSuccess){
+    cerr << "id " << id << " error in cudaSetDevice()" << endl;
+    return -1;
+  }
+  
+  cutilSafeCall(cudaMallocPitch(&d_Xtsnp, &d_XtsnpPitch, 
+				(n + iterationLimit) * sizeof(double), 
+				geno_count));
+  XtsnpSize = d_XtsnpPitch * geno_count;
+  totalSize = fSize + XtsnpSize + snptsnpSize + snpMaskSize + snptySize;
+
+  struct cudaDeviceProp prop;
+  cudaStatus = cudaGetDeviceProperties(&prop, device);
+  if(cudaStatus != cudaSuccess){
+    cerr << "id " << id << " error in cudaGetDeviceProperties()" << endl;
+    return -1;
+  }
+  if(totalSize >= prop.totalGlobalMem){
+    cerr << "id " << id << " insufficient device memory" << endl;
+    return -1;
+  }
+  if(totalConstantSize >= prop.totalConstMem){
+    cerr << "id " << id << " insufficient device constant memory" << endl;
+    return -1;
+  }
+  
   cutilSafeCall(cudaMalloc(&d_snpMask, geno_count * sizeof(unsigned)));
   cutilSafeCall(cudaMemcpy(d_snpMask, &snpMask[0], 
 			   geno_count * sizeof(unsigned), 
 			   cudaMemcpyHostToDevice));
-
   
   //! @todo this won't be coalesced
   cutilSafeCall(cudaMalloc(&d_snptsnp, geno_count * sizeof(double)));
   cutilSafeCall(cudaMemcpy(d_snptsnp, &SNPtSNP[0], geno_count * sizeof(double), 
 			   cudaMemcpyHostToDevice));
 
-  cutilSafeCall(cudaMallocPitch(&d_Xtsnp, &d_XtsnpPitch, 
-				(n + iterationLimit) * sizeof(double), 
-				geno_count));
   cutilSafeCall(cudaMemcpy2D(d_Xtsnp, d_XtsnpPitch, &XtSNP.values[0], 
 			     n * sizeof(double), n * sizeof(double), geno_count, 
 			     cudaMemcpyHostToDevice));
@@ -198,6 +237,13 @@ void copyToDevice(unsigned geno_count, const unsigned n,
   cutilSafeCall(cudaMemcpyToSymbol(d_Xty, &Xty[0], n * sizeof(double)));
   
   cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(double)));
+
+  cublasStatus status = cublasInit();
+  if(status != CUBLAS_STATUS_SUCCESS){
+    cerr << "id " << id << " error in cublasInit()" << endl;
+    return -1;
+  }
+  return 0;
 }
 
 void copyUpdateToDevice(unsigned id, unsigned iteration,  

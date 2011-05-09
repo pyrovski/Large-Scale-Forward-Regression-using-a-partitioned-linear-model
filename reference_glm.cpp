@@ -478,7 +478,7 @@ void write(const char *filename, const vector<unsigned> &list){
   std::fstream file;
   file.open(filename, std::fstream::out);
   if(file.fail()){
-    std::cout << "failed to open file: " << filename << std::endl;
+    std::cerr << "failed to open file: " << filename << std::endl;
     exit(1);
   }
   file << std::setprecision(15);
@@ -676,12 +676,18 @@ int main(int argc, char **argv)
 
   if(!CPUOnly){
     gettimeofday(&tstart, NULL);
-    copyToDevice(mySNPs, n, 
-		 d_snptsnp, d_Xtsnp, d_XtsnpPitch, d_snpty, d_snpMask, d_f,
-		 SNPtSNP, XtSNP, 
-		 SNPty, Xty, XtXi, snpMask);
+    int copyStatus = 
+      copyToDevice(id, mySNPs, n,
+		   d_snptsnp, d_Xtsnp, d_XtsnpPitch, d_snpty, d_snpMask, d_f,
+		   SNPtSNP, XtSNP, 
+		   SNPty, Xty, XtXi, snpMask);
     gettimeofday(&tstop, NULL);
   
+    if(copyStatus){
+      cerr << "id " << id << " copyToDevice failed." << endl;
+      MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
     GPUCopyTime = tvDouble(tstop - tstart);
   
     if(verbosity > 0){

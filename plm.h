@@ -19,7 +19,9 @@ geno_count, n, n * sizeof(ftype),
 	d_f
 */
 
-int copyToDevice(const unsigned id, const unsigned geno_count, const unsigned n,
+int copyToDevice(const unsigned id, 
+		 const unsigned verbosity,
+		 const unsigned geno_count, const unsigned n,
 		 ftype *&d_snptsnp, ftype *&d_Xtsnp, size_t &d_XtsnpPitch, 
 		 ftype *&d_snpty, unsigned *&d_snpMask, ftype *&d_f,
 		  const std::vector<double> &SNPtSNP, const FortranMatrix &XtSNP,

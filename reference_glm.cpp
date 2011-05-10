@@ -304,8 +304,12 @@ void compPrepare(unsigned id, unsigned iteration,
   
     // compute Xt * SNP    
 
-    //! @todo fix lda for incremental computation
-    //! @todo can be computed incrementally between major iterations
+    //! @todo fix XtSNP lda for incremental computation
+    /*! XtSNP is computed incrementally between major iterations.
+      The initial computation requires more time, though, and
+      @todo XtSNP could be computed as the geno data is read 
+      from disk
+     */
   cblas_dgemm(CblasColMajor,
 	      CblasTrans,
 	      CblasNoTrans,
@@ -330,6 +334,9 @@ void compPrepare(unsigned id, unsigned iteration,
 #endif
 
   //SNPty[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
+  /*! @todo SNPty could also be computed as the geno data is read 
+    from disk
+   */
   cblas_dgemv(CblasColMajor,
 	      CblasTrans,
 	      m,
@@ -343,9 +350,11 @@ void compPrepare(unsigned id, unsigned iteration,
 	      &SNPty[0],
 	      1
 	      );
-  
+
+  /*! @todo SNPtSNP could be computed as the geno data is read from disk
+   */
   for (uint64_t i=0; i<mySNPs; ++i){
-    //! these will never change for each SNP, so they could be moved out of all loops
+    //! these will never change for each SNP
     SNPtSNP[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
 				&geno.values[i*geno_ind], 1);
   }
@@ -396,7 +405,9 @@ void compUpdate(unsigned id, unsigned iteration,
       }
     }
 #endif
+  //! @todo this is probably slow
   XtSNP.resize_retain(n+1, mySNPs);
+
   cblas_dgemv(CblasColMajor, CblasTrans, 
 	      m, mySNPs,
 	      1.0, 

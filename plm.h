@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "type.h"
 #include "fortran_matrix.h"
 
@@ -6,7 +8,8 @@
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
 		 unsigned m, ftype* d_snptsnp, ftype* d_Xtsnp, 
 		 unsigned d_XtsnpPitch, ftype ErrorSS, unsigned V2, 
-		 ftype* d_snpty, unsigned* d_snpMask, ftype* d_f) throw(int);
+		 ftype* d_snpty, unsigned* d_snpMask, ftype* d_f,
+		 std::vector<double> &Fval) throw(int);
 /*
 geno_count, n, n * sizeof(ftype), 
 	m ,        

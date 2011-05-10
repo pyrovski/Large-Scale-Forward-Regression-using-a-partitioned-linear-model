@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "type.h"
+#include "fortran_matrix.h"
 
 #include "plm.h"
 
@@ -131,11 +132,14 @@ cudaEvent_t start, stopKernel, stopMax;
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
 		 unsigned m, double* d_snptsnp, double* d_Xtsnp, 
 		 unsigned d_XtsnpPitch, double ErrorSS, unsigned V2, 
-		 double* d_snpty, unsigned* d_snpMask, double* d_f) throw(int)
+		 double* d_snpty, unsigned* d_snpMask, double* d_f,
+		 vector<double> &Fval) throw(int)
 {
     cublasGetError();
     cudaEventRecord(start, 0);
-    plm<<<geno_count, blockSize, blockSize * sizeof(double)>>>
+    dim3 grid(max(geno_count % 65536, 1),
+	      max(geno_count / 65536, 1) , 1);
+    plm<<<grid, blockSize, blockSize * sizeof(double)>>>
       (m ,        
        d_snptsnp, 
        d_Xtsnp, 
@@ -145,7 +149,12 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
        d_snpMask,
        d_f);
     cudaEventRecord(stopKernel, 0);
-    //cutilSafeCall(cudaThreadSynchronize());
+    cutilSafeCall(cudaThreadSynchronize());
+
+#ifdef _DEBUG
+    cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(double),
+			     cudaMemcpyDeviceToHost));
+#endif
 
     cublasStatus status = cublasGetError();
 
@@ -213,12 +222,17 @@ int copyToDevice(const unsigned id,
   XtsnpSize = d_XtsnpPitch * geno_count;
   totalSize = fSize + XtsnpSize + snptsnpSize + snpMaskSize + snptySize;
 
+  cudaFree(&d_Xtsnp);
+
   struct cudaDeviceProp prop;
   cudaStatus = cudaGetDeviceProperties(&prop, device);
   if(cudaStatus != cudaSuccess){
     cerr << "id " << id << " error in cudaGetDeviceProperties()" << endl;
     return -1;
   }
+  if(verbosity > 1)
+    cout << "id " << id << " requires " << totalSize << "/" 
+	 << prop.totalGlobalMem << " bytes global memory" << endl;
   if(totalSize >= prop.totalGlobalMem){
     cerr << "id " << id << " insufficient device memory" << endl;
     return -1;
@@ -228,6 +242,10 @@ int copyToDevice(const unsigned id,
     return -1;
   }
   
+  cutilSafeCall(cudaMallocPitch(&d_Xtsnp, &d_XtsnpPitch, 
+				(n + iterationLimit) * sizeof(double), 
+				geno_count));
+
   cutilSafeCall(cudaMalloc(&d_snpMask, geno_count * sizeof(unsigned)));
   cutilSafeCall(cudaMemcpy(d_snpMask, &snpMask[0], 
 			   geno_count * sizeof(unsigned), 
@@ -279,10 +297,10 @@ void copyUpdateToDevice(unsigned id, unsigned iteration,
 #endif
     cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
 			     sizeof(unsigned), cudaMemcpyHostToDevice));
+#ifdef _DEBUG
     unsigned maskVal;
     cutilSafeCall(cudaMemcpy(&maskVal, d_snpMask + maxFIndex,
 			     sizeof(unsigned), cudaMemcpyDeviceToHost));
-#ifdef _DEBUG
       cout << "iteration " << iteration << " id " << id 
 	   << " mask index " << maxFIndex << ": "
 	   << maskVal << endl;
@@ -329,8 +347,16 @@ void getMaxFGPU(unsigned id, unsigned iteration, unsigned geno_count,
 #ifndef _DEBUG
     cutilSafeCall(cudaMemcpy(&Fval[maxFIndex], &d_f[maxFIndex], sizeof(double),
 			     cudaMemcpyDeviceToHost));
+    /*
 #else
-    cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(double),
-			     cudaMemcpyDeviceToHost));
+    {
+      vector<double> Fval_post(geno_count);
+      cutilSafeCall(cudaMemcpy(&Fval_post[0], d_f, geno_count * sizeof(double),
+			       cudaMemcpyDeviceToHost));
+      stringstream ss;
+      ss << "Fval_post_" << iteration << "_" << id << ".dat";
+      writeD(ss.str(), Fval_post);
+    }
+    */
 #endif
 }

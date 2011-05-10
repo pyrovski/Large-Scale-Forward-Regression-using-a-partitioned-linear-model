@@ -110,6 +110,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
       left -= status;
       readCount += status;
     }
+    /*
 #ifdef _DEBUG
     {
       stringstream ss;
@@ -117,6 +118,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
       geno.writeD(ss.str());
     }
 #endif
+    */
     free(array);
   }
   
@@ -522,7 +524,7 @@ int main(int argc, char **argv)
   int opt;
   string input_filename;
   bool CPUOnly = false;
-  while((opt = getopt(argc, argv, "cf:v:")) != -1){
+  while((opt = getopt(argc, argv, "cf:v:l:")) != -1){
     switch(opt){
     case 'c':
       CPUOnly = true;
@@ -533,6 +535,11 @@ int main(int argc, char **argv)
     case 'v':
       verbosity = atoi(optarg);
       break;
+      /*
+    case 'l':
+      iterationLimit = atoi(optarg);
+      break;
+      */
     default:
       if(!id)
 	printUsage(argv[0]);
@@ -745,7 +752,8 @@ int main(int argc, char **argv)
 				 glm_data.ErrorSS, glm_data.V2, 
 				 d_snpty, 
 				 d_snpMask,
-				 d_f);
+				 d_f,
+				 Fval);
       } catch(int e){
 	MPI_Abort(MPI_COMM_WORLD, e);
       }

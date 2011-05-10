@@ -34,6 +34,7 @@ extern "C"{
 const uint64_t readSize = 1024 * 1024 * 32;
 const uint64_t readLength = readSize / sizeof(double);
 unsigned verbosity = 0;
+//unsigned iterationLimit = 50;
 
 using namespace std;
 

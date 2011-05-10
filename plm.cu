@@ -6,12 +6,13 @@
 
 #include "type.h"
 #include "fortran_matrix.h"
+#include "reference_glm.h"
 
 #include "plm.h"
 
 #ifdef _DEBUG
 #if __CUDA_ARCH__ >= 200
-//#define printGPU
+#define printGPU
 #endif
 #endif
 
@@ -33,6 +34,7 @@ __constant__ double d_Xty[iterationLimit + 27];
 __constant__ double d_G[(iterationLimit + 27)*(iterationLimit + 27)];
 
 __global__ void plm(// inputs
+		    const unsigned geno_count, // # of SNPs
 		    const unsigned m,          // rows of X
 		    //const unsigned n,        // colums of X == number of blocks
 		    const double *snptsnp,      // scalar, unique to block
@@ -60,6 +62,13 @@ __global__ void plm(// inputs
 
   unsigned BID = blockIdx.x + gridDim.x * blockIdx.y;
   unsigned TID = threadIdx.x;
+
+  #ifdef printGPU
+  printf("BID: %u\n", BID);
+  #endif
+
+  if(BID >= geno_count)
+    return;
   if(snpMask[BID]){
     // don't compute new F
     if(!TID)
@@ -129,6 +138,30 @@ __global__ void plm(// inputs
 
 cudaEvent_t start, stopKernel, stopMax;
 
+void initGrid(dim3 &grid, unsigned geno_count) throw(int){
+  static unsigned old_geno_count = 0;
+  static dim3 oldGrid;
+  if(old_geno_count == geno_count){
+    grid = oldGrid;
+    return;
+  }
+  grid.x = geno_count;
+  grid.y = 1;
+  grid.z = 1;
+  while(grid.x > 65535){
+    grid.x += grid.x % 2;
+    grid.x /= 2;
+    grid.y *= 2;
+  }
+  // could probably do a better job factoring here; instead bail
+  if(grid.y > 65535)
+    throw(2);
+  oldGrid = grid;
+#ifdef _DEBUG
+  cout << "grid: " << grid.x << "x" << grid.y << endl;
+#endif
+}
+
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
 		 unsigned m, double* d_snptsnp, double* d_Xtsnp, 
 		 unsigned d_XtsnpPitch, double ErrorSS, unsigned V2, 
@@ -137,10 +170,12 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
 {
     cublasGetError();
     cudaEventRecord(start, 0);
-    dim3 grid(max(geno_count % 65536, 1),
-	      max(geno_count / 65536, 1) , 1);
+    dim3 grid;
+    initGrid(grid, geno_count);
+    
     plm<<<grid, blockSize, blockSize * sizeof(double)>>>
-      (m ,        
+      (geno_count,
+       m,
        d_snptsnp, 
        d_Xtsnp, 
        d_XtsnpPitch, 
@@ -149,7 +184,7 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
        d_snpMask,
        d_f);
     cudaEventRecord(stopKernel, 0);
-    cutilSafeCall(cudaThreadSynchronize());
+    //cutilSafeCall(cudaThreadSynchronize());
 
 #ifdef _DEBUG
     cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(double),

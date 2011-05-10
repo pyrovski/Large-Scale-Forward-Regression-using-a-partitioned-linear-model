@@ -3,7 +3,11 @@ DBG=-D_DEBUG
 OPT_FLAGS = -g
 CUDA_FLAGS = -G
 else
+ifeq ($(datafiles),1)
+DBG=-D_DEBUG
+else
 DBG=
+endif
 OPT_FLAGS = -O3
 CUDA_FLAGS = 
 endif

@@ -508,14 +508,15 @@ void write(const char *filename, const vector<unsigned> &list){
 
 
 void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop, 
+		     double MPITime,
 		     uint64_t mySNPs, unsigned iteration, unsigned id){
   gettimeofday(&tGlobalStop, NULL);
   
-  cout << "id " << id << " total time, not including IO: " 
-       << tvDouble(tGlobalStop - tGlobalStart) 
+  cout << "id " << id << " total time, not including disk/MPI IO: " 
+       << tvDouble(tGlobalStop - tGlobalStart) - MPITime
        << "s" << endl;
   cout << "id " << id << " total time (-IO) per SNP per iteration: " 
-       << tvDouble(tGlobalStop - tGlobalStart) / mySNPs / iteration
+       << (tvDouble(tGlobalStop - tGlobalStart) - MPITime) / mySNPs / iteration
        << "s" << endl;
 }
 
@@ -973,7 +974,8 @@ int main(int argc, char **argv)
   }
 
   if(verbosity > 0){
-    printGlobalTime(tGlobalStart, tGlobalStop, mySNPs, iteration, id);
+    printGlobalTime(tGlobalStart, tGlobalStop, MPITime,
+		    mySNPs, iteration, id);
     cout << "id " << id << " MPI communication time: " << MPITime << " s" 
 	 << endl;
   }

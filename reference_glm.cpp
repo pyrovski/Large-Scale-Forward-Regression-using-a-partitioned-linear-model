@@ -1,8 +1,9 @@
 /*! @todo print id numbers padded with 0s
-  also @todo:
-  - use GPU and host RAM size to estimate how many SNPs can be processed at a time
-  -- host holds all SNPs plus derived data; currently, GPU holds only derived data
-  - do comp update on GPU?
+  @todo use GPU and host RAM size to estimate how many SNPs can be processed at a time
+  - host holds all SNPs plus derived data; currently, GPU holds only derived data
+  - can get allocated memory size from sge runtime
+  
+  @todo comp prepare or update on GPU?
  */
 
 // System header files

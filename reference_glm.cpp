@@ -1,8 +1,7 @@
-/*! @todo
-  - get size of GPU RAM at run time
+/*! @todo print id numbers padded with 0s
+  also @todo:
   - use GPU and host RAM size to estimate how many SNPs can be processed at a time
   -- host holds all SNPs plus derived data; currently, GPU holds only derived data
-  - list of input files should be command line parameter
   - do comp update on GPU?
  */
 
@@ -690,7 +689,8 @@ int main(int argc, char **argv)
   
   double GPUCompTime = 0, GPUMaxTime = 0,
     GPUCopyTime = 0, GPUCopyUpdateTime = 0,
-    CPUCompUpdateTime = 0;
+    CPUCompUpdateTime = 0,
+    MPITime = 0;
   
 
   if(!CPUOnly){
@@ -803,10 +803,12 @@ int main(int argc, char **argv)
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
+    gettimeofday(&tstart, NULL);
     // get max F value
     MPI_Allreduce(&Fval[localMaxFIndex], &globalMaxF, 1, MPI_DOUBLE, MPI_MAX,
 		  MPI_COMM_WORLD);
-
+    gettimeofday(&tstop, NULL);
+    MPITime += tvDouble(tstop - tstart);
 
     // get p value
     Pval[iteration] = 1 - gsl_cdf_fdist_P(globalMaxF, 1, glm_data.V2 - 1);
@@ -823,6 +825,7 @@ int main(int argc, char **argv)
       break;
     }
 
+    gettimeofday(&tstart, NULL);
     // determine a unique rank holding the max F value
     int globalMinRankMaxF;
     if(Fval[localMaxFIndex] == globalMaxF)
@@ -833,6 +836,8 @@ int main(int argc, char **argv)
       MPI_Allreduce(&tempInt, &globalMinRankMaxF, 1, MPI_INT, MPI_MIN, 
 		    MPI_COMM_WORLD);
     }
+    gettimeofday(&tstop, NULL);
+    MPITime += tvDouble(tstop - tstart);
 
     if(verbosity > 1){
       if(!id)
@@ -871,6 +876,7 @@ int main(int argc, char **argv)
       it could be faster to send precalculated results in one transmission
       or recalculate them
      */
+    gettimeofday(&tstart, NULL);
     MPI_Bcast(nextSNP, geno_ind, MPI_DOUBLE, globalMinRankMaxF,
 	      MPI_COMM_WORLD);
     MPI_Bcast(nextXtSNP, n, MPI_DOUBLE, globalMinRankMaxF,
@@ -879,6 +885,8 @@ int main(int argc, char **argv)
 	      MPI_COMM_WORLD);
     MPI_Bcast(&nextSNPty, 1, MPI_DOUBLE, globalMinRankMaxF,
 	      MPI_COMM_WORLD);
+    gettimeofday(&tstop, NULL);
+    MPITime += tvDouble(tstop - tstart);
     
 #ifdef _DEBUG
     {
@@ -964,8 +972,11 @@ int main(int argc, char **argv)
       cout << "iteration limit (" << iterationLimit << ") reached" << endl;
   }
 
-  if(verbosity > 0)
+  if(verbosity > 0){
     printGlobalTime(tGlobalStart, tGlobalStop, mySNPs, iteration, id);
+    cout << "id " << id << " MPI communication time: " << MPITime << " s" 
+	 << endl;
+  }
 
   // kludge to get chosen SNP indices from whichever node owns the SNPs
   /*! @todo fix

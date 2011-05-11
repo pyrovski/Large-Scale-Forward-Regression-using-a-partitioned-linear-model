@@ -1,4 +1,6 @@
 /*! @todo print id numbers padded with 0s
+  @todo use sched_setaffinity() to select a CPU core
+  - if using two cores per node, use separate sockets
   @todo use GPU and host RAM size to estimate how many SNPs can be processed at a time
   - host holds all SNPs plus derived data; currently, GPU holds only derived data
   - can get allocated memory size from sge runtime

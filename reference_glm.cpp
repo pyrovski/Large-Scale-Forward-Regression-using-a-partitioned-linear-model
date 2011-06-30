@@ -524,7 +524,7 @@ void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop,
 }
 
 void printUsage(char *name){
-  cout << "usage: " << name << "-f <input file> [-c] [-v <verbosity level>]" 
+  cout << "usage: " << name << " -f <input file> [-c] [-v <verbosity level>]" 
        << endl 
        << "where <input file> contains run-time settings" << endl;
 }
@@ -565,8 +565,7 @@ int main(int argc, char **argv)
 
   if(input_filename == ""){
     if(!id)
-      cout << "usage: " << argv[0] << "-f <input file> [-c]" << endl 
-	   << "where <input file> contains run-time settings" << endl;
+      printUsage(argv[0]);
     
     MPI_Abort(MPI_COMM_WORLD, 1);
   }

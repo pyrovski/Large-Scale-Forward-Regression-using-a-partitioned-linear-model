@@ -1,4 +1,6 @@
 /*! @todo print id numbers padded with 0s
+  @todo use sched_setaffinity() to select a CPU core
+  - if using two cores per node, use separate sockets
   @todo use GPU and host RAM size to estimate how many SNPs can be processed at a time
   - host holds all SNPs plus derived data; currently, GPU holds only derived data
   - can get allocated memory size from sge runtime
@@ -522,7 +524,7 @@ void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop,
 }
 
 void printUsage(char *name){
-  cout << "usage: " << name << "-f <input file> [-c] [-v <verbosity level>]" 
+  cout << "usage: " << name << " -f <input file> [-c] [-v <verbosity level>]" 
        << endl 
        << "where <input file> contains run-time settings" << endl;
 }
@@ -563,8 +565,7 @@ int main(int argc, char **argv)
 
   if(input_filename == ""){
     if(!id)
-      cout << "usage: " << argv[0] << "-f <input file> [-c]" << endl 
-	   << "where <input file> contains run-time settings" << endl;
+      printUsage(argv[0]);
     
     MPI_Abort(MPI_COMM_WORLD, 1);
   }

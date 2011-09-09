@@ -1,5 +1,11 @@
 # The path to the data files
-path = /Users/peterson/code/iplant/TACC_Dec_2010/data_maize_nam/
+path = /code/glm/statinf/GLM-Matlab/TACC_Dec_2010/data_maize_nam
+fixed_filename = fixed.effects.nam.sorted.filtered.bin
+geno_filename = imputed.marker.chr10.sorted.filtered.bin
+y_filename = residuals.chr10.sorted.bin
+fixed_count = 26
+geno_ind = 4892
+geno_count = 79
 
 # Local Variables:
 # mode: shell-script

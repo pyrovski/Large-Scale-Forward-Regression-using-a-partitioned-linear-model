@@ -991,6 +991,7 @@ int main(int argc, char **argv)
   if(!id){
     write("Pval.dat", Pval);
     //write("Pindices.dat", chosenSNPs);
+    cout << "iterations: " << iteration << endl;
   }
   
   MPI_Finalize();

@@ -1,0 +1,12 @@
+# The path to the data files
+path = /
+fixed_filename = code/glm/statinf/GLM-Matlab/TACC_Dec_2010/data_maize_nam/fixed.effects.nam.sorted.filtered.bin
+geno_filename = scratch/pb/massiver.dat
+y_filename = code/glm/statinf/GLM-Matlab/TACC_Dec_2010/data_maize_nam/residuals.chr10.sorted.bin
+fixed_count = 26
+geno_ind = 4892
+geno_count = 65536
+
+# Local Variables:
+# mode: shell-script
+# End:

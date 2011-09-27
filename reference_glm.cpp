@@ -98,6 +98,10 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
        - for now, just assume column-major on disk
      */
     while(left){
+#ifdef _DEBUG
+      cout << "id " << id << " reading " << min(readLength, left) 
+	   << " doubles from " << geno_filename << endl;
+#endif
       size_t status = fread(&geno.values[readCount], sizeof(double), 
 			    min(readLength, left), 
 			    geno_file);
@@ -473,7 +477,7 @@ void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop,
 }
 
 void printUsage(char *name){
-  cout << "usage: " << name << " -f <fixed effects file> -g <SNP data file> -r <residuals file>[-c] [-v <verbosity level>]" 
+  cout << "usage: " << name << " -f <fixed effects file> --num_fixed <number of fixed effects> -g <SNP data file> --num_geno <number of SNPs> -r <residuals file> --num_r <number of residuals> [-c] [-v <verbosity level>]" 
        << endl 
        << "where <input file> contains run-time settings" << endl;
 }

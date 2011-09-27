@@ -34,6 +34,7 @@ extern "C"{
 #include "tvUtil.h"
 #include "plm.h"
 
+//! @todo match this to Lustre stripe size?
 const uint64_t readSize = 1024 * 1024 * 32;
 const uint64_t readLength = readSize / sizeof(double);
 unsigned verbosity = 0;

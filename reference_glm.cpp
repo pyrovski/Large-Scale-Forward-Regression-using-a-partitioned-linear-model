@@ -27,7 +27,6 @@ extern "C"{
 // Local project includes
 #include "fortran_matrix.h"
 #include "glm.h"
-#include "GetPot"
 #include "svd.h"
 
 #include "type.h"

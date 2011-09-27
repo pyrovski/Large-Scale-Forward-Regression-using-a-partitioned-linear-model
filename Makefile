@@ -33,7 +33,6 @@ CC=mpicxx
 BLAS_PATH ?= /usr
 BLAS_INCLUDE ?= -I$(BLAS_PATH)/include
 BLAS_LAPACK_LIB ?= -L$(BLAS_PATH)/lib -llapack -lf77blas -lcblas -latlas 
-# You should not need to edit anything below this line...
 
 # Location of GSL header files and libraries
 GSL_PATH ?= /usr/
@@ -42,7 +41,6 @@ GSL_LIB = -L$(GSL_PATH)/lib -lgsl
 
 LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB) -lcublas $(CUDA_LIBS)
 
-# Set all include flags here for later use
 INCLUDES = $(CUDA_INC) $(GSL_INCLUDE) $(BLAS_INCLUDE)
 
 CPU_SRC = reference_glm.cpp tvUtil.cpp fortran_matrix.cpp glm.cpp print_matrix.cpp svd.cpp
@@ -59,8 +57,6 @@ clean:
 	rm -f *~ *.P *.o $(target) convertToBinary
 
 $(target): $(objects)
-#	$(CC) $(DBG) $(OPT_FLAGS) $(CUDA_INC) $(CPU_SRC) -c 
-#	$(GPUCC) $(DBG) $(OPT_FLAGS) $(CUDA_INC) $(GPU_SRC) $(CUDA_FLAGS) $(LIBS)
 	$(CC) -o $@ $^ $(LIBS)
 
 %.o:%.cpp

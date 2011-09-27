@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <sstream>
 #include <iomanip>
+#include <getopt.h>
 #include <mpi.h>
 #include <gsl/gsl_cdf.h>
 extern "C"{
@@ -59,9 +60,8 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
   // assume this is small.
   {
     // Open "fixed" file for reading
-    string filename = path + "/" + fixed_filename;
     ifstream fixed_file;
-    fixed_file.open(filename.c_str(), ios::binary | ios::in);
+    fixed_file.open(fixed_filename.c_str(), ios::binary | ios::in);
     if (!fixed_file){
       cerr << "Failed to open fixed file: " << endl;
       MPI_Abort(MPI_COMM_WORLD, 1);
@@ -80,8 +80,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
   {
 
     // Open geno file for reading
-    string filename = path + "/" + geno_filename;
-    FILE *geno_file = fopen(filename.c_str(), "r");
+    FILE *geno_file = fopen(geno_filename.c_str(), "r");
     if(!geno_file){
       cerr << "failed to open geno file" << endl;
       MPI_Abort(MPI_COMM_WORLD, 1);
@@ -113,15 +112,6 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
       left -= status;
       readCount += status;
     }
-    /*
-#ifdef _DEBUG
-    {
-      stringstream ss;
-      ss << "geno_" << id << ".dat";
-      geno.writeD(ss.str());
-    }
-#endif
-    */
     free(array);
   }
   
@@ -135,7 +125,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path,
   {
     // Open y file for reading
     ifstream y_file;
-    y_file.open((path + "/" + y_filename).c_str(), ios::binary | ios::in);
+    y_file.open(y_filename.c_str(), ios::binary | ios::in);
 
     if (!y_file){
       cerr << "Failed to open file: " << endl;
@@ -431,63 +421,22 @@ void compUpdate(unsigned id, unsigned iteration,
 
 }
 
-void getInputs(string input_filename, 
-	       string &path, string &fixed_filename, string &geno_filename, 
-	       string &y_filename, unsigned &fixed_count, unsigned &geno_ind,
-	       uint64_t &geno_count, int id){
+void getInputs(const string &fixed_filename, const string &geno_filename, 
+	       const string &y_filename, const unsigned &fixed_count, const unsigned &geno_ind,
+	       const uint64_t &geno_count, int id){
 
   // Create input file object.  Put the path to your data files here!
-  GetPot input_file(input_filename.c_str());
-  
-  path = input_file("path", path.c_str());
-  
+
   // File containing the "population structure".  It is a 4892-by-26 matrix
-  fixed_filename = input_file("fixed_filename", "");
-  if(fixed_filename == ""){
-    if(!id)
-      cerr << "invalid fixed_filename in input file" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
 
   // File containing the genotypes.  It is a 4892-by-79 matrix.
-  geno_filename = input_file("geno_filename", "");
-  if(geno_filename == ""){
-    if(!id)
-      cerr << "invalid geno_filename in input file" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
 
   // File containing the phenotypes.  It is a 4892-by-1 matrix.  The file is
   // arranged in a single column.
-  y_filename = input_file("y_filename", "");
-  if(y_filename == ""){
-    if(!id)
-      cerr << "invalid y_filename in input file" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
 
   // In Matlab, these sizes are inferred from the data.  In C++, we hard-code them
   // to make reading the data simpler...
-  fixed_count = input_file("fixed_count", 0); // rows, columns of the fixed array
-  if(fixed_count == 0){
-    if(!id)
-      cerr << "invalid fixed_count in input file" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
   
-  geno_ind = input_file("geno_ind", 0);
-  geno_count = input_file("geno_count", 0); // rows, columns of the geno array
-  if(geno_count == 0){
-    if(!id)
-      cerr << "invalid geno_count in input file" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
-  if(geno_ind == 0){
-    if(!id)
-      cerr << "invalid geno_ind in input file" << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
-
 }
 
 void write(const char *filename, const vector<unsigned> &list){
@@ -524,7 +473,7 @@ void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop,
 }
 
 void printUsage(char *name){
-  cout << "usage: " << name << " -f <input file> [-c] [-v <verbosity level>]" 
+  cout << "usage: " << name << " -f <fixed effects file> -g <SNP data file> -r <residuals file>[-c] [-v <verbosity level>]" 
        << endl 
        << "where <input file> contains run-time settings" << endl;
 }
@@ -537,18 +486,59 @@ int main(int argc, char **argv)
   MPI_Comm_rank(MPI_COMM_WORLD, &id);
 
   int opt;
-  string input_filename;
+
+  string path = "./"; // default path is the current directory.
+  string fixed_filename;
+  string geno_filename;
+  string y_filename;
+  unsigned fixed_count,
+    geno_ind; //rows 
+  uint64_t geno_count; // columns of the geno array
+
   bool CPUOnly = false;
-  while((opt = getopt(argc, argv, "cf:v:l:")) != -1){
+  int optIndex;
+  struct option options[4] = {{"num_fixed", required_argument, 0, 'n'},
+			      {"num_geno", required_argument, 0, 'm'},
+			      {"num_r", required_argument, 0, 'o'},
+			      {0,0,0,0}};
+  
+  /* get the following from the command line:
+
+     -f fixed effects filename
+     --num_fixed number of fixed effects
+
+     -g geno (SNP data) filename
+     --num_geno number of SNPs
+
+     -r residuals (y) filename
+     --num_r number of residuals
+  */
+
+  while((opt = getopt_long(argc, argv, "cf:v:l:r:g:", options, &optIndex)) != -1){
     switch(opt){
     case 'c':
       CPUOnly = true;
       break;
     case 'f':
-      input_filename = optarg;
+      fixed_filename = optarg;
+      break;
+    case 'g':
+      geno_filename = optarg;
+      break;
+    case 'r':
+      y_filename = optarg;
       break;
     case 'v':
       verbosity = atoi(optarg);
+      break;
+    case 'n':
+      fixed_count = strtoul(optarg, 0, 0);
+      break;
+    case 'm':
+      geno_count = strtoull(optarg, 0, 0);
+      break;
+    case 'o':
+      geno_ind = strtoul(optarg, 0, 0);
       break;
       /*
     case 'l':
@@ -563,7 +553,7 @@ int main(int argc, char **argv)
     }
   }
 
-  if(input_filename == ""){
+  if(fixed_filename == "" || geno_filename == "" || y_filename == ""){
     if(!id)
       printUsage(argv[0]);
     
@@ -579,18 +569,10 @@ int main(int argc, char **argv)
   // global timing
   timeval tGlobalStart, tGlobalStop;
 
-  // The path on my system to the location of the data files.  Don't forget the trailing
-  // slash here, as this will be prepended to the filename below
-  string path = "./"; // default path is the current directory.
-  string fixed_filename;
-  string geno_filename;
-  string y_filename;
-  unsigned fixed_count;
-  unsigned geno_ind; //rows 
-  uint64_t geno_count; // columns of the geno array
-
-  getInputs(input_filename, path, fixed_filename, geno_filename, y_filename, fixed_count, 
+  /*
+  getInputs(fixed_filename, geno_filename, y_filename, fixed_count, 
 	    geno_ind, geno_count, id);
+  */
 
   const unsigned m = geno_ind;
 

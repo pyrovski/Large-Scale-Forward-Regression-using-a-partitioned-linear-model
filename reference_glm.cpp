@@ -459,7 +459,7 @@ void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop,
 }
 
 void printUsage(char *name){
-  cout << "usage: " << name << " -f <fixed effects file> --num_fixed <number of fixed effects> -g <SNP data file> --num_geno <number of SNPs> -r <residuals file> --num_r <number of residuals> [-c] [-v <verbosity level>] [-e SNP entry limit]" 
+  cout << "usage: " << name << " -f <fixed effects file> --num_fixed <number of fixed effects> -g <SNP data file> --num_geno <number of SNPs> -r <residuals file> --num_r <number of residuals> [-c] [-v<verbosity level>] [-e SNP entry limit]" 
        << endl 
        << "where <input file> contains run-time settings" << endl;
 }
@@ -506,7 +506,7 @@ int main(int argc, char **argv)
      -e <entry limit>
   */
 
-  while((opt = getopt_long(argc, argv, "cf:v:l:r:g:e:", options, &optIndex)) != -1){
+  while((opt = getopt_long(argc, argv, "cf:v::l:r:g:e:", options, &optIndex)) != -1){
     switch(opt){
     case 'e':
       entry_limit = atof(optarg);
@@ -524,7 +524,10 @@ int main(int argc, char **argv)
       y_filename = optarg;
       break;
     case 'v':
-      verbosity = atoi(optarg);
+      if(optarg)
+	verbosity = atoi(optarg);
+      else
+	verbosity = 1;
       break;
     case 'n':
       fixed_count = strtoul(optarg, 0, 0);

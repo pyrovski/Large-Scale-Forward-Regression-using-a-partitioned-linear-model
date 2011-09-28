@@ -19,7 +19,8 @@ endif
 CUDA_SM_VER ?= sm_13
 
 CUDA_FLAGS+=-arch $(CUDA_SM_VER) -Xptxas -v
-# -maxrregcount=16
+COMMON_FLAGS+=-D$(CUDA_SM_VER)
+
 -include CUDA_PATHS
 CUDA_SDK?=/home/user/NVIDIA_GPU_Computing_SDK3.2
 CUDA_TK?=/usr/local/cuda
@@ -60,6 +61,6 @@ $(target): $(objects)
 	$(CC) -o $@ $^ $(LIBS)
 
 %.o:%.cpp
-	$(CC) $(DBG) $(OPT_FLAGS) $(INCLUDES) $^ -c
+	$(CC) $(DBG) $(OPT_FLAGS) $(INCLUDES) $(COMMON_FLAGS) $^ -c
 %.o:%.cu
-	$(GPUCC) $(DBG) $(OPT_FLAGS) $(INCLUDES) $(CUDA_FLAGS) $^ -c
+	$(GPUCC) $(DBG) $(OPT_FLAGS) $(INCLUDES) $(COMMON_FLAGS) $(CUDA_FLAGS) $^ -c

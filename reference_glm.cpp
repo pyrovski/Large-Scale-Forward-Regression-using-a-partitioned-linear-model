@@ -51,7 +51,7 @@ uint64_t adjust(uint64_t total, unsigned ranks){
   return result;
 }
 
-int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, string path, 
+int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, 
 	       string fixed_filename, 
 	       string geno_filename, 
 	       string y_filename,
@@ -425,24 +425,6 @@ void compUpdate(unsigned id, unsigned iteration,
 
 }
 
-void getInputs(const string &fixed_filename, const string &geno_filename, 
-	       const string &y_filename, const unsigned &fixed_count, const unsigned &geno_ind,
-	       const uint64_t &geno_count, int id){
-
-  // Create input file object.  Put the path to your data files here!
-
-  // File containing the "population structure".  It is a 4892-by-26 matrix
-
-  // File containing the genotypes.  It is a 4892-by-79 matrix.
-
-  // File containing the phenotypes.  It is a 4892-by-1 matrix.  The file is
-  // arranged in a single column.
-
-  // In Matlab, these sizes are inferred from the data.  In C++, we hard-code them
-  // to make reading the data simpler...
-  
-}
-
 void write(const char *filename, const vector<unsigned> &list){
   std::fstream file;
   file.open(filename, std::fstream::out);
@@ -477,7 +459,7 @@ void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop,
 }
 
 void printUsage(char *name){
-  cout << "usage: " << name << " -f <fixed effects file> --num_fixed <number of fixed effects> -g <SNP data file> --num_geno <number of SNPs> -r <residuals file> --num_r <number of residuals> [-c] [-v <verbosity level>]" 
+  cout << "usage: " << name << " -f <fixed effects file> --num_fixed <number of fixed effects> -g <SNP data file> --num_geno <number of SNPs> -r <residuals file> --num_r <number of residuals> [-c] [-v <verbosity level>] [-e SNP entry limit]" 
        << endl 
        << "where <input file> contains run-time settings" << endl;
 }
@@ -491,7 +473,7 @@ int main(int argc, char **argv)
 
   int opt;
 
-  string path = "./"; // default path is the current directory.
+  double entry_limit = 0.2;
   string fixed_filename;
   string geno_filename;
   string y_filename;
@@ -508,18 +490,27 @@ int main(int argc, char **argv)
   
   /* get the following from the command line:
 
-     -f fixed effects filename
-     --num_fixed number of fixed effects
+     -f <fixed effects filename>
+     --num_fixed <number of fixed effects>
 
-     -g geno (SNP data) filename
-     --num_geno number of SNPs
+     -g <geno (SNP data) filename>
+     --num_geno <number of SNPs>
 
-     -r residuals (y) filename
-     --num_r number of residuals
+     -r <residuals (y) filename>
+     --num_r <number of residuals>
+
+     -v <verbosity level>
+
+     -c for CPU only (otherwise use GPU too)
+
+     -e <entry limit>
   */
 
-  while((opt = getopt_long(argc, argv, "cf:v:l:r:g:", options, &optIndex)) != -1){
+  while((opt = getopt_long(argc, argv, "cf:v:l:r:g:e:", options, &optIndex)) != -1){
     switch(opt){
+    case 'e':
+      entry_limit = atof(optarg);
+      break;
     case 'c':
       CPUOnly = true;
       break;
@@ -563,20 +554,12 @@ int main(int argc, char **argv)
     
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
-  
-  //! @todo this should be a command line parameter
-  double entry_limit = 0.2;
 
   // local timing
   timeval tstart, tstop;
 
   // global timing
   timeval tGlobalStart, tGlobalStop;
-
-  /*
-  getInputs(fixed_filename, geno_filename, y_filename, fixed_count, 
-	    geno_ind, geno_count, id);
-  */
 
   const unsigned m = geno_ind;
 
@@ -611,7 +594,7 @@ int main(int argc, char **argv)
   
   // Begin timing the file IO for all 3 files
   gettimeofday(&tstart, NULL);
-  readInputs(id, myOffset, mySize, path, fixed_filename, geno_filename, 
+  readInputs(id, myOffset, mySize, fixed_filename, geno_filename, 
 	     y_filename, fixed, geno, y);
   gettimeofday(&tstop, NULL);
   

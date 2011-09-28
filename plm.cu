@@ -340,10 +340,6 @@ void copyUpdateToDevice(unsigned id, unsigned iteration,
 	   << " mask index " << maxFIndex << ": "
 	   << maskVal << endl;
 #endif
-      /* this doesn't help...
-    cutilSafeCall(cudaMemcpy(d_snpMask, &snpMask[0], 
-			     sizeof(unsigned) * geno_count, cudaMemcpyHostToDevice));
-      */
   }
 
     //! copy updated XtSNP to GPU

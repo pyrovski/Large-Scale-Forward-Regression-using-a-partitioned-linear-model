@@ -3,6 +3,11 @@
 #include "type.h"
 #include "fortran_matrix.h"
 
+/*! @todo make hardIterationLimit a hard limit, and iterationLimit a soft limit.
+  hardIterationLimit is constrained by constant memory size, which varies
+  according to device family, so we can define hardIterationLimit as 
+  a macro function of 
+ */
 #define iterationLimit 50
 
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
@@ -10,17 +15,6 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
 		 unsigned d_XtsnpPitch, ftype ErrorSS, unsigned V2, 
 		 ftype* d_snpty, unsigned* d_snpMask, ftype* d_f,
 		 std::vector<double> &Fval) throw(int);
-/*
-geno_count, n, n * sizeof(ftype), 
-	m ,        
-	d_snptsnp, 
-	d_Xtsnp, 
-	d_XtsnpPitch, 
-	glm_data.ErrorSS, glm_data.V2, 
-	d_snpty, 
-	d_snpMask,
-	d_f
-*/
 
 int copyToDevice(const unsigned id, 
 		 const unsigned verbosity,
@@ -31,6 +25,7 @@ int copyToDevice(const unsigned id,
 		 const std::vector<double> &SNPty,
 		 const std::vector<double> &Xty, const FortranMatrix &XtXi, 
 		 const std::vector<unsigned> &snpMask);
+
 void copyUpdateToDevice(unsigned id, unsigned iteration,
 			unsigned geno_count, unsigned n,
 			unsigned *d_snpMask, 
@@ -39,7 +34,9 @@ void copyUpdateToDevice(unsigned id, unsigned iteration,
 			const std::vector<unsigned> &snpMask,
 			FortranMatrix &XtSNP, const FortranMatrix &XtXi,
 			const std::vector<double> &Xty);
+
 float getGPUCompTime();
+
 float getGPUMaxTime();
 
 void getMaxFGPU(unsigned id, unsigned iteration, unsigned geno_count, 

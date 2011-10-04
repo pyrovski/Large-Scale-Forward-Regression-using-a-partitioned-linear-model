@@ -58,7 +58,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
 	       FortranMatrix &fixed, FortranMatrix &geno, vector<double> &y){
   // Read the "fixed" array from file.
   // assume this is small.
-  {
+  if(fixed_filename != ""){
     // Open "fixed" file for reading
     ifstream fixed_file;
     fixed_file.open(fixed_filename.c_str(), ios::binary | ios::in);
@@ -69,6 +69,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
     
     //! assume row-major disk storage format for now
     fixed_file.read((char*)&fixed.values[0], fixed.values.size() * sizeof(double));
+    fixed_file.close();
     fixed.transpose_dims();
     fixed.transpose_self();
     fixed.writeD("fixed.dat");
@@ -459,7 +460,7 @@ void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop,
 }
 
 void printUsage(char *name){
-  cout << "usage: " << name << " -f <fixed effects file> --num_fixed <number of fixed effects> -g <SNP data file> --num_geno <number of SNPs> -r <residuals file> --num_r <number of residuals> [-c] [-v<verbosity level>] [-e SNP entry limit]" 
+  cout << "usage: " << name << " [-f <fixed effects file> --num_fixed <number of fixed effects>] -g <SNP data file> --num_geno <number of SNPs> -r <residuals file> --num_r <number of residuals> [-c] [-v<verbosity level>] [-e SNP entry limit]" 
        << endl 
        << "where <input file> contains run-time settings" << endl;
 }
@@ -474,10 +475,10 @@ int main(int argc, char **argv)
   int opt;
 
   double entry_limit = 0.2;
-  string fixed_filename;
+  string fixed_filename = "";
   string geno_filename;
   string y_filename;
-  unsigned fixed_count,
+  unsigned fixed_count = 0,
     geno_ind; //rows 
   uint64_t geno_count; // columns of the geno array
 
@@ -551,10 +552,15 @@ int main(int argc, char **argv)
     }
   }
 
-  if(fixed_filename == "" || geno_filename == "" || y_filename == ""){
+  if(geno_filename == "" || y_filename == ""){
     if(!id)
       printUsage(argv[0]);
     
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  if((fixed_filename == "") ^ (!fixed_count)){
+    if(!id)
+      printf("must supply both -f and --num_fixed, or neither\n");
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 

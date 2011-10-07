@@ -26,12 +26,12 @@ using namespace std;
 //__shared__ double fval; // scalar
 extern __shared__ double shared[];
 
-__constant__ double d_Xty[iterationLimit + 27];
+__constant__ double d_Xty[fixedPlusIteration_limit + 1];
 
-//const unsigned GPitch = (iterationLimit + 27) % 16 ? iterationLimit + 27 : (iterationLimit + 27)/16 * 16 + 16;
-
-// extra space for padding.  Could make this triangular.
-__constant__ double d_G[(iterationLimit + 27)*(iterationLimit + 27)];
+/*! extra space for padding.  Could make this triangular.
+  If triangular, we could fit fixedPlusIteration_limit = 127, rather than 89
+ */
+__constant__ double d_G[(fixedPlusIteration_limit + 1)*(fixedPlusIteration_limit + 1)];
 
 __global__ void plm(// inputs
 		    const unsigned geno_count, // # of SNPs
@@ -227,11 +227,9 @@ int copyToDevice(const unsigned id,
     snptsnpSize = geno_count * sizeof(double), 
     XtsnpSize, 
     snptySize = geno_count * sizeof(double), 
-    GSize = (iterationLimit + n)*(iterationLimit + n) * sizeof(double), // in constant memory
-    XtySize = (iterationLimit + n), // in constant memory
     fSize = geno_count * sizeof(double);
 
-  uint64_t totalSize, totalConstantSize = GSize + XtySize;
+  uint64_t totalSize;
 
   cudaError_t cudaStatus;
   int deviceCount;
@@ -272,10 +270,13 @@ int copyToDevice(const unsigned id,
     cerr << "id " << id << " insufficient device memory" << endl;
     return -1;
   }
+
+  /* this is checked by the compiler
   if(totalConstantSize >= prop.totalConstMem){
     cerr << "id " << id << " insufficient device constant memory" << endl;
     return -1;
   }
+  */
   
   cutilSafeCall(cudaMallocPitch(&d_Xtsnp, &d_XtsnpPitch, 
 				(n + iterationLimit) * sizeof(double), 

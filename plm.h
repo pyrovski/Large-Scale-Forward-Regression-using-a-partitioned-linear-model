@@ -8,7 +8,7 @@
   according to device family, so we can define hardIterationLimit as 
   a macro function of 
  */
-#define iterationLimit 50
+#define fixedPlusIteration_limit 89
 
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
 		 unsigned m, ftype* d_snptsnp, ftype* d_Xtsnp, 

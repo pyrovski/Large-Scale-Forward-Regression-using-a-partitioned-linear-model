@@ -37,7 +37,7 @@ extern "C"{
 const uint64_t readSize = 1024 * 1024 * 32;
 const uint64_t readLength = readSize / sizeof(double);
 unsigned verbosity = 0;
-//unsigned iterationLimit = 50;
+unsigned iterationLimit = 50;
 
 using namespace std;
 
@@ -539,11 +539,9 @@ int main(int argc, char **argv)
     case 'o':
       geno_ind = strtoul(optarg, 0, 0);
       break;
-      /*
     case 'l':
       iterationLimit = atoi(optarg);
       break;
-      */
     default:
       if(!id)
 	printUsage(argv[0]);
@@ -561,6 +559,13 @@ int main(int argc, char **argv)
   if((fixed_filename == "") ^ (!fixed_count)){
     if(!id)
       printf("must supply both -f and --num_fixed, or neither\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+
+  if(iterationLimit + fixed_count > fixedPlusIteration_limit){
+    if(!id)
+      printf("number of iterations plus number of fixed effects must be \n"
+	     "less than %d\n", fixedPlusIteration_limit);
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 

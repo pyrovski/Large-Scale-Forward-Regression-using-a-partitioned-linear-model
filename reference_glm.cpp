@@ -11,6 +11,7 @@
 // System header files
 #include <sys/time.h>
 #include <string>
+#include <string.h>
 #include <fstream>
 #include <vector>
 #include <limits>

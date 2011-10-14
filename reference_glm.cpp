@@ -448,10 +448,13 @@ void write(const char *filename, const vector<unsigned> &list){
 
 
 void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop, 
-		     double MPITime,
+		     double MPITime, double diskIOTime,
 		     uint64_t mySNPs, unsigned iteration, unsigned id){
   gettimeofday(&tGlobalStop, NULL);
   
+  cout << "id " << id << " total time: " 
+       << tvDouble(tGlobalStop - tGlobalStart) + diskIOTime
+       << "s" << endl;
   cout << "id " << id << " total time, not including disk/MPI IO: " 
        << tvDouble(tGlobalStop - tGlobalStart) - MPITime
        << "s" << endl;
@@ -607,15 +610,21 @@ int main(int argc, char **argv)
     cout << "id " << id 
 	 << " reading input data..." << endl;
   
+  double GPUCompTime = 0, GPUMaxTime = 0,
+    GPUCopyTime = 0, GPUCopyUpdateTime = 0,
+    CPUCompUpdateTime = 0,
+    MPITime = 0, diskIOTime = 0;
+
   // Begin timing the file IO for all 3 files
   gettimeofday(&tstart, NULL);
   readInputs(id, myOffset, mySize, fixed_filename, geno_filename, 
 	     y_filename, fixed, geno, y);
   gettimeofday(&tstop, NULL);
   
+  diskIOTime = tvDouble(tstop - tstart);
   if(verbosity > 0)
     cout << "id " << id 
-	 << " I/O time: " << tvDouble(tstop - tstart) << " s" << endl;
+	 << " I/O time: " << diskIOTime << " s" << endl;
   
   gettimeofday(&tGlobalStart, NULL);
 
@@ -674,12 +683,6 @@ int main(int argc, char **argv)
   // column-major with padding
   size_t d_XtsnpPitch;
   
-  double GPUCompTime = 0, GPUMaxTime = 0,
-    GPUCopyTime = 0, GPUCopyUpdateTime = 0,
-    CPUCompUpdateTime = 0,
-    MPITime = 0;
-  
-
   if(!CPUOnly){
     gettimeofday(&tstart, NULL);
     int copyStatus = 
@@ -960,7 +963,7 @@ int main(int argc, char **argv)
   }
 
   if(verbosity > 0){
-    printGlobalTime(tGlobalStart, tGlobalStop, MPITime,
+    printGlobalTime(tGlobalStart, tGlobalStop, MPITime, diskIOTime,
 		    mySNPs, iteration, id);
     cout << "id " << id << " MPI communication time: " << MPITime << " s" 
 	 << endl;

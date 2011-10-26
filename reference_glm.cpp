@@ -384,10 +384,14 @@ void compUpdate(unsigned id, unsigned iteration,
 		const double &nextSNPtSNP, 
 		const double &nextSNPty){
 
+  timeval tGLMStart, tGLMStop, tResizeStop, tXtSNPStop;
+  
   // update XtXi, Xty
   // output glm_data
-  glm(id, iteration, n, XtXi, nextXtSNP, nextSNPtSNP, nextSNPty, yty, Xty, 
-      rX, glm_data);
+  gettimeofday(&tGLMStart, 0);
+  glm(id, iteration, n, XtXi, nextXtSNP, nextSNPtSNP, nextSNPty, yty, Xty,
+	rX, glm_data);
+  gettimeofday(&tGLMStop, 0);
 #ifdef _DEBUG
   if(!id)
     {
@@ -406,6 +410,8 @@ void compUpdate(unsigned id, unsigned iteration,
   //! @todo this is probably slow
   XtSNP.resize_retain(n+1, mySNPs);
 
+  gettimeofday(&tResizeStop, 0);
+
   cblas_dgemv(CblasColMajor, CblasTrans, 
 	      m, mySNPs,
 	      1.0, 
@@ -417,6 +423,8 @@ void compUpdate(unsigned id, unsigned iteration,
 	      &XtSNP(n, 0),
 	      n+1
 	      );
+
+  gettimeofday(&tXtSNPStop, 0);
 #ifdef _DEBUG
   {
     stringstream ss;
@@ -424,7 +432,20 @@ void compUpdate(unsigned id, unsigned iteration,
     XtSNP.writeD(ss.str());
   }
 #endif
-
+  if(verbosity > 1){
+    /*
+      10/24/2011, 1M 4892-SNPs
+      GLM: 30us
+      resize: 30ms
+      XtSNP: 5s
+     */
+    cout << "id " << id 
+	 << " GLM update time: " << tvDouble(tGLMStop - tGLMStart) << endl
+	 << "id " << id 
+	 << " resize time: " << tvDouble(tResizeStop - tGLMStop) << endl
+	 << "id " << id
+	 << " XtSNP time: " << tvDouble(tXtSNPStop - tResizeStop) << endl;
+  }
 }
 
 void write(const char *filename, const vector<unsigned> &list){
@@ -759,10 +780,33 @@ int main(int argc, char **argv)
       } catch(int e){
 	MPI_Abort(MPI_COMM_WORLD, e);
       }
+      GPUCompTime = getGPUCompTime();
     
       // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
       // if V1 = 0, ignore; F is undefined
       getMaxFGPU(id, iteration, mySNPs, Fval, localMaxFIndex, d_f);
+      GPUMaxTime = getGPUMaxTime();
+      if(verbosity > 1){
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " GPU computation time: "
+	     << GPUCompTime << " s" << endl;
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " GPU computation time per SNP: "
+	     << GPUCompTime / mySNPs 
+	     << " s" << endl;
+	
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " GPU reduction time: "
+	     << GPUMaxTime << " s" << endl;
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " GPU reduction time per SNP: "
+	     << GPUMaxTime / mySNPs 
+	     << " s" << endl;
+      }
     } else {
       // call CPU plm, get max F & index
       for(uint64_t i = 0; i < mySNPs; i++){
@@ -911,36 +955,21 @@ int main(int argc, char **argv)
     gettimeofday(&tstop, NULL);
     CPUCompUpdateTime = tvDouble(tstop - tstart);
 
+    if(verbosity > 1){
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " CPU computation update time: "
+	   << CPUCompUpdateTime << " s" << endl;
+    }
+
     if(!CPUOnly){
       gettimeofday(&tstart, NULL);
       copyUpdateToDevice(id, iteration, mySNPs, n, d_snpMask, localMaxFIndex, 
 			 d_Xtsnp, d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);
       gettimeofday(&tstop, NULL);
       GPUCopyUpdateTime = tvDouble(tstop - tstart);
-      GPUCompTime = getGPUCompTime();
-      GPUMaxTime = getGPUMaxTime();
 
-      if(verbosity > 1){
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU computation time: "
-	     << GPUCompTime << " s" << endl;
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU computation time per SNP: "
-	     << GPUCompTime / mySNPs 
-	     << " s" << endl;
-	
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU reduction time: "
-	     << GPUMaxTime << " s" << endl;
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU reduction time per SNP: "
-	     << GPUMaxTime / mySNPs 
-	     << " s" << endl;
-	
+      if(verbosity > 1){	
 	cout << "iteration " << iteration 
 	     << " id " << id 
 	     << " GPU copy update time: "
@@ -948,12 +977,6 @@ int main(int argc, char **argv)
       }
     }
       
-    if(verbosity > 1){
-      cout << "iteration " << iteration 
-	   << " id " << id 
-	   << " CPU computation update time: "
-	   << CPUCompUpdateTime << " s" << endl;
-    }
     n++;
     iteration++;
   } // while(1)

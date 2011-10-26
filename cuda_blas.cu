@@ -72,13 +72,10 @@ __device__ double vecGMatCSq(const unsigned TID,
 			  const double *A, 
 			  const unsigned lda,
 			  double *reduce){
-  double retVal;
   for(int i = 0; i < N; i++){
     dotGG(TID, N, x, A + lda * i, reduce);
-    if(i == TID)
-      retVal = *reduce;
   }
-  return retVal;
+  return reduce[TID];
 }
 
 
@@ -90,12 +87,9 @@ __device__ double vecGMatG(const unsigned TID,
 			  const unsigned lda,
 			  double *reduce) // reduce must be of length >= N, N <= M
 {
-  double retVal;
   for(int i = 0; i < N; i++){
     dotRG(TID, M, x[TID], A + lda * i, reduce);
-    if(i == TID)
-      retVal = *reduce;
   }
-  return retVal;
+  return reduce[TID];
 }
 

@@ -34,9 +34,9 @@ __constant__ double d_Xty[fixedPlusIteration_limit + 1];
 __constant__ double d_G[(fixedPlusIteration_limit + 1)*(fixedPlusIteration_limit + 1)];
 
 __global__ void plm(// inputs
-		    const unsigned geno_count, // # of SNPs
+		    const unsigned geno_count, // # of SNPs == # of blocks?
 		    const unsigned m,          // rows of X
-		    //const unsigned n,        // colums of X == number of blocks
+		    //const unsigned n,        // colums of X == threads/block
 		    const double *snptsnp,      // scalar, unique to block
 		    const double *Xtsnp,        // n x 1 vector, unique to block
 		    const unsigned XtsnpPitch, 
@@ -45,6 +45,7 @@ __global__ void plm(// inputs
 		    //const double *G,          // symmetric matrix in const mem
 		    //const double *Xty,        // n x 1 vector in const mem
 		    const double *snpty,        // scalar, unique to block
+		    //! @todo snpMask could be a bit mask, instead of a word mask
 		    const unsigned *snpMask,   // n x 1 vector
 		    // outputs
 		    double *f){

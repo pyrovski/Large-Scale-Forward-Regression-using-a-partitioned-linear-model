@@ -30,6 +30,9 @@ __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
 /*
   Written for register-based storage.  Result is placed in *reduce.
  */
+/*! @todo dot products could be faster; specifically, each thread is only 
+  multiplying or adding, not both simultaneously.
+ */
 __device__ void dotRR(const unsigned TID,
 		    const unsigned N, 
 		    const double x,

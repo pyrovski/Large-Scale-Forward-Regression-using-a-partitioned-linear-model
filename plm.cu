@@ -46,7 +46,7 @@ __global__ void plm(// inputs
 		    //const double *Xty,        // n x 1 vector in const mem
 		    const double *snpty,        // scalar, unique to block
 		    //! @todo snpMask could be a bit mask, instead of a word mask
-		    const unsigned *snpMask,   // n x 1 vector
+		    const char *snpMask,   // n x 1 vector
 		    // outputs
 		    double *f){
   /*! @todo could compute two SNPs per thread block.  
@@ -171,7 +171,7 @@ void initGrid(dim3 &grid, unsigned geno_count) throw(int){
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
 		 unsigned m, double* d_snptsnp, double* d_Xtsnp, 
 		 unsigned d_XtsnpPitch, double ErrorSS, unsigned V2, 
-		 double* d_snpty, unsigned* d_snpMask, double* d_f,
+		 double* d_snpty, char* d_snpMask, double* d_f,
 		 vector<double> &Fval) throw(int)
 {
     cublasGetError();
@@ -223,13 +223,13 @@ int copyToDevice(const unsigned id,
 		 const unsigned verbosity,
 		 const unsigned geno_count, const unsigned n, 
 		 double *&d_snptsnp, double *&d_Xtsnp, size_t &d_XtsnpPitch, 
-		 double *&d_snpty, unsigned *&d_snpMask, double *&d_f,
+		 double *&d_snpty, char *&d_snpMask, double *&d_f,
 		 const vector<double> &SNPtSNP, const FortranMatrix &XtSNP,
 		 const vector<double> &SNPty,
 		 const vector<double> &Xty, const FortranMatrix &XtXi, 
-		 const vector<unsigned> &snpMask){
+		 const vector<char> &snpMask){
 
-  uint64_t snpMaskSize = geno_count * sizeof(unsigned), 
+  uint64_t snpMaskSize = geno_count * sizeof(char), 
     snptsnpSize = geno_count * sizeof(double), 
     XtsnpSize, 
     snptySize = geno_count * sizeof(double), 
@@ -288,9 +288,9 @@ int copyToDevice(const unsigned id,
 				(n + iterationLimit) * sizeof(double), 
 				geno_count));
 
-  cutilSafeCall(cudaMalloc(&d_snpMask, geno_count * sizeof(unsigned)));
+  cutilSafeCall(cudaMalloc(&d_snpMask, geno_count * sizeof(char)));
   cutilSafeCall(cudaMemcpy(d_snpMask, &snpMask[0], 
-			   geno_count * sizeof(unsigned), 
+			   geno_count * sizeof(char), 
 			   cudaMemcpyHostToDevice));
   
   //! @todo this won't be coalesced
@@ -324,10 +324,10 @@ int copyToDevice(const unsigned id,
 
 void copyUpdateToDevice(unsigned id, unsigned iteration,  
 			unsigned geno_count, unsigned n,
-		       unsigned *d_snpMask, 
+		       char *d_snpMask, 
 		       int maxFIndex, double *d_Xtsnp, 
 		       size_t d_XtsnpPitch,
-		       const vector<unsigned> &snpMask,
+		       const vector<char> &snpMask,
 		       FortranMatrix &XtSNP, const FortranMatrix &XtXi,
 		       const vector<double> &Xty){
 
@@ -338,11 +338,11 @@ void copyUpdateToDevice(unsigned id, unsigned iteration,
 	   << snpMask[maxFIndex] << endl;
 #endif
     cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
-			     sizeof(unsigned), cudaMemcpyHostToDevice));
+			     sizeof(char), cudaMemcpyHostToDevice));
 #ifdef _DEBUG
     unsigned maskVal;
     cutilSafeCall(cudaMemcpy(&maskVal, d_snpMask + maxFIndex,
-			     sizeof(unsigned), cudaMemcpyDeviceToHost));
+			     sizeof(char), cudaMemcpyDeviceToHost));
       cout << "iteration " << iteration << " id " << id 
 	   << " mask index " << maxFIndex << ": "
 	   << maskVal << endl;

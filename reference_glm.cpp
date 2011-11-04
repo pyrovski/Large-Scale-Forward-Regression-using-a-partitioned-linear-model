@@ -699,8 +699,8 @@ int main(int argc, char **argv)
   double *d_snptsnp, *d_Xtsnp, *d_snpty,
     *d_f;
   //! @todo could use d_f also as a mask
-  unsigned *d_snpMask;
-  vector<unsigned> snpMask(mySNPs, 0);
+  char *d_snpMask;
+  vector<char> snpMask(mySNPs, 0);
   // column-major with padding
   size_t d_XtsnpPitch;
   

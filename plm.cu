@@ -59,6 +59,7 @@ __global__ void plm(// inputs
   double GtXtsnp; // each thread stores one element of each array // Xtsnp
   //! @todo these might use fewer registers if kept in shared memory
   double snptmy; // scalar
+  //! @todo this could be single precision
   double s; // scalar
 
   unsigned BID = blockIdx.x + gridDim.x * blockIdx.y;
@@ -78,14 +79,15 @@ __global__ void plm(// inputs
   }
   // snptsnp - snptXGXtsnp:
 
-
+  //#error fixme double read
+  double myXtsnp = *(Xtsnp + BID * XtsnpPitch/sizeof(double) + TID);
   // GtXtsnp
-  GtXtsnp = vecGMatCSq(TID, Xtsnp + BID * XtsnpPitch/sizeof(double), blockDim.x, d_G, 
+  GtXtsnp = vecRMatCSq(TID, myXtsnp, blockDim.x, d_G, 
 		     blockDim.x,  //! length of column plus padding (no padding)
 		     reduce); 
   
   // snptsnp - snptXGXtsnp
-  dotRG(TID, blockDim.x, GtXtsnp, Xtsnp + BID * XtsnpPitch/sizeof(double), reduce);
+  dotRR(TID, blockDim.x, GtXtsnp, myXtsnp, reduce);
   s = snptsnp[BID] - *reduce;
 #ifdef printGPU
   if(printBIDs(BID)){
@@ -114,8 +116,11 @@ __global__ void plm(// inputs
       }
 #endif
       snptmy += snpty[BID];
+      //! @todo this could be single precision
       double modelSS = snptmy * snptmy * s;
+
       double errorSS2 = errorSS - modelSS;
+
       unsigned V2 = errorDF - 1;
       f[BID] = modelSS / errorSS2 * V2;
 #ifdef printGPU

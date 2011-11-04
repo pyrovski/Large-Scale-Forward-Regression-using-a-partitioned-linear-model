@@ -1,5 +1,38 @@
 #include "type.h"
 
+__device__ void reduceMadDotGG(const unsigned TID, unsigned N, double *reduce, 
+			  const double *x, const double *y){
+  // serial version for clarity
+  /*
+  if(!TID){
+    reduce[0] = x[0] * y[0];
+      for(int i = 1; i < N; i++)
+	reduce[0] += x[i]*y[i];
+  }
+  */
+
+  unsigned threads, nextSmaller;
+  // parallel version
+  if(__popc(N) != 1){ // non power of two
+    // do one reduction to a power of two
+    nextSmaller = 1 << (31-__clz(N));
+    threads = nextSmaller/2;
+    //! @todo threads could be > nextSmaller/2,
+    if(TID < threads){
+      reduce[TID] = x[TID] * y[TID] + x[TID + threads] * y[TID + threads];
+      if(TID < N - nextSmaller)
+	reduce[TID] += x[TID + nextSmaller] * y[TID + nextSmaller];
+    }
+    __syncthreads();
+  } else {
+    threads = N/2;
+  }
+  reduceCorePow2(TID, threads, reduce);
+}
+
+__device__ void reduceCorePow2(const unsigned TID, unsigned N, double *reduce){
+}
+
 __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
   /*
   if(!TID){
@@ -10,17 +43,27 @@ __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
   ///*
   unsigned threads;
   while(N/2){
+    /*
     if(N % 2){
       threads = (N + 1) / 2;
       //if(TID == threads - 1)
       //reduce[TID + threads] = 0;
-      if(TID < threads - 1) //! @todo can remove this, as it doesn't affect the result or save time
+      //! @todo can remove this condition test if threads <= 64, 
+      //as it doesn't affect the result or save time,
+      //assuming shared size is 2*threads
+
+      if(TID < threads - 1) 
 	reduce[TID] += reduce[TID + threads];
     } else {
       threads = N / 2;
       if(TID < threads)
 	reduce[TID] += reduce[TID + threads];
     }
+    */
+    threads = (N + 1) / 2;
+    if(TID < threads - (N % 2))
+      reduce[TID] += reduce[TID + threads];
+    
     __syncthreads();
     N = threads;
   }

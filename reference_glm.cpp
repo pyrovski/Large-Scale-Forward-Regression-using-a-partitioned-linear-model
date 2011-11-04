@@ -660,7 +660,7 @@ int main(int argc, char **argv)
   vector<unsigned> chosenSNPsReduced(iterationLimit);
 
   // An array to hold the results of the GLM calculations
-  vector<double> Fval(mySNPs);
+  vector<float> Fval(mySNPs);
  
   // Initialize the X-matrix.  The first column is all ones, the next
   // fixed_count columns are equal to the fixed matrix, and the last
@@ -696,8 +696,8 @@ int main(int argc, char **argv)
 	 << " computation prep time: "
 	 << tvDouble(tstop - tstart) << " s" << endl;
   
-  double *d_snptsnp, *d_Xtsnp, *d_snpty,
-    *d_f;
+  double *d_snptsnp, *d_Xtsnp, *d_snpty;
+  float *d_f;
   //! @todo could use d_f also as a mask
   char *d_snpMask;
   vector<char> snpMask(mySNPs, 0);
@@ -762,7 +762,7 @@ int main(int argc, char **argv)
     */
     int localMaxFIndex;
 
-    double globalMaxF;
+    float globalMaxF;
 
     if(!CPUOnly){
       // ~3.5 us per SNP on Longhorn (FX5800)
@@ -817,7 +817,7 @@ int main(int argc, char **argv)
 	  Fval[i] = 0.0;
 	}
       }
-      localMaxFIndex = cblas_idamax(mySNPs, &Fval[0], 1);
+      localMaxFIndex = cblas_isamax(mySNPs, &Fval[0], 1);
     }
     
     {
@@ -839,7 +839,7 @@ int main(int argc, char **argv)
 
     gettimeofday(&tstart, NULL);
     // get max F value
-    MPI_Allreduce(&Fval[localMaxFIndex], &globalMaxF, 1, MPI_DOUBLE, MPI_MAX,
+    MPI_Allreduce(&Fval[localMaxFIndex], &globalMaxF, 1, MPI_FLOAT, MPI_MAX,
 		  MPI_COMM_WORLD);
     gettimeofday(&tstop, NULL);
     MPITime += tvDouble(tstop - tstart);

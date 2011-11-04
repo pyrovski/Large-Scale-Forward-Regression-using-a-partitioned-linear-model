@@ -11,16 +11,16 @@
 #define fixedPlusIteration_limit 89
 
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
-		 unsigned m, ftype* d_snptsnp, ftype* d_Xtsnp, 
-		 unsigned d_XtsnpPitch, ftype ErrorSS, unsigned V2, 
-		 ftype* d_snpty, char* d_snpMask, ftype* d_f,
-		 std::vector<double> &Fval) throw(int);
+		 unsigned m, double* d_snptsnp, double* d_Xtsnp, 
+		 unsigned d_XtsnpPitch, double ErrorSS, unsigned V2, 
+		 double* d_snpty, char* d_snpMask, float* d_f,
+		 std::vector<float> &Fval) throw(int);
 
 int copyToDevice(const unsigned id, 
 		 const unsigned verbosity,
 		 const unsigned geno_count, const unsigned n,
-		 ftype *&d_snptsnp, ftype *&d_Xtsnp, size_t &d_XtsnpPitch, 
-		 ftype *&d_snpty, char *&d_snpMask, ftype *&d_f,
+		 double *&d_snptsnp, double *&d_Xtsnp, size_t &d_XtsnpPitch, 
+		 double *&d_snpty, char *&d_snpMask, float *&d_f,
 		  const std::vector<double> &SNPtSNP, const FortranMatrix &XtSNP,
 		 const std::vector<double> &SNPty,
 		 const std::vector<double> &Xty, const FortranMatrix &XtXi, 
@@ -29,7 +29,7 @@ int copyToDevice(const unsigned id,
 void copyUpdateToDevice(unsigned id, unsigned iteration,
 			unsigned geno_count, unsigned n,
 			char *d_snpMask, 
-			int maxFIndex, ftype *d_Xtsnp, 
+			int maxFIndex, double *d_Xtsnp, 
 			size_t d_XtsnpPitch,
 			const std::vector<char> &snpMask,
 			FortranMatrix &XtSNP, const FortranMatrix &XtXi,
@@ -40,5 +40,5 @@ float getGPUCompTime();
 float getGPUMaxTime();
 
 void getMaxFGPU(unsigned id, unsigned iteration, unsigned geno_count, 
-	     std::vector<double> &Fval, 
-	     unsigned maxFIndex, ftype *d_f);
+	     std::vector<float> &Fval, 
+	     unsigned maxFIndex, float *d_f);

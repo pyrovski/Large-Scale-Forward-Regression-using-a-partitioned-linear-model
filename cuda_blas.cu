@@ -1,5 +1,8 @@
 #include "type.h"
 
+__device__ void reduceCorePow2(const unsigned TID, unsigned N, double *reduce){
+}
+
 __device__ void reduceMadDotGG(const unsigned TID, unsigned N, double *reduce, 
 			  const double *x, const double *y){
   // serial version for clarity
@@ -30,8 +33,6 @@ __device__ void reduceMadDotGG(const unsigned TID, unsigned N, double *reduce,
   reduceCorePow2(TID, threads, reduce);
 }
 
-__device__ void reduceCorePow2(const unsigned TID, unsigned N, double *reduce){
-}
 
 __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
   /*

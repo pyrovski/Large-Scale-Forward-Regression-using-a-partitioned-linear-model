@@ -17,7 +17,7 @@
 #endif
 
 __device__ int printBIDs(unsigned BID){
-  return(BID == 0 || BID == 40);
+  return(BID == 0);
 }
 
 #include "cuda_blas.cu"
@@ -66,7 +66,8 @@ __global__ void plm(// inputs
   unsigned TID = threadIdx.x;
 
   #ifdef printGPU
-  printf("BID: %u\n", BID);
+  if(printBIDs(BID))
+    printf("BID: %u\n", BID);
   #endif
 
   if(BID >= geno_count)

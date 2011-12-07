@@ -101,13 +101,15 @@ __device__ double vecRMatCSq(const unsigned TID,
 			  const unsigned lda,
 			  double *reduce){
   double retVal = 0.0;
+  reduce[TID] = x;
+  __syncthreads();
   for(int i = 0; i < N; i++){
     /*
     dotRG(TID, N, x, A + lda * i, reduce);
     if(i == TID)
       retVal = *reduce;
     */
-    retVal += x * A[lda * i + TID];
+    retVal += reduce[i] * A[lda * TID + i];
   }
   return retVal;
 }

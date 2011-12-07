@@ -216,6 +216,7 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
     return maxFIndex;
 }
 
+//! @todo convert for gpu
 /*!
   should only be called once
  */
@@ -322,6 +323,7 @@ int copyToDevice(const unsigned id,
   return 0;
 }
 
+//! @todo convert for gpu
 void copyUpdateToDevice(unsigned id, unsigned iteration,  
 			unsigned geno_count, unsigned n,
 		       char *d_snpMask, 

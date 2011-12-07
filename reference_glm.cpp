@@ -145,6 +145,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
   return 0;
 }
 
+//! @todo convert for gpu?  This one will be hard.
 void compPrepare(unsigned id, unsigned iteration, 
 		 //FortranMatrix &X, 
 		 FortranMatrix &fixed, 
@@ -684,6 +685,7 @@ int main(int argc, char **argv)
   // Begin timing the computations
   gettimeofday(&tstart, NULL);
 
+//! @todo convert for gpu?
   compPrepare(id, 0, fixed, fixed_count, XtX, Xty, y, U, S, Vt, rX, 
 	      beta, n, tol, XtXi, 
 	      yty, glm_data, geno_ind, mySNPs, m, geno, XtSNP, SNPty, 
@@ -706,6 +708,7 @@ int main(int argc, char **argv)
   
   if(!CPUOnly){
     gettimeofday(&tstart, NULL);
+    //! @todo convert for gpu
     int copyStatus = 
       copyToDevice(id, verbosity,
 		   mySNPs, n,
@@ -953,6 +956,7 @@ int main(int argc, char **argv)
       To remove SNP from geno, set mask at SNP index.
      */
 
+//! @todo convert for gpu
     gettimeofday(&tstart, NULL);
     compUpdate(id, iteration, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, m, 
 	       geno, 
@@ -969,6 +973,7 @@ int main(int argc, char **argv)
 
     if(!CPUOnly){
       gettimeofday(&tstart, NULL);
+      //! @todo convert for gpu
       copyUpdateToDevice(id, iteration, mySNPs, n, d_snpMask, localMaxFIndex, 
 			 d_Xtsnp, d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);
       gettimeofday(&tstop, NULL);

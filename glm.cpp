@@ -136,7 +136,7 @@ void plm(
 	 const double yty, 
 	 const vector<double> &Xty, 
 	 const unsigned rX,
-	 double *F,
+	 float *F,
 	 double ErrorSS,
 	 unsigned V2
 	 //const GLMData &glm_data,

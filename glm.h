@@ -23,7 +23,7 @@ struct GLMData
   // 1 - fcdf(F, V1, V2), as computed in the glm function
   double p;
 
-  double F; // input to fcdf
+  float F; // input to fcdf
 
   // y'*y - beta'*Xy, as computed in the glm function
   double ErrorSS;
@@ -59,7 +59,7 @@ void plm(
 	 const double yty, 
 	 const std::vector<double> &Xty, 
 	 const unsigned rX,
-	 double *F,
+	 float *F,
 	 double ErrorSS,
 	 unsigned V2
 );

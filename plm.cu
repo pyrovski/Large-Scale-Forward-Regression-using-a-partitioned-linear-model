@@ -335,8 +335,8 @@ void copyUpdateToDevice(unsigned id, unsigned iteration,
   if(maxFIndex >= 0){
 #ifdef _DEBUG
       cout << "iteration " << iteration << " id " << id 
-	   << " masking index " << maxFIndex << " on device: " 
-	   << snpMask[maxFIndex] << endl;
+	   << " masking index " << maxFIndex << " on device" 
+	   << endl;
 #endif
     cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
 			     sizeof(char), cudaMemcpyHostToDevice));

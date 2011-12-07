@@ -66,7 +66,7 @@ __global__ void plm(// inputs
   unsigned TID = threadIdx.x;
 
   #ifdef printGPU
-  if(printBIDs(BID))
+  if(printBIDs(BID) && !TID)
     printf("BID: %u\n", BID);
   #endif
 
@@ -92,12 +92,16 @@ __global__ void plm(// inputs
   s = snptsnp[BID] - *reduce;
 #ifdef printGPU
   if(printBIDs(BID)){
-    printf("b%03u\tt%03u\tXtsnp: %1.10le\n", BID, TID, Xtsnp[BID * XtsnpPitchInWords + TID]);
-    printf("b%03u\tt%03u\tGtXtsnp: %1.10le\n", BID, TID, GtXtsnp);
-    if(!TID){
-      printf("b%03u\tt%03u\tsnptsnp: %1.10le\n", BID, TID, snptsnp[BID]);
-      printf("b%03u\tt%03u\tsnptXGXtsnp: %1.10le\n", BID, TID, *reduce);
-      printf("b%03u\tt%03u\ts: %1.10le\n", BID, TID, s);
+    for(int i = 0; i < blockDim.x; i++){
+      if(i == TID){
+	printf("b%03u\tt%03u\tXtsnp: %1.10le\n", BID, TID, Xtsnp[BID * XtsnpPitchInWords + TID]);
+	printf("b%03u\tt%03u\tGtXtsnp: %1.10le\n", BID, TID, GtXtsnp);
+	if(!TID){
+	  printf("b%03u\tt%03u\tsnptsnp: %1.10le\n", BID, TID, snptsnp[BID]);
+	  printf("b%03u\tt%03u\tsnptXGXtsnp: %1.10le\n", BID, TID, *reduce);
+	  printf("b%03u\tt%03u\ts: %1.10le\n", BID, TID, s);
+	}
+      }
     }
   }
 #endif
@@ -112,8 +116,12 @@ __global__ void plm(// inputs
     if(!TID){
 #ifdef printGPU
       if(printBIDs(BID)){
-	printf("b%03u\tt%03u\tsnptXGXty: %1.10le\n", BID, TID, snptmy);
-	printf("b%03u\tt%03u\tsnpty: %1.10le\n", BID, TID, snpty[BID]);
+	for(int i = 0; i < blockDim.x; i++){
+	  if(i == TID){
+	    printf("b%03u\tt%03u\tsnptXGXty: %1.10le\n", BID, TID, snptmy);
+	    printf("b%03u\tt%03u\tsnpty: %1.10le\n", BID, TID, snpty[BID]);
+	  }
+	}
       }
 #endif
       snptmy += snpty[BID];
@@ -126,11 +134,15 @@ __global__ void plm(// inputs
       f[BID] = modelSS / errorSS2 * V2;
 #ifdef printGPU
   if(printBIDs(BID)){
-
-    printf("b%03u\tt%03u\tmodelSS: %1.10le\n", BID, TID, modelSS);
-    printf("b%03u\tt%03u\tnew errorSS: %1.10le\n", BID, TID, errorSS2);
-    printf("b%03u\tt%03u\tnew V2: %u\n", BID, TID, V2);
-    printf("b%03u\tt%03u\tf: %1.10le\n", BID, TID, f[BID]);
+    for(int i = 0; i < blockDim.x; i++){
+      if(i == TID){
+	
+	printf("b%03u\tt%03u\tmodelSS: %1.10le\n", BID, TID, modelSS);
+	printf("b%03u\tt%03u\tnew errorSS: %1.10le\n", BID, TID, errorSS2);
+	printf("b%03u\tt%03u\tnew V2: %u\n", BID, TID, V2);
+	printf("b%03u\tt%03u\tf: %1.10le\n", BID, TID, f[BID]);
+      }
+    }
   }
 #endif
 

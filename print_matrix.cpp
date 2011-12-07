@@ -19,4 +19,3 @@ void print_matrix( const char* desc, int m, int n, const double* a, int lda)
   std::cout.flags(flags);
 }
 
-

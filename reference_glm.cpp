@@ -807,7 +807,7 @@ int main(int argc, char **argv)
 	     << GPUMaxTime / mySNPs 
 	     << " s" << endl;
       }
-    } else {
+    } else { // CPUOnly == 1
       // call CPU plm, get max F & index
       for(uint64_t i = 0; i < mySNPs; i++){
 	if(!snpMask[i])

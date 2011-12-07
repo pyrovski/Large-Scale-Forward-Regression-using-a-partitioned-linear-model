@@ -109,8 +109,11 @@ __device__ double vecRMatCSq(const unsigned TID,
     if(i == TID)
       retVal = *reduce;
     */
+    if(i == TID)
+      continue;
     retVal += reduce[i] * A[lda * TID + i];
   }
+  retVal += x * A[lda * TID + TID];
   return retVal;
 }
 

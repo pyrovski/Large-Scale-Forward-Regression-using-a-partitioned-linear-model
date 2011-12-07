@@ -39,7 +39,7 @@ __global__ void plm(// inputs
 		    //const unsigned n,        // colums of X == threads/block
 		    const double *snptsnp,      // scalar, unique to block
 		    const double *Xtsnp,        // n x 1 vector, unique to block
-		    const unsigned XtsnpPitch, 
+		    const unsigned XtsnpPitchInWords, 
 		    const double errorSS,       // scalar
 		    const unsigned errorDF,       // scalar
 		    //const double *G,          // symmetric matrix in const mem
@@ -81,7 +81,7 @@ __global__ void plm(// inputs
   // snptsnp - snptXGXtsnp:
 
   //#error fixme double read
-  double myXtsnp = *(Xtsnp + BID * XtsnpPitch/sizeof(double) + TID);
+  double myXtsnp = *(Xtsnp + BID * XtsnpPitchInWords + TID);
   // GtXtsnp
   GtXtsnp = vecRMatCSq(TID, myXtsnp, blockDim.x, d_G, 
 		     blockDim.x,  //! length of column plus padding (no padding)
@@ -92,7 +92,7 @@ __global__ void plm(// inputs
   s = snptsnp[BID] - *reduce;
 #ifdef printGPU
   if(printBIDs(BID)){
-    printf("b%03u\tt%03u\tXtsnp: %1.10le\n", BID, TID, Xtsnp[BID * XtsnpPitch/sizeof(double) + TID]);
+    printf("b%03u\tt%03u\tXtsnp: %1.10le\n", BID, TID, Xtsnp[BID * XtsnpPitchInWords + TID]);
     printf("b%03u\tt%03u\tGtXtsnp: %1.10le\n", BID, TID, GtXtsnp);
     if(!TID){
       printf("b%03u\tt%03u\tsnptsnp: %1.10le\n", BID, TID, snptsnp[BID]);
@@ -185,7 +185,7 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
        m,
        d_snptsnp, 
        d_Xtsnp, 
-       d_XtsnpPitch, 
+       d_XtsnpPitch / sizeof(double), 
        ErrorSS, V2, 
        d_snpty, 
        d_snpMask,

@@ -46,9 +46,9 @@ __global__ void plm(// inputs
 		    //const double *Xty,        // n x 1 vector in const mem
 		    const double *snpty,        // scalar, unique to block
 		    //! @todo snpMask could be a bit mask, instead of a word mask
-		    const unsigned *snpMask,   // n x 1 vector
+		    const char *snpMask,   // n x 1 vector
 		    // outputs
-		    double *f){
+		    float *f){
   /*! @todo could compute two SNPs per thread block.  
     This would ease the limitation of 8 thread blocks/MP for SM 1.3 devices,
     but might need some thread padding for warps.
@@ -59,6 +59,7 @@ __global__ void plm(// inputs
   double GtXtsnp; // each thread stores one element of each array // Xtsnp
   //! @todo these might use fewer registers if kept in shared memory
   double snptmy; // scalar
+
   double s; // scalar
 
   unsigned BID = blockIdx.x + gridDim.x * blockIdx.y;
@@ -78,14 +79,15 @@ __global__ void plm(// inputs
   }
   // snptsnp - snptXGXtsnp:
 
-
+  //#error fixme double read
+  double myXtsnp = *(Xtsnp + BID * XtsnpPitch/sizeof(double) + TID);
   // GtXtsnp
-  GtXtsnp = vecGMatCSq(TID, Xtsnp + BID * XtsnpPitch/sizeof(double), blockDim.x, d_G, 
+  GtXtsnp = vecRMatCSq(TID, myXtsnp, blockDim.x, d_G, 
 		     blockDim.x,  //! length of column plus padding (no padding)
 		     reduce); 
   
   // snptsnp - snptXGXtsnp
-  dotRG(TID, blockDim.x, GtXtsnp, Xtsnp + BID * XtsnpPitch/sizeof(double), reduce);
+  dotRR(TID, blockDim.x, GtXtsnp, myXtsnp, reduce);
   s = snptsnp[BID] - *reduce;
 #ifdef printGPU
   if(printBIDs(BID)){
@@ -114,8 +116,11 @@ __global__ void plm(// inputs
       }
 #endif
       snptmy += snpty[BID];
-      double modelSS = snptmy * snptmy * s;
-      double errorSS2 = errorSS - modelSS;
+      //! @todo this could be single precision
+      float modelSS = snptmy * snptmy * s;
+
+      double errorSS2 = errorSS - (double)modelSS;
+
       unsigned V2 = errorDF - 1;
       f[BID] = modelSS / errorSS2 * V2;
 #ifdef printGPU
@@ -166,8 +171,8 @@ void initGrid(dim3 &grid, unsigned geno_count) throw(int){
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
 		 unsigned m, double* d_snptsnp, double* d_Xtsnp, 
 		 unsigned d_XtsnpPitch, double ErrorSS, unsigned V2, 
-		 double* d_snpty, unsigned* d_snpMask, double* d_f,
-		 vector<double> &Fval) throw(int)
+		 double* d_snpty, char* d_snpMask, float* d_f,
+		 vector<float> &Fval) throw(int)
 {
     cublasGetError();
     cudaEventRecord(start, 0);
@@ -188,14 +193,14 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
     //cutilSafeCall(cudaThreadSynchronize());
 
 #ifdef _DEBUG
-    cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(double),
+    cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(float),
 			     cudaMemcpyDeviceToHost));
 #endif
 
     cublasStatus status = cublasGetError();
 
     // cublas uses 1-based index
-    int maxFIndex = cublasIdamax(geno_count, d_f, 1);
+    int maxFIndex = cublasIsamax(geno_count, d_f, 1);
     cudaEventRecord(stopMax, 0);
     status = cublasGetError();
     if(status != CUBLAS_STATUS_SUCCESS){
@@ -218,17 +223,17 @@ int copyToDevice(const unsigned id,
 		 const unsigned verbosity,
 		 const unsigned geno_count, const unsigned n, 
 		 double *&d_snptsnp, double *&d_Xtsnp, size_t &d_XtsnpPitch, 
-		 double *&d_snpty, unsigned *&d_snpMask, double *&d_f,
+		 double *&d_snpty, char *&d_snpMask, float *&d_f,
 		 const vector<double> &SNPtSNP, const FortranMatrix &XtSNP,
 		 const vector<double> &SNPty,
 		 const vector<double> &Xty, const FortranMatrix &XtXi, 
-		 const vector<unsigned> &snpMask){
+		 const vector<char> &snpMask){
 
-  uint64_t snpMaskSize = geno_count * sizeof(unsigned), 
+  uint64_t snpMaskSize = geno_count * sizeof(char), 
     snptsnpSize = geno_count * sizeof(double), 
     XtsnpSize, 
     snptySize = geno_count * sizeof(double), 
-    fSize = geno_count * sizeof(double);
+    fSize = geno_count * sizeof(float);
 
   uint64_t totalSize;
 
@@ -283,9 +288,9 @@ int copyToDevice(const unsigned id,
 				(n + iterationLimit) * sizeof(double), 
 				geno_count));
 
-  cutilSafeCall(cudaMalloc(&d_snpMask, geno_count * sizeof(unsigned)));
+  cutilSafeCall(cudaMalloc(&d_snpMask, geno_count * sizeof(char)));
   cutilSafeCall(cudaMemcpy(d_snpMask, &snpMask[0], 
-			   geno_count * sizeof(unsigned), 
+			   geno_count * sizeof(char), 
 			   cudaMemcpyHostToDevice));
   
   //! @todo this won't be coalesced
@@ -304,7 +309,7 @@ int copyToDevice(const unsigned id,
   cutilSafeCall(cudaMemcpyToSymbol(d_G, &XtXi.values[0], n * n * sizeof(double)));
   cutilSafeCall(cudaMemcpyToSymbol(d_Xty, &Xty[0], n * sizeof(double)));
   
-  cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(double)));
+  cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(float)));
 
   cublasStatus status = cublasInit();
   if(status != CUBLAS_STATUS_SUCCESS){
@@ -319,10 +324,10 @@ int copyToDevice(const unsigned id,
 
 void copyUpdateToDevice(unsigned id, unsigned iteration,  
 			unsigned geno_count, unsigned n,
-		       unsigned *d_snpMask, 
+		       char *d_snpMask, 
 		       int maxFIndex, double *d_Xtsnp, 
 		       size_t d_XtsnpPitch,
-		       const vector<unsigned> &snpMask,
+		       const vector<char> &snpMask,
 		       FortranMatrix &XtSNP, const FortranMatrix &XtXi,
 		       const vector<double> &Xty){
 
@@ -333,11 +338,11 @@ void copyUpdateToDevice(unsigned id, unsigned iteration,
 	   << snpMask[maxFIndex] << endl;
 #endif
     cutilSafeCall(cudaMemcpy(d_snpMask + maxFIndex, &snpMask[maxFIndex], 
-			     sizeof(unsigned), cudaMemcpyHostToDevice));
+			     sizeof(char), cudaMemcpyHostToDevice));
 #ifdef _DEBUG
     unsigned maskVal;
     cutilSafeCall(cudaMemcpy(&maskVal, d_snpMask + maxFIndex,
-			     sizeof(unsigned), cudaMemcpyDeviceToHost));
+			     sizeof(char), cudaMemcpyDeviceToHost));
       cout << "iteration " << iteration << " id " << id 
 	   << " mask index " << maxFIndex << ": "
 	   << maskVal << endl;
@@ -375,10 +380,10 @@ float getGPUMaxTime(){
 }
 
 void getMaxFGPU(unsigned id, unsigned iteration, unsigned geno_count, 
-	     vector<double> &Fval, 
-	     unsigned maxFIndex, double *d_f){
+	     vector<float> &Fval, 
+	     unsigned maxFIndex, float *d_f){
 #ifndef _DEBUG
-    cutilSafeCall(cudaMemcpy(&Fval[maxFIndex], &d_f[maxFIndex], sizeof(double),
+    cutilSafeCall(cudaMemcpy(&Fval[maxFIndex], &d_f[maxFIndex], sizeof(float),
 			     cudaMemcpyDeviceToHost));
     /*
 #else

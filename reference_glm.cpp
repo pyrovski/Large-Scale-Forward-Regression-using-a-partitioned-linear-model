@@ -393,11 +393,12 @@ void compUpdate(unsigned id, unsigned iteration,
 		const double &nextSNPtSNP, 
 		const double &nextSNPty){
 
-  timeval tGLMStart, tGLMStop, tResizeStop, tXtSNPStop;
+  timeval tGLMStart, tGLMStop;
   
   // update XtXi, Xty
   // output glm_data
   gettimeofday(&tGLMStart, 0);
+  //! @todo fix for GPU
   glm(id, iteration, n, XtXi, nextXtSNP, nextSNPtSNP, nextSNPty, yty, Xty,
 	rX, glm_data);
   gettimeofday(&tGLMStop, 0);
@@ -416,10 +417,6 @@ void compUpdate(unsigned id, unsigned iteration,
       }
     }
 #endif
-  //! @todo this is probably slow
-  XtSNP.resize_retain(n+1, mySNPs);
-
-  gettimeofday(&tResizeStop, 0);
 
   cblas_dgemv(CblasColMajor, CblasTrans, 
 	      geno_ind,
@@ -434,14 +431,7 @@ void compUpdate(unsigned id, unsigned iteration,
 	      n+1
 	      );
 
-  gettimeofday(&tXtSNPStop, 0);
-#ifdef _DEBUG
-  {
-    stringstream ss;
-    ss << "XtSNP_" << iteration << "p_" << id << ".dat";
-    XtSNP.writeD(ss.str());
-  }
-#endif
+  gettimeofday(&tGLMStop, 0);
   if(verbosity > 1){
     /*
       10/24/2011, 1M 4892-SNPs
@@ -450,11 +440,7 @@ void compUpdate(unsigned id, unsigned iteration,
       XtSNP: 5s
      */
     cout << "id " << id 
-	 << " GLM update time: " << tvDouble(tGLMStop - tGLMStart) << endl
-	 << "id " << id 
-	 << " resize time: " << tvDouble(tResizeStop - tGLMStop) << endl
-	 << "id " << id
-	 << " XtSNP time: " << tvDouble(tXtSNPStop - tResizeStop) << endl;
+	 << " GLM update time: " << tvDouble(tGLMStop - tGLMStart) << endl;
   }
 }
 

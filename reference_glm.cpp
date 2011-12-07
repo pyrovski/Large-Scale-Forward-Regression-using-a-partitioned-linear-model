@@ -146,16 +146,14 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
 }
 
 //! @todo convert for gpu?  This one will be hard.
-void compPrepare(unsigned id, unsigned iteration, 
-		 //FortranMatrix &X, 
+void compPrepareCPU(unsigned id, unsigned iteration, 
+		 FortranMatrix &Xt, 
 		 FortranMatrix &fixed, 
 		 unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, 
 		 vector<double> &y, FortranMatrix &U, vector<double> &S, 
 		 FortranMatrix &Vt, unsigned &rX, vector<double> &beta, 
 		 unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, 
-		 GLMData &glm_data, unsigned &geno_ind, uint64_t &mySNPs, 
-		 const unsigned &m, FortranMatrix &geno, FortranMatrix &XtSNP, 
-		 vector<double> &SNPty, vector<double> &SNPtSNP){
+		 GLMData &glm_data, unsigned &geno_ind){
 
   FortranMatrix X(geno_ind/*4892*/, n/*27*/);
 
@@ -219,7 +217,6 @@ void compPrepare(unsigned id, unsigned iteration,
   // Initialize SVD components, A = U * S * V^T
   Xty = matvec(X, y, /*transX=*/true);
   
-  //! @todo this is altering XtX
   // Create the SVD of X^T * X 
   svd_create(XtX, U, S, Vt);
 
@@ -300,6 +297,14 @@ void compPrepare(unsigned id, unsigned iteration,
   
   glm_data.V2 = geno_ind - rX;
 
+}
+
+void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y, 
+		    double *d_XtSNP, double *d_SNPty, double *d_SNPtSNP,
+		    const unsigned n, const uint64_t mySNPs, 
+		    const unsigned geno_ind, 
+		    const size_t d_XtPitch, const size_t d_genoPitch, 
+		    const size_t d_XtSNPPitch){
   
     // compute Xt * SNP    
 
@@ -309,6 +314,8 @@ void compPrepare(unsigned id, unsigned iteration,
       @todo XtSNP could be computed as the geno data is read 
       from disk
      */
+  //! @todo this is easy on GPU
+  /*
   cblas_dgemm(CblasColMajor,
 	      CblasTrans,
 	      CblasNoTrans,
@@ -317,9 +324,9 @@ void compPrepare(unsigned id, unsigned iteration,
 	      geno_ind,
 	      1.0,
 	      &X.values[0],
-	      m, 
+	      geno_ind, 
 	      &geno.values[0],
-	      m,
+	      geno_ind,
 	      0.0,
 	      &XtSNP.values[0],
 	      n
@@ -333,16 +340,15 @@ void compPrepare(unsigned id, unsigned iteration,
 #endif
 
   //SNPty[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
-  /*! @todo SNPty could also be computed as the geno data is read 
-    from disk
-   */
+  //! @todo SNPty could also be computed as the geno data is read from disk
+  //! @todo this is easy on GPU
   cblas_dgemv(CblasColMajor,
 	      CblasTrans,
-	      m,
+	      geno_ind,
 	      mySNPs,
 	      1.0,
 	      &geno.values[0],
-	      m,
+	      geno_ind,
 	      &y[0],
 	      1,
 	      0.0,
@@ -350,8 +356,8 @@ void compPrepare(unsigned id, unsigned iteration,
 	      1
 	      );
 
-  /*! @todo SNPtSNP could be computed as the geno data is read from disk
-   */
+  //! @todo SNPtSNP could be computed as the geno data is read from disk
+  //! @todo this is easy on GPU
   for (uint64_t i=0; i<mySNPs; ++i){
     //! these will never change for each SNP
     SNPtSNP[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
@@ -369,16 +375,18 @@ void compPrepare(unsigned id, unsigned iteration,
     writeD(ss.str(), SNPtSNP);
   }
 #endif
-
-
+  */
 }
 
+//! @todo fix for GPU
 void compUpdate(unsigned id, unsigned iteration, 
 		//FortranMatrix &X, 
-		FortranMatrix &XtXi, FortranMatrix &XtSNP, 
+		FortranMatrix &XtXi, 
+		double *d_XtSNP, const size_t d_XtSNPPitch,
 		const double &yty,
 		vector<double> &Xty, const unsigned &rX, GLMData &glm_data,
-		const unsigned &n, const uint64_t &mySNPs, const unsigned &m, 
+		const unsigned &n, const uint64_t &mySNPs, 
+		const unsigned &geno_ind, 
 		FortranMatrix &geno,
 		const double *nextSNP,
 		const double *nextXtSNP,
@@ -414,10 +422,11 @@ void compUpdate(unsigned id, unsigned iteration,
   gettimeofday(&tResizeStop, 0);
 
   cblas_dgemv(CblasColMajor, CblasTrans, 
-	      m, mySNPs,
+	      geno_ind,
+	      mySNPs,
 	      1.0, 
 	      &geno.values[0],
-	      m,
+	      geno_ind,
 	      nextSNP,
 	      1,
 	      0,
@@ -508,7 +517,6 @@ int main(int argc, char **argv)
     geno_ind; //rows 
   uint64_t geno_count; // columns of the geno array
 
-  bool CPUOnly = false;
   int optIndex;
   struct option options[4] = {{"num_fixed", required_argument, 0, 'n'},
 			      {"num_geno", required_argument, 0, 'm'},
@@ -539,7 +547,7 @@ int main(int argc, char **argv)
       entry_limit = atof(optarg);
       break;
     case 'c':
-      CPUOnly = true;
+      cout << "CPU only mode not supported in this version" << endl;
       break;
     case 'f':
       fixed_filename = optarg;
@@ -584,13 +592,13 @@ int main(int argc, char **argv)
   }
   if((fixed_filename == "") ^ (!fixed_count)){
     if(!id)
-      printf("must supply both -f and --num_fixed, or neither\n");
+      fprintf(stderr, "must supply both -f and --num_fixed, or neither\n");
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
   if(iterationLimit + fixed_count > fixedPlusIteration_limit){
     if(!id)
-      printf("number of iterations plus number of fixed effects must be \n"
+      fprintf(stderr, "number of iterations plus number of fixed effects must be \n"
 	     "less than %d\n", fixedPlusIteration_limit);
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
@@ -600,8 +608,6 @@ int main(int argc, char **argv)
 
   // global timing
   timeval tGlobalStart, tGlobalStop;
-
-  const unsigned m = geno_ind;
 
   uint64_t totalSize = geno_count * geno_ind * sizeof(double);
   uint64_t perRankSNPs = adjust(geno_count, numProcs);
@@ -668,6 +674,7 @@ int main(int argc, char **argv)
   // column (which changes) is the i'th column of the geno array.
   unsigned n = fixed_count + 1;
 
+  FortranMatrix Xt(n, geno_ind);
   //! have to set size here; constructor for return value doesn't work in matmat
   FortranMatrix XtX(n, n);
   vector<double> S;
@@ -679,17 +686,41 @@ int main(int argc, char **argv)
   unsigned rX;
   double tol;
   double yty;
-  vector<double> SNPtSNP(mySNPs), SNPty(mySNPs);
-  FortranMatrix XtSNP(n, mySNPs);
   
   // Begin timing the computations
   gettimeofday(&tstart, NULL);
 
-//! @todo convert for gpu?
-  compPrepare(id, 0, fixed, fixed_count, XtX, Xty, y, U, S, Vt, rX, 
+//! @todo convert for gpu
+  compPrepareCPU(id, 0, Xt, fixed, fixed_count, XtX, Xty, y, U, S, Vt, rX, 
 	      beta, n, tol, XtXi, 
-	      yty, glm_data, geno_ind, mySNPs, m, geno, XtSNP, SNPty, 
-	      SNPtSNP);
+	      yty, glm_data, geno_ind);
+
+  double *d_SNPtSNP, *d_XtSNP, *d_SNPty, *d_geno, *d_Xt, *d_y;
+  float *d_f;
+  //! @todo could use d_f also as a mask
+  char *d_SNPMask;
+  // column-major with padding
+  size_t d_XtSNPPitch, d_genoPitch, d_XtPitch, d_SNPtSNPPitch;
+
+  /*!
+    allocate SNPtSNP, XtSNP
+    X, G, geno, y on GPU
+    copy X, G, geno, y to GPU,
+   */
+  copyToDevice(id, verbosity, mySNPs, n, geno_ind, d_SNPtSNP, d_XtSNP, 
+	       d_XtSNPPitch, d_SNPty, d_SNPMask, d_f, d_geno, d_genoPitch,
+	       d_Xt, d_XtPitch, d_y,
+	       Xty, XtXi, Xt, geno);
+
+  /*!
+    compute XtSNP, SNPty, SNPtSNP on GPU
+   */
+  compPrepareGPU(d_Xt, d_geno, d_y, 
+		 d_XtSNP, d_SNPty, d_SNPtSNP,
+		 n, mySNPs, 
+		 geno_ind, 
+		 d_XtPitch, d_genoPitch, 
+		 d_XtSNPPitch);
 
   gettimeofday(&tstop, NULL);
   
@@ -697,42 +728,34 @@ int main(int argc, char **argv)
     cout << "id " << id 
 	 << " computation prep time: "
 	 << tvDouble(tstop - tstart) << " s" << endl;
-  
-  double *d_snptsnp, *d_Xtsnp, *d_snpty;
-  float *d_f;
-  //! @todo could use d_f also as a mask
-  char *d_snpMask;
-  vector<char> snpMask(mySNPs, 0);
-  // column-major with padding
-  size_t d_XtsnpPitch;
-  
-  if(!CPUOnly){
-    gettimeofday(&tstart, NULL);
-    //! @todo convert for gpu
-    int copyStatus = 
-      copyToDevice(id, verbosity,
-		   mySNPs, n,
-		   d_snptsnp, d_Xtsnp, d_XtsnpPitch, d_snpty, d_snpMask, d_f,
-		   SNPtSNP, XtSNP, 
-		   SNPty, Xty, XtXi, snpMask);
-    gettimeofday(&tstop, NULL);
-  
-    if(copyStatus){
-      cerr << "id " << id << " copyToDevice failed." << endl;
-      MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-
-    GPUCopyTime = tvDouble(tstop - tstart);
-  
-    if(verbosity > 0){
-      cout << "id " << id 
-	   << " GPU copy time: "
-	   << GPUCopyTime << " s" << endl;
-      cout << "GPU copy time per SNP: " << GPUCopyTime / mySNPs 
-	   << " s" << endl;
-    }
     
+  gettimeofday(&tstart, NULL);
+  //! @todo convert for gpu
+  /*
+  int copyStatus = 
+    copyToDevice(id, verbosity,
+		 mySNPs, n,
+		 d_SNPtSNP, d_XtSNP, d_XtSNPPitch, d_SNPty, d_SNPMask, d_f,
+		 SNPtSNP, XtSNP, 
+		 SNPty, Xty, XtXi, SNPMask);
+  gettimeofday(&tstop, NULL);
+  
+  if(copyStatus){
+    cerr << "id " << id << " copyToDevice failed." << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
   }
+
+  GPUCopyTime = tvDouble(tstop - tstart);
+  
+  if(verbosity > 0){
+    cout << "id " << id 
+	 << " GPU copy time: "
+	 << GPUCopyTime << " s" << endl;
+    cout << "GPU copy time per SNP: " << GPUCopyTime / mySNPs 
+	 << " s" << endl;
+  }
+  */
+
   // For each column of the geno array, set up the "X" matrix,
   // call the GLM routine, and store the computed p value.  Note
   // we are assuming y is a vector for now (because GLM currently expects
@@ -767,60 +790,47 @@ int main(int argc, char **argv)
 
     float globalMaxF;
 
-    if(!CPUOnly){
-      // ~3.5 us per SNP on Longhorn (FX5800)
-      try{
-	localMaxFIndex = plm_GPU(mySNPs, n, 
-				 m ,        
-				 d_snptsnp, 
-				 d_Xtsnp, 
-				 d_XtsnpPitch, 
-				 glm_data.ErrorSS, glm_data.V2, 
-				 d_snpty, 
-				 d_snpMask,
-				 d_f,
-				 Fval);
-      } catch(int e){
-	MPI_Abort(MPI_COMM_WORLD, e);
-      }
-      GPUCompTime = getGPUCompTime();
+    // ~3.5 us per SNP on Longhorn (FX5800)
+    try{
+      localMaxFIndex = plm_GPU(mySNPs, n, 
+			       geno_ind ,        
+			       d_SNPtSNP, 
+			       d_XtSNP, 
+			       d_XtSNPPitch, 
+			       glm_data.ErrorSS, glm_data.V2, 
+			       d_SNPty, 
+			       d_SNPMask,
+			       d_f,
+			       Fval);
+    } catch(int e){
+      MPI_Abort(MPI_COMM_WORLD, e);
+    }
+    GPUCompTime = getGPUCompTime();
     
-      // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
-      // if V1 = 0, ignore; F is undefined
-      getMaxFGPU(id, iteration, mySNPs, Fval, localMaxFIndex, d_f);
-      GPUMaxTime = getGPUMaxTime();
-      if(verbosity > 1){
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU computation time: "
-	     << GPUCompTime << " s" << endl;
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU computation time per SNP: "
-	     << GPUCompTime / mySNPs 
-	     << " s" << endl;
+    // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
+    // if V1 = 0, ignore; F is undefined
+    getMaxFGPU(id, iteration, mySNPs, Fval, localMaxFIndex, d_f);
+    GPUMaxTime = getGPUMaxTime();
+    if(verbosity > 1){
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " GPU computation time: "
+	   << GPUCompTime << " s" << endl;
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " GPU computation time per SNP: "
+	   << GPUCompTime / mySNPs 
+	   << " s" << endl;
 	
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU reduction time: "
-	     << GPUMaxTime << " s" << endl;
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU reduction time per SNP: "
-	     << GPUMaxTime / mySNPs 
-	     << " s" << endl;
-      }
-    } else { // CPUOnly == 1
-      // call CPU plm, get max F & index
-      for(uint64_t i = 0; i < mySNPs; i++){
-	if(!snpMask[i])
-	  plm(XtXi, &XtSNP(0, i), SNPtSNP[i], SNPty[i], yty, Xty, rX, &Fval[i], 
-	      glm_data.ErrorSS, glm_data.V2);
-	else{
-	  Fval[i] = 0.0;
-	}
-      }
-      localMaxFIndex = cblas_isamax(mySNPs, &Fval[0], 1);
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " GPU reduction time: "
+	   << GPUMaxTime << " s" << endl;
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " GPU reduction time per SNP: "
+	   << GPUMaxTime / mySNPs 
+	   << " s" << endl;
     }
     
     {
@@ -884,11 +894,11 @@ int main(int argc, char **argv)
     if(id == globalMinRankMaxF){
       // I have the max F value
       // send SNP which yielded max F value
+      //! @todo fix for GPU
       nextSNP = &geno(0, localMaxFIndex);
       nextXtSNP = &XtSNP(0, localMaxFIndex);
       nextSNPty = SNPty[localMaxFIndex];
       nextSNPtSNP = SNPtSNP[localMaxFIndex];
-      snpMask[localMaxFIndex] = 1;
 #ifdef _DEBUG
       cout << "iteration " << iteration << " id " << id 
 	   << " masking index " << localMaxFIndex << endl;
@@ -947,7 +957,7 @@ int main(int argc, char **argv)
     /*! update 
       - Xty, (done)
       - geno, (done)
-      - Xtsnp: matrix update from n x geno_count to n+1 x geno_count,
+      - XtSNP: matrix update from n x geno_count to n+1 x geno_count,
       - consists of appending (chosen SNP)' * geno = a new row
       - glm_data.ErrorSS, (done)
       - glm_data.V2, (done)
@@ -958,7 +968,9 @@ int main(int argc, char **argv)
 
 //! @todo convert for gpu
     gettimeofday(&tstart, NULL);
-    compUpdate(id, iteration, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, m, 
+    compUpdate(id, iteration, XtXi, d_XtSNP, d_XtSNPPitch, yty, Xty, rX, 
+	       glm_data, n, mySNPs, 
+	       geno_ind, 
 	       geno, 
 	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty);
     gettimeofday(&tstop, NULL);
@@ -971,29 +983,28 @@ int main(int argc, char **argv)
 	   << CPUCompUpdateTime << " s" << endl;
     }
 
-    if(!CPUOnly){
-      gettimeofday(&tstart, NULL);
-      //! @todo convert for gpu
-      copyUpdateToDevice(id, iteration, mySNPs, n, d_snpMask, localMaxFIndex, 
-			 d_Xtsnp, d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);
-      gettimeofday(&tstop, NULL);
-      GPUCopyUpdateTime = tvDouble(tstop - tstart);
-
-      if(verbosity > 1){	
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU copy update time: "
-	     << GPUCopyUpdateTime << " s" << endl;
-      }
+    gettimeofday(&tstart, NULL);
+    //! @todo convert for gpu
+    copyUpdateToDevice(id, iteration, mySNPs, n, d_SNPMask, localMaxFIndex, 
+		       d_XtSNP, d_XtSNPPitch, XtXi, Xty);
+    gettimeofday(&tstop, NULL);
+    GPUCopyUpdateTime = tvDouble(tstop - tstart);
+    
+    if(verbosity > 1){	
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " GPU copy update time: "
+	   << GPUCopyUpdateTime << " s" << endl;
     }
-      
+    
     n++;
     iteration++;
   } // while(1)
-
+  
   // reduce chosenSNPs to rank 0
   chosenSNPsReduced.resize(iteration);
-  MPI_Reduce(&chosenSNPs[0], &chosenSNPsReduced[0], iteration, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&chosenSNPs[0], &chosenSNPsReduced[0], iteration, MPI_INT, MPI_MAX, 
+	     0, MPI_COMM_WORLD);
 
   if(iteration >= iterationLimit){
     if(!id)

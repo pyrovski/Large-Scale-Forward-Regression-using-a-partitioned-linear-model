@@ -448,7 +448,7 @@ void compUpdate(unsigned id, unsigned iteration,
   }
 }
 
-void write(const char *filename, const vector<unsigned> &list){
+template <class T> void write(const char *filename, const vector<T> &list){
   std::fstream file;
   file.open(filename, std::fstream::out);
   if(file.fail()){
@@ -485,7 +485,7 @@ void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop,
 }
 
 void printUsage(char *name){
-  cout << "usage: " << name << " [-f <fixed effects file> --num_fixed <number of fixed effects>] -g <SNP data file> --num_geno <number of SNPs> -r <residuals file> --num_r <number of residuals> [-c] [-v<verbosity level>] [-e SNP entry limit]" 
+  cout << "usage: " << name << " [-f <fixed effects file> --num_fixed <number of fixed effects>] -g <SNP data file> --num_geno <number of SNPs> -r <residuals file> --num_r <number of residuals> [-c] [-v<verbosity level>] [-e SNP entry limit] [-l <max # of iterations>]" 
        << endl 
        << "where <input file> contains run-time settings" << endl;
 }
@@ -656,8 +656,8 @@ int main(int argc, char **argv)
   vector<double> Pval(iterationLimit); 
 
   // global indices of chosen SNPs from each iteration
-  vector<unsigned> chosenSNPs(iterationLimit);
-  vector<unsigned> chosenSNPsReduced(iterationLimit);
+  vector<int> chosenSNPs(iterationLimit);
+  vector<int> chosenSNPsReduced(iterationLimit);
 
   // An array to hold the results of the GLM calculations
   vector<float> Fval(mySNPs);
@@ -854,11 +854,10 @@ int main(int argc, char **argv)
 	
 	Pval.resize(iteration);
 	chosenSNPs.resize(iteration);
-	chosenSNPsReduced.resize(iteration);
       }
       break;
     }
-
+      
     gettimeofday(&tstart, NULL);
     // determine a unique rank holding the max F value
     int globalMinRankMaxF;
@@ -897,6 +896,12 @@ int main(int argc, char **argv)
       nextSNP = &incomingSNP[0];
       nextXtSNP = &incomingXtSNP[0];
       localMaxFIndex = -1;
+      chosenSNPs[iteration] = -1;
+    }
+
+    if(iteration + 1 >= iterationLimit){
+      iteration++;
+      break;
     }
 
     /*
@@ -980,6 +985,11 @@ int main(int argc, char **argv)
     n++;
     iteration++;
   } // while(1)
+
+  // reduce chosenSNPs to rank 0
+  chosenSNPsReduced.resize(iteration);
+  MPI_Reduce(&chosenSNPs[0], &chosenSNPsReduced[0], iteration, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+
   if(iteration >= iterationLimit){
     if(!id)
       cout << "iteration limit (" << iterationLimit << ") reached" << endl;
@@ -1000,7 +1010,7 @@ int main(int argc, char **argv)
 
   if(!id){
     write("Pval.dat", Pval);
-    //write("Pindices.dat", chosenSNPs);
+    write("Pindices.dat", chosenSNPsReduced);
     cout << "iterations: " << iteration << endl;
   }
   

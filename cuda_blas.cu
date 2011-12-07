@@ -41,26 +41,8 @@ __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
       reduce[0] += reduce[i];
   }
   */
-  ///*
   unsigned threads;
   while(N/2){
-    /*
-    if(N % 2){
-      threads = (N + 1) / 2;
-      //if(TID == threads - 1)
-      //reduce[TID + threads] = 0;
-      //! @todo can remove this condition test if threads <= 64, 
-      //as it doesn't affect the result or save time,
-      //assuming shared size is 2*threads
-
-      if(TID < threads - 1) 
-	reduce[TID] += reduce[TID + threads];
-    } else {
-      threads = N / 2;
-      if(TID < threads)
-	reduce[TID] += reduce[TID + threads];
-    }
-    */
     threads = (N + 1) / 2;
     if(TID < threads - (N % 2))
       reduce[TID] += reduce[TID + threads];
@@ -68,7 +50,6 @@ __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
     __syncthreads();
     N = threads;
   }
-  //*/
 }
 
 /*
@@ -111,7 +92,7 @@ __device__ void dotGG(const unsigned TID,
 }
 
 /*
-  A is in constant memory.  A must be column-major and square.
+  A is in constant memory.  A must be column-major and square (NxN).
  */
 __device__ double vecRMatCSq(const unsigned TID,
 			  const double x,
@@ -119,11 +100,14 @@ __device__ double vecRMatCSq(const unsigned TID,
 			  const double *A, 
 			  const unsigned lda,
 			  double *reduce){
-  double retVal;
+  double retVal = 0.0;
   for(int i = 0; i < N; i++){
+    /*
     dotRG(TID, N, x, A + lda * i, reduce);
     if(i == TID)
       retVal = *reduce;
+    */
+    retVal += x * A[lda * i + TID];
   }
   return retVal;
 }

@@ -66,6 +66,7 @@ __device__ void dotRR(const unsigned TID,
 
   // compute dot product terms
   // place x*y in shared memory (reduce)
+  __syncthreads();
   reduce[TID] = x * y;
   __syncthreads();
   reduceCore(TID, N, reduce);
@@ -76,6 +77,7 @@ __device__ void dotRG(const unsigned TID,
 		      const double x,
 		      const double *y,
 		      double *reduce){ // assume blockDim.x elements
+  __syncthreads();
   reduce[TID] = x * y[TID];
   __syncthreads();
   reduceCore(TID, N, reduce);
@@ -86,6 +88,7 @@ __device__ void dotGG(const unsigned TID,
 		      const double *x,
 		      const double *y,
 		      double *reduce){ // assume blockDim.x elements
+  __syncthreads();
   reduce[TID] = x[TID] * y[TID];
   __syncthreads();
   reduceCore(TID, N, reduce);
@@ -95,12 +98,14 @@ __device__ void dotGG(const unsigned TID,
   A is in constant memory.  A must be column-major and square (NxN).
  */
 __device__ double vecRMatCSq(const unsigned TID,
+			     const unsigned BID,
 			  const double x,
 			  const unsigned N,
 			  const double *A, 
 			  const unsigned lda,
 			  double *reduce){
   double retVal = 0.0;
+  __syncthreads();
   reduce[TID] = x;
   __syncthreads();
   /*
@@ -111,8 +116,15 @@ __device__ double vecRMatCSq(const unsigned TID,
   }
   retVal += x * A[lda * TID + TID];
   */
-  for(int i = 0; i < N; i++)
+  for(int i = 0; i < N; i++){
     retVal += reduce[i] * A[lda * TID + i];
+    #ifdef printGPU
+    if(printBIDs(BID)){
+      if(!TID)
+	printf("b%03u\tt%03u\tmultiplying:\t%1.10le\t*\t%1.10le:\t%1.10le,\tsum:%1.10le\n", BID, TID, reduce[i], A[lda * TID + i], reduce[i] * A[lda * TID + i], retVal);
+    }
+    #endif
+  }
   return retVal;
 }
 

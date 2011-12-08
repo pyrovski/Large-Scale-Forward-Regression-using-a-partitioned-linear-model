@@ -83,7 +83,7 @@ __global__ void plm(// inputs
   //#error fixme double read
   double myXtsnp = *(Xtsnp + BID * XtsnpPitchInWords + TID);
   // GtXtsnp
-  GtXtsnp = vecRMatCSq(TID, myXtsnp, blockDim.x, d_G, 
+  GtXtsnp = vecRMatCSq(TID, BID, myXtsnp, blockDim.x, d_G, 
 		     blockDim.x,  //! length of column plus padding (no padding)
 		     reduce); 
   

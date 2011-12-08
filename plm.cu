@@ -95,6 +95,8 @@ __global__ void plm(// inputs
     for(int i = 0; i < blockDim.x; i++){
       if(i == TID){
 	printf("b%03u\tt%03u\tXtsnp: %1.10le\n", BID, TID, Xtsnp[BID * XtsnpPitch/sizeof(double) + TID]);
+	for(int j = 0; j < blockDim.x; j++)
+	  printf("b%03u\tt%03u\tG[%d,%d]: %1.10le\n", BID, TID, i, j, d_G[i*blockDim.x + j]);
 	printf("b%03u\tt%03u\tGtXtsnp: %1.10le\n", BID, TID, GtXtsnp);
 	if(!TID){
 	  printf("b%03u\tt%03u\tsnptsnp: %1.10le\n", BID, TID, snptsnp[BID]);

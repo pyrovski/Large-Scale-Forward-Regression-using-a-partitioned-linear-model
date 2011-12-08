@@ -104,6 +104,7 @@ __global__ void plm(// inputs
 	  printf("b%03u\tt%03u\ts: %1.10le\n", BID, TID, s);
 	}
       }
+      __syncthreads();
     }
   }
 #endif
@@ -123,6 +124,7 @@ __global__ void plm(// inputs
 	    printf("b%03u\tt%03u\tsnptXGXty: %1.10le\n", BID, TID, snptmy);
 	    printf("b%03u\tt%03u\tsnpty: %1.10le\n", BID, TID, snpty[BID]);
 	  }
+	  __syncthreads();
 	}
       }
 #endif
@@ -144,6 +146,7 @@ __global__ void plm(// inputs
 	printf("b%03u\tt%03u\tnew V2: %u\n", BID, TID, V2);
 	printf("b%03u\tt%03u\tf: %1.10le\n", BID, TID, f[BID]);
       }
+      __syncthreads();
     }
   }
 #endif

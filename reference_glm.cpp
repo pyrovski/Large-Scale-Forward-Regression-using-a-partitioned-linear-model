@@ -809,6 +809,7 @@ int main(int argc, char **argv)
       }
     } else { // CPUOnly == 1
       // call CPU plm, get max F & index
+      gettimeofday(&tstart, 0);
       for(uint64_t i = 0; i < mySNPs; i++){
 	if(!snpMask[i])
 	  plm(XtXi, &XtSNP(0, i), SNPtSNP[i], SNPty[i], yty, Xty, rX, &Fval[i], 
@@ -817,7 +818,33 @@ int main(int argc, char **argv)
 	  Fval[i] = 0.0;
 	}
       }
+      gettimeofday(&tstop, 0);
+      double CPUCompTime = tvDouble(tstop - tstart);
       localMaxFIndex = cblas_isamax(mySNPs, &Fval[0], 1);
+      gettimeofday(&tstart, 0);
+      double CPUMaxTime = tvDouble(tstart - tstop);
+      if(verbosity > 1){
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " CPU computation time: "
+	     << CPUCompTime << " s" << endl;
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " CPU computation time per SNP: "
+	     << CPUCompTime / mySNPs 
+	     << " s" << endl;
+	
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " CPU reduction time: "
+	     << CPUMaxTime << " s" << endl;
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " CPU reduction time per SNP: "
+	     << CPUMaxTime / mySNPs 
+	     << " s" << endl;
+
+      }
     }
     
     {

@@ -116,15 +116,8 @@ __device__ double vecRMatCSq(const unsigned TID,
   }
   retVal += x * A[lda * TID + TID];
   */
-  for(int i = 0; i < N; i++){
-    retVal += reduce[i] * A[lda * TID + i];
-    #ifdef printGPU
-    if(printBIDs(BID)){
-      if(!TID)
-	printf("b%03u\tt%03u\tmultiplying:\t%1.10le\t*\t%1.10le:\t%1.10le,\tsum:%1.10le\n", BID, TID, reduce[i], A[lda * TID + i], reduce[i] * A[lda * TID + i], retVal);
-    }
-    #endif
-  }
+  for(int i = 0; i < N; i++)
+    retVal += reduce[i] * A[lda * i + TID];
   return retVal;
 }
 

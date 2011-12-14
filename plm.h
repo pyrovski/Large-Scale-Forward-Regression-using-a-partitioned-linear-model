@@ -46,3 +46,10 @@ float getGPUMaxTime();
 void getMaxFGPU(unsigned id, unsigned iteration, unsigned geno_count, 
 	     std::vector<float> &Fval, 
 	     unsigned maxFIndex, float *d_f);
+
+// defined in cuda_blas.cu:
+void columnDot_gpu(const double *d_mat, unsigned n_rows, uint64_t n_cols, 
+		   unsigned columnPitchInWords, // words between tops of columns
+		   double *d_result, 
+		   unsigned resultStrideInWords // words between result elements
+		   );

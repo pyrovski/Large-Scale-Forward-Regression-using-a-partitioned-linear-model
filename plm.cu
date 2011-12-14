@@ -20,6 +20,30 @@ __device__ int printBIDs(unsigned BID){
   return(BID == 0 || BID == 40);
 }
 
+void initGrid(dim3 &grid, unsigned geno_count) throw(int){
+  static unsigned old_geno_count = 0;
+  static dim3 oldGrid;
+  if(old_geno_count == geno_count){
+    grid = oldGrid;
+    return;
+  }
+  grid.x = geno_count;
+  grid.y = 1;
+  grid.z = 1;
+  while(grid.x > 65535){
+    grid.x += grid.x % 2;
+    grid.x /= 2;
+    grid.y *= 2;
+  }
+  // could probably do a better job factoring here; instead bail
+  if(grid.y > 65535)
+    throw(2);
+  oldGrid = grid;
+#ifdef _DEBUG
+  cout << "grid: " << grid.x << "x" << grid.y << endl;
+#endif
+}
+
 #include "cuda_blas.cu"
 
 using namespace std;
@@ -144,30 +168,6 @@ __global__ void plm(// inputs
 }
 
 cudaEvent_t start, stopKernel, stopMax;
-
-void initGrid(dim3 &grid, unsigned geno_count) throw(int){
-  static unsigned old_geno_count = 0;
-  static dim3 oldGrid;
-  if(old_geno_count == geno_count){
-    grid = oldGrid;
-    return;
-  }
-  grid.x = geno_count;
-  grid.y = 1;
-  grid.z = 1;
-  while(grid.x > 65535){
-    grid.x += grid.x % 2;
-    grid.x /= 2;
-    grid.y *= 2;
-  }
-  // could probably do a better job factoring here; instead bail
-  if(grid.y > 65535)
-    throw(2);
-  oldGrid = grid;
-#ifdef _DEBUG
-  cout << "grid: " << grid.x << "x" << grid.y << endl;
-#endif
-}
 
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
 		 unsigned m, double* d_snptsnp, double* d_Xtsnp, 

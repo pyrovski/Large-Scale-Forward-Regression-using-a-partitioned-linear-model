@@ -25,6 +25,8 @@
 extern "C"{
 #include <cblas.h>
 }
+#include <cublas.h>
+
 // Local project includes
 #include "fortran_matrix.h"
 #include "glm.h"
@@ -310,12 +312,12 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
 
     //! @todo fix XtSNP lda for incremental computation
     /*! XtSNP is computed incrementally between major iterations.
-      The initial computation requires more time, though, and
+      The initial computation requires more time, though
       @todo XtSNP could be computed as the geno data is read 
       from disk
      */
   //! @todo this is easy on GPU
-  /*
+  /* X, geno, XtSNP on GPU
   cblas_dgemm(CblasColMajor,
 	      CblasTrans,
 	      CblasNoTrans,
@@ -331,6 +333,22 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
 	      &XtSNP.values[0],
 	      n
 	      );
+  */
+  cublasDgemm('n',
+	      'n',
+	      n,
+	      mySNPs,
+	      geno_ind,
+	      1.0,
+	      d_Xt,
+	      d_XtPitch / sizeof(double),
+	      d_geno,
+	      d_genoPitch / sizeof(double),
+	      0.0,
+	      d_XtSNP,
+	      d_XtSNPPitch / sizeof(double)
+	      );
+
 #ifdef _DEBUG
   {
     stringstream ss;
@@ -342,6 +360,7 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
   //SNPty[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
   //! @todo SNPty could also be computed as the geno data is read from disk
   //! @todo this is easy on GPU
+  /* geno, y, SNPty on GPU
   cblas_dgemv(CblasColMajor,
 	      CblasTrans,
 	      geno_ind,
@@ -355,14 +374,37 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
 	      &SNPty[0],
 	      1
 	      );
+  */
+  cublasDgemv('n',
+	      geno_ind,
+	      mySNPs,
+	      1.0,
+	      d_geno,
+	      d_genoPitch / sizeof(double),
+	      d_y,
+	      1,
+	      0.0,
+	      d_SNPty,
+	      1
+	      );
 
   //! @todo SNPtSNP could be computed as the geno data is read from disk
-  //! @todo this is easy on GPU
+  /*! @todo this is easy on GPU; it is better to issue a single kernel for this,
+    rather than issue a bunch of cublasDdot()s, at least on cards without 
+    simultaneous kernel execution
+    geno on GPU
+  */
+  /*
   for (uint64_t i=0; i<mySNPs; ++i){
     //! these will never change for each SNP
     SNPtSNP[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
 				&geno.values[i*geno_ind], 1);
   }
+  */
+  columnDot_gpu(d_geno, geno_ind, mySNPs, d_genoPitch / sizeof(double), 
+    d_SNPtSNP, 1);
+
+  /*
 #ifdef _DEBUG
   {
     stringstream ss;
@@ -418,6 +460,10 @@ void compUpdate(unsigned id, unsigned iteration,
     }
 #endif
 
+  /*! @todo convert for gpu
+    geno, XtSNP will be on GPU, nextSNP needs to be copied to GPU
+   */
+  
   cblas_dgemv(CblasColMajor, CblasTrans, 
 	      geno_ind,
 	      mySNPs,

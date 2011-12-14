@@ -134,13 +134,7 @@ __device__ double vecRMatCSq(const unsigned TID,
 			  const double *A, 
 			  const unsigned lda,
 			  double *reduce){
-  double retVal;
-  for(int i = 0; i < N; i++){
-    dotRG(TID, N, x, A + lda * i, reduce);
-    if(i == TID)
-      retVal = *reduce;
-  }
-  return retVal;
+#error merge changes from master branch
 }
 
 /*

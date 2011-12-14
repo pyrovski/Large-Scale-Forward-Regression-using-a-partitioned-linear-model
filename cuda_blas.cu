@@ -8,7 +8,7 @@ extern __shared__ double shared[];
 #endif
 
 template <unsigned blockSize> __device__ 
-void warpReduce(unsigned TID, volatile double *reduce){
+void warpReduce(const unsigned TID, volatile double *reduce){
   // warp-synchronous, with max 32 threads!
   if(blockSize >= 64) reduce[TID] += reduce[TID + 32];
   if(blockSize >= 32) reduce[TID] += reduce[TID + 16];
@@ -18,11 +18,12 @@ void warpReduce(unsigned TID, volatile double *reduce){
   if(blockSize >= 2)  reduce[TID] += reduce[TID + 1];
 }
 
-template <unsigned blockSize> __device__ void reduceCorePow2(const unsigned TID, double *reduce){
+template <unsigned blockSize> 
+__device__ void reduceCorePow2(const unsigned TID, double *reduce){
   if(blockSize == 512){if(TID < 256){reduce[TID] += reduce[TID + 256];} __syncthreads();}
   if(blockSize >= 256){if(TID < 128){reduce[TID] += reduce[TID + 128];} __syncthreads();}
   if(blockSize >= 127){if(TID < 64) {reduce[TID] += reduce[TID +  64];} __syncthreads();}
-  if(TID < 32) warpReduce(TID, reduce);
+  if(TID < 32) warpReduce<blockSize>(TID, reduce);
 }
 
 /*
@@ -241,12 +242,13 @@ columnDot___(const double *d_mat, unsigned n_rows, uint64_t n_cols,
   Compute the dot product of each column with itself.
   Matrix is stored in column-major order.
  */
-__global__ template<unsigned blockSize> void 
+template<unsigned blockSize> __global__ void 
 columnDot(const double *d_mat, unsigned n_rows, unsigned n_cols, 
 	  unsigned columnPitchInWords, // words between tops of columns
 	  double *result, 
 	  unsigned resultStrideInWords // words between result elements
 	  ){
+  __shared__ double myShared[blockSize];
   const unsigned BID = blockIdx.x + gridDim.x * blockIdx.y;
   const unsigned TID = threadIdx.x;
   
@@ -262,11 +264,11 @@ columnDot(const double *d_mat, unsigned n_rows, unsigned n_cols,
     myResult += tmp * tmp;
   }
 
-  shared[TID] = myResult;
+  myShared[TID] = myResult;
   __syncthreads();
-  reduceCorePow2<blockSize>(TID, blockSize, shared);
+  reduceCorePow2<blockSize>(TID, myShared);
   if(!TID)
-    result[BID * resultStrideInWords] = shared[0];
+    result[BID * resultStrideInWords] = myShared[0];
 }
 
 void columnDot_gpu(const double *d_mat, unsigned n_rows, uint64_t n_cols, 
@@ -279,10 +281,10 @@ void columnDot_gpu(const double *d_mat, unsigned n_rows, uint64_t n_cols,
   const unsigned blockSize = 256;
 
   if(blockSize <= 32 || blockSize > 512){
-    cerr << "invalid blockSize:" << blockSize << endl;
+    std::cerr << "invalid blockSize:" << blockSize << std::endl;
     exit(1);
   }
   columnDot<blockSize>
-    <<<grid, blockSize, blockSize * sizeof(double)>>>
+    <<<grid, blockSize>>>
     (d_mat, n_rows, n_cols, columnPitchInWords, d_result, resultStrideInWords);
 }

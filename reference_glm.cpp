@@ -26,6 +26,8 @@ extern "C"{
 #include <cblas.h>
 }
 #include <cublas.h>
+#include <cuda.h>
+#include <cutil_inline.h>
 
 // Local project includes
 #include "fortran_matrix.h"
@@ -429,11 +431,13 @@ void compUpdate(unsigned id, unsigned iteration,
 		vector<double> &Xty, const unsigned &rX, GLMData &glm_data,
 		const unsigned &n, const uint64_t &mySNPs, 
 		const unsigned &geno_ind, 
-		FortranMatrix &geno,
+		const double *d_geno,
+		const unsigned d_genoPitch,
 		const double *nextSNP,
 		const double *nextXtSNP,
 		const double &nextSNPtSNP, 
-		const double &nextSNPty){
+		const double &nextSNPty,
+		double *d_nextSNP){
 
   timeval tGLMStart, tGLMStop;
   
@@ -460,10 +464,9 @@ void compUpdate(unsigned id, unsigned iteration,
     }
 #endif
 
+  // actually compute (geno^t * nextSNP)^t, rather than (updated X^t) * geno
   /*! @todo convert for gpu
     geno, XtSNP will be on GPU, nextSNP needs to be copied to GPU
-   */
-  
   cblas_dgemv(CblasColMajor, CblasTrans, 
 	      geno_ind,
 	      mySNPs,
@@ -475,6 +478,21 @@ void compUpdate(unsigned id, unsigned iteration,
 	      0,
 	      &XtSNP(n, 0),
 	      n+1
+	      );
+  */
+  /*! @todo it would be nice to have x * A rather than A * x; 
+    maybe it doesn't matter */
+  cublasDgemv('t',
+	      geno_ind,
+	      mySNPs,
+	      1.0,
+	      d_geno,
+	      d_genoPitch / sizeof(double),
+	      d_nextSNP,
+	      1,
+	      0.0,
+	      d_XtSNP + n,
+	      d_XtSNPPitch
 	      );
 
   gettimeofday(&tGLMStop, 0);
@@ -727,7 +745,7 @@ int main(int argc, char **argv)
 	      beta, n, tol, XtXi, 
 	      yty, glm_data, geno_ind);
 
-  double *d_SNPtSNP, *d_XtSNP, *d_SNPty, *d_geno, *d_Xt, *d_y;
+  double *d_SNPtSNP, *d_XtSNP, *d_SNPty, *d_geno, *d_Xt, *d_y, *d_nextSNP;
   float *d_f;
   //! @todo could use d_f also as a mask
   char *d_SNPMask;
@@ -742,7 +760,8 @@ int main(int argc, char **argv)
   copyToDevice(id, verbosity, mySNPs, n, geno_ind, d_SNPtSNP, d_XtSNP, 
 	       d_XtSNPPitch, d_SNPty, d_SNPMask, d_f, d_geno, d_genoPitch,
 	       d_Xt, d_XtPitch, d_y,
-	       Xty, XtXi, Xt, geno);
+	       Xty, XtXi, Xt, geno,
+	       d_nextSNP);
 
   /*!
     compute XtSNP, SNPty, SNPtSNP on GPU
@@ -923,14 +942,25 @@ int main(int argc, char **argv)
 	  globalMinRankMaxF << ": " << globalMaxF << endl;
     }
 
+    nextXtSNP = &incomingXtSNP[0];
     if(id == globalMinRankMaxF){
       // I have the max F value
       // send SNP which yielded max F value
       //! @todo fix for GPU
       nextSNP = &geno(0, localMaxFIndex);
-      nextXtSNP = &XtSNP(0, localMaxFIndex);
-      nextSNPty = SNPty[localMaxFIndex];
-      nextSNPtSNP = SNPtSNP[localMaxFIndex];
+      cutilSafeCall(cudaMemcpy(nextXtSNP, 
+			       d_XtSNP + (d_XtSNPPitch/sizeof(double)) * localMaxFIndex,
+			       n * sizeof(double),
+			       cudaMemcpyDeviceToHost));
+      cutilSafeCall(cudaMemcpy(&nextSNPty, 
+			       d_SNPty + localMaxFIndex,
+			       sizeof(double),
+			       cudaMemcpyDeviceToHost));
+      cutilSafeCall(cudaMemcpy(&nextSNPtSNP, 
+			       d_SNPtSNP + localMaxFIndex,
+			       sizeof(double),
+			       cudaMemcpyDeviceToHost));
+      
 #ifdef _DEBUG
       cout << "iteration " << iteration << " id " << id 
 	   << " masking index " << localMaxFIndex << endl;
@@ -939,7 +969,6 @@ int main(int argc, char **argv)
     }else{
       // receive SNP which yielded max F value
       nextSNP = &incomingSNP[0];
-      nextXtSNP = &incomingXtSNP[0];
       localMaxFIndex = -1;
       chosenSNPs[iteration] = -1;
     }
@@ -1003,8 +1032,9 @@ int main(int argc, char **argv)
     compUpdate(id, iteration, XtXi, d_XtSNP, d_XtSNPPitch, yty, Xty, rX, 
 	       glm_data, n, mySNPs, 
 	       geno_ind, 
-	       geno, 
-	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty);
+	       d_geno, d_genoPitch,
+	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty,
+	       d_nextSNP);
     gettimeofday(&tstop, NULL);
     CPUCompUpdateTime = tvDouble(tstop - tstart);
 

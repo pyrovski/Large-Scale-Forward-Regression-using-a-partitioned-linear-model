@@ -234,7 +234,8 @@ int copyToDevice(const unsigned id, // MPI rank
 		 const vector<double> &Xty, 
 		 const FortranMatrix &XtXi, // G
 		 const FortranMatrix &Xt, // only for XtSNP
-		 const FortranMatrix &geno){
+		 const FortranMatrix &geno,
+		 double *&d_nextSNP){
 
   uint64_t snpMaskSize = geno_count * sizeof(char), 
     snptsnpSize = geno_count * sizeof(double), 
@@ -242,7 +243,8 @@ int copyToDevice(const unsigned id, // MPI rank
     snptySize = geno_count * sizeof(double), 
     fSize = geno_count * sizeof(float),
     genoSize, // new
-    XtSize; // new
+    XtSize, // new
+    nextSNPSize = geno_ind * sizeof(double); // new
 
   uint64_t totalSize;
 
@@ -286,7 +288,7 @@ int copyToDevice(const unsigned id, // MPI rank
 
   // Xty and G are in constant memory; compiler checks this
   totalSize = fSize + XtsnpSize + snptsnpSize + snpMaskSize + snptySize
-    + genoSize + XtSize;
+    + genoSize + XtSize + nextSNPSize;
 
   struct cudaDeviceProp prop;
   cudaStatus = cudaGetDeviceProperties(&prop, device);
@@ -322,6 +324,7 @@ int copyToDevice(const unsigned id, // MPI rank
   cutilSafeCall(cudaMemcpyToSymbol(d_Xty, &Xty[0], n * sizeof(double)));
   
   cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(float)));
+  cutilSafeCall(cudaMalloc(&d_nextSNP, geno_ind * sizeof(double)));
 
   cublasStatus status = cublasInit();
   if(status != CUBLAS_STATUS_SUCCESS){

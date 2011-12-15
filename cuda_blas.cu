@@ -106,20 +106,19 @@ __device__ double vecRMatCSq(const unsigned TID,
 			  const unsigned lda){
   
   double retVal = 0.0;
-  double *reduce = shared;
   __syncthreads();
-  reduce[TID] = x;
+  shared[TID] = x;
   __syncthreads();
   /*
   for(int i = 0; i < N; i++){
     if(i == TID)
       continue;
-    retVal += reduce[i] * A[lda * TID + i];
+    retVal += shared[i] * A[lda * TID + i];
   }
   retVal += x * A[lda * TID + TID];
   */
   for(int i = 0; i < N; i++)
-    retVal += reduce[i] * A[lda * i + TID];
+    retVal += shared[i] * A[lda * i + TID];
   return retVal;
 }
 

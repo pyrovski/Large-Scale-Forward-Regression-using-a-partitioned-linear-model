@@ -289,7 +289,10 @@ int copyToDevice(const unsigned id,
   }
   if(verbosity > 1)
     cout << "id " << id << " requires " << totalSize << "/" 
-	 << prop.totalGlobalMem << " bytes global memory" << endl;
+	 << prop.totalGlobalMem << " bytes global memory"  
+	 << " (" << (100.0 * totalSize) / prop.totalGlobalMem 
+	 << "%)"
+	 << endl;
   if(totalSize >= prop.totalGlobalMem){
     cerr << "id " << id << " insufficient device memory" << endl;
     return -1;

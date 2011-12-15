@@ -22,7 +22,7 @@ template <unsigned blockSize>
 __device__ void reduceCorePow2(const unsigned TID, double *reduce){
   if(blockSize == 512){if(TID < 256){reduce[TID] += reduce[TID + 256];} __syncthreads();}
   if(blockSize >= 256){if(TID < 128){reduce[TID] += reduce[TID + 128];} __syncthreads();}
-  if(blockSize >= 127){if(TID < 64) {reduce[TID] += reduce[TID +  64];} __syncthreads();}
+  if(blockSize >= 128){if(TID < 64) {reduce[TID] += reduce[TID +  64];} __syncthreads();}
   if(TID < 32) warpReduce<blockSize>(TID, reduce);
 }
 

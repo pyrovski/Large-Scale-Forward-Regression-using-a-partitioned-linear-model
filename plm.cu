@@ -20,11 +20,11 @@ __device__ int printBIDs(unsigned BID){
   return(BID == 0);
 }
 
+extern __shared__ double shared[];
 #include "cuda_blas.cu"
 
 using namespace std;
 //__shared__ double fval; // scalar
-extern __shared__ double shared[];
 
 __constant__ double d_Xty[fixedPlusIteration_limit + 1];
 
@@ -54,8 +54,6 @@ __global__ void plm(// inputs
     but might need some thread padding for warps.
    */
 
-  double *reduce = shared; // n x 1
-  //double *reduce2 = reduce + n;
   double GtXtsnp; // each thread stores one element of each array // Xtsnp
   //! @todo these might use fewer registers if kept in shared memory
   double snptmy; // scalar
@@ -84,12 +82,11 @@ __global__ void plm(// inputs
   double myXtsnp = *(Xtsnp + BID * XtsnpPitchInWords + TID);
   // GtXtsnp
   GtXtsnp = vecRMatCSq(TID, BID, myXtsnp, blockDim.x, d_G, 
-		     blockDim.x,  //! length of column plus padding (no padding)
-		     reduce); 
+		       blockDim.x);  //! length of column plus padding (no padding)
   
   // snptsnp - snptXGXtsnp
-  dotRR(TID, blockDim.x, GtXtsnp, myXtsnp, reduce);
-  s = snptsnp[BID] - *reduce;
+  dotRR(TID, blockDim.x, GtXtsnp, myXtsnp);
+  s = snptsnp[BID] - shared[0];
 #ifdef printGPU
   if(printBIDs(BID)){
     for(int i = 0; i < blockDim.x; i++){
@@ -100,7 +97,7 @@ __global__ void plm(// inputs
 	printf("b%03u\tt%03u\tGtXtsnp: %1.10le\n", BID, TID, GtXtsnp);
 	if(!TID){
 	  printf("b%03u\tt%03u\tsnptsnp: %1.10le\n", BID, TID, snptsnp[BID]);
-	  printf("b%03u\tt%03u\tsnptXGXtsnp: %1.10le\n", BID, TID, *reduce);
+	  printf("b%03u\tt%03u\tsnptXGXtsnp: %1.10le\n", BID, TID, shared[0]);
 	  printf("b%03u\tt%03u\ts: %1.10le\n", BID, TID, s);
 	}
       }
@@ -113,8 +110,8 @@ __global__ void plm(// inputs
     s = (double)1/s;
     
     // snptmy
-    dotRG(TID, blockDim.x, GtXtsnp, d_Xty, reduce);
-    snptmy = -*reduce;
+    dotRG(TID, blockDim.x, GtXtsnp, d_Xty);
+    snptmy = -shared[0];
     
     if(!TID){
 #ifdef printGPU

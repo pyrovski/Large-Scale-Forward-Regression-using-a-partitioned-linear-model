@@ -61,8 +61,9 @@ __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
 __device__ void dotRR(const unsigned TID,
 		    const unsigned N, 
 		    const double x,
-		    const double y,
-		    double *reduce){
+		    const double y){
+
+  double *reduce = shared;
 
   // compute dot product terms
   // place x*y in shared memory (reduce)
@@ -75,8 +76,8 @@ __device__ void dotRR(const unsigned TID,
 __device__ void dotRG(const unsigned TID,
 		      const unsigned N, 
 		      const double x,
-		      const double *y,
-		      double *reduce){ // assume blockDim.x elements
+		      const double *y){ // assume blockDim.x elements
+  double *reduce = shared;
   __syncthreads();
   reduce[TID] = x * y[TID];
   __syncthreads();
@@ -102,9 +103,10 @@ __device__ double vecRMatCSq(const unsigned TID,
 			  const double x,
 			  const unsigned N,
 			  const double *A, 
-			  const unsigned lda,
-			  double *reduce){
+			  const unsigned lda){
+  
   double retVal = 0.0;
+  double *reduce = shared;
   __syncthreads();
   reduce[TID] = x;
   __syncthreads();
@@ -150,7 +152,7 @@ __device__ double vecGMatG(const unsigned TID,
 {
   double retVal;
   for(int i = 0; i < N; i++){
-    dotRG(TID, M, x[TID], A + lda * i, reduce);
+    dotRG(TID, M, x[TID], A + lda * i);
     if(i == TID)
       retVal = *reduce;
   }

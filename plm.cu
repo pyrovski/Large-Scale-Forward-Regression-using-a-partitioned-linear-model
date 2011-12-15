@@ -40,7 +40,7 @@ void initGrid(dim3 &grid, unsigned geno_count) throw(int){
     throw(2);
   oldGrid = grid;
 #ifdef _DEBUG
-  cout << "grid: " << grid.x << "x" << grid.y << endl;
+  std::cout << "grid: " << grid.x << "x" << grid.y << std::endl;
 #endif
 }
 
@@ -400,16 +400,5 @@ void getMaxFGPU(unsigned id, unsigned iteration, unsigned geno_count,
 #ifndef _DEBUG
     cutilSafeCall(cudaMemcpy(&Fval[maxFIndex], &d_f[maxFIndex], sizeof(float),
 			     cudaMemcpyDeviceToHost));
-    /*
-#else
-    {
-      vector<double> Fval_post(geno_count);
-      cutilSafeCall(cudaMemcpy(&Fval_post[0], d_f, geno_count * sizeof(double),
-			       cudaMemcpyDeviceToHost));
-      stringstream ss;
-      ss << "Fval_post_" << iteration << "_" << id << ".dat";
-      writeD(ss.str(), Fval_post);
-    }
-    */
 #endif
 }

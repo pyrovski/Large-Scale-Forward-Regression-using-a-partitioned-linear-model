@@ -351,14 +351,6 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
 	      d_XtSNPPitch / sizeof(double)
 	      );
 
-#ifdef _DEBUG
-  {
-    stringstream ss;
-    ss << "XtSNP_" << iteration << "p_" << id << ".dat";
-    XtSNP.writeD(ss.str());
-  }
-#endif
-
   //SNPty[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
   //! @todo SNPty could also be computed as the geno data is read from disk
   //! @todo this is easy on GPU

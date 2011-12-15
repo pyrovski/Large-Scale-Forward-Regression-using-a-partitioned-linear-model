@@ -310,6 +310,8 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
 		    const size_t d_XtPitch, const size_t d_genoPitch, 
 		    const size_t d_XtSNPPitch){
   
+  cublasStatus status;
+
     // compute Xt * SNP    
 
     //! @todo fix XtSNP lda for incremental computation
@@ -350,6 +352,14 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
 	      d_XtSNP,
 	      d_XtSNPPitch / sizeof(double)
 	      );
+#ifdef _DEBUG
+  status = cublasGetError();
+  if(status != CUBLAS_STATUS_SUCCESS){
+    cerr << "cublas error in cublasDgemm(): " << status << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+#endif
+  
 
   //SNPty[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, &y[0], 1);
   //! @todo SNPty could also be computed as the geno data is read from disk
@@ -381,6 +391,14 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
 	      d_SNPty,
 	      1
 	      );
+
+#ifdef _DEBUG
+  status = cublasGetError();
+  if(status != CUBLAS_STATUS_SUCCESS){
+    cerr << "cublas error in cublasDgemv(): " << status << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+#endif
 
   //! @todo SNPtSNP could be computed as the geno data is read from disk
   /*! @todo this is easy on GPU; it is better to issue a single kernel for this,
@@ -431,6 +449,7 @@ void compUpdate(unsigned id, unsigned iteration,
 		const double &nextSNPty,
 		double *d_nextSNP){
 
+  cublasStatus status;
   timeval tGLMStart, tGLMStop;
   
   // update XtXi, Xty
@@ -486,6 +505,14 @@ void compUpdate(unsigned id, unsigned iteration,
 	      d_XtSNP + n,
 	      d_XtSNPPitch
 	      );
+
+#ifdef _DEBUG
+  status = cublasGetError();
+  if(status != CUBLAS_STATUS_SUCCESS){
+    cerr << "cublas error in cublasDgemv(): " << status << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+#endif
 
   gettimeofday(&tGLMStop, 0);
   if(verbosity > 1){
@@ -729,6 +756,30 @@ int main(int argc, char **argv)
   double tol;
   double yty;
   
+  int deviceCount;
+  cudaGetDeviceCount(&deviceCount);
+  int device = deviceCount > 1 ? (id % 2) : 0;
+  /*! @todo set device numbers from sge wayness parameter;
+    for now, assume that if ID is even, use first GPU, 
+    otherwise, use second GPU
+  */
+  cudaError_t cudaStatus;
+  cudaStatus = cudaSetDevice(device);
+  if(cudaStatus != cudaSuccess){
+    cerr << "id " << id << " error in cudaSetDevice(" << device << "): " 
+	 << cudaStatus << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  if(verbosity > 1){
+    cout << "id " << id << " using GPU " << device + 1 << " of " << deviceCount
+	 << endl;
+  }
+
+  if(cublasInit() != CUBLAS_STATUS_SUCCESS){
+    cerr << "id " << id << " error in cublasInit()" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+
   // Begin timing the computations
   gettimeofday(&tstart, NULL);
 
@@ -744,16 +795,22 @@ int main(int argc, char **argv)
   // column-major with padding
   size_t d_XtSNPPitch, d_genoPitch, d_XtPitch, d_SNPtSNPPitch;
 
+  int status;
+
   /*!
     allocate SNPtSNP, XtSNP
     X, G, geno, y on GPU
     copy X, G, geno, y to GPU,
    */
-  copyToDevice(id, verbosity, mySNPs, n, geno_ind, d_SNPtSNP, d_XtSNP, 
-	       d_XtSNPPitch, d_SNPty, d_SNPMask, d_f, d_geno, d_genoPitch,
-	       d_Xt, d_XtPitch, d_y,
-	       Xty, XtXi, Xt, geno,
-	       d_nextSNP);
+  status = copyToDevice(id, verbosity, mySNPs, n, geno_ind, d_SNPtSNP, d_XtSNP, 
+			d_XtSNPPitch, d_SNPty, d_SNPMask, d_f, d_geno, d_genoPitch,
+			d_Xt, d_XtPitch, d_y,
+			Xty, XtXi, Xt, geno,
+			d_nextSNP);
+  if(status){
+    cerr << "error in copyToDevice()" << endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
   /*!
     compute XtSNP, SNPty, SNPtSNP on GPU

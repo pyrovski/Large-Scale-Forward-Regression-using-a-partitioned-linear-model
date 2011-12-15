@@ -190,9 +190,9 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
        d_snpMask,
        d_f);
     cudaEventRecord(stopKernel, 0);
-    //cutilSafeCall(cudaThreadSynchronize());
 
 #ifdef _DEBUG
+    cutilSafeCall(cudaThreadSynchronize());
     cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(float),
 			     cudaMemcpyDeviceToHost));
 #endif
@@ -247,30 +247,13 @@ int copyToDevice(const unsigned id, // MPI rank
 
   uint64_t totalSize;
 
-  cudaError_t cudaStatus;
-  int deviceCount;
-  cudaGetDeviceCount(&deviceCount);
-  int device = deviceCount > 1 ? (id % 2) : 0;
-  /*! @todo set device numbers from sge wayness parameter;
-    for now, assume that if ID is even, use first GPU, 
-    otherwise, use second GPU
-  */
-  cudaStatus = cudaSetDevice(device);
-  if(cudaStatus != cudaSuccess){
-    cerr << "id " << id << " error in cudaSetDevice()" << endl;
-    return -1;
-  }
-  if(verbosity > 1){
-    cout << "id " << id << " using GPU " << device + 1 << " of " << deviceCount
-	 << endl;
-  }
   
   cutilSafeCall(cudaMallocPitch(&d_Xtsnp, &d_XtsnpPitch, 
 				(n + iterationLimit) * sizeof(double), 
 				geno_count));
   XtsnpSize = d_XtsnpPitch * geno_count;
    
-  cutilSafeCall(cudaMallocPitch(&d_geno, &d_genoPitch, geno_ind, geno_count));
+  cutilSafeCall(cudaMallocPitch(&d_geno, &d_genoPitch, geno_ind * sizeof(double), geno_count));
   if(d_genoPitch < geno_ind){
     cerr << "error allocating d_geno" << endl;
     return -1;
@@ -290,6 +273,9 @@ int copyToDevice(const unsigned id, // MPI rank
     + genoSize + XtSize + nextSNPSize;
 
   struct cudaDeviceProp prop;
+  cudaError_t cudaStatus;
+  int device;
+  cudaGetDevice(&device);
   cudaStatus = cudaGetDeviceProperties(&prop, device);
   if(cudaStatus != cudaSuccess){
     cerr << "id " << id << " error in cudaGetDeviceProperties()" << endl;
@@ -325,11 +311,6 @@ int copyToDevice(const unsigned id, // MPI rank
   cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(float)));
   cutilSafeCall(cudaMalloc(&d_nextSNP, geno_ind * sizeof(double)));
 
-  cublasStatus status = cublasInit();
-  if(status != CUBLAS_STATUS_SUCCESS){
-    cerr << "id " << id << " error in cublasInit()" << endl;
-    return -1;
-  }
   cudaEventCreate(&start);
   cudaEventCreate(&stopKernel);
   cudaEventCreate(&stopMax);

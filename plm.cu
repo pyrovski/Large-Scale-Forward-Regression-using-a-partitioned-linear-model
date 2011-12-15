@@ -234,7 +234,8 @@ int copyToDevice(const unsigned id, // MPI rank
 		 const FortranMatrix &XtXi, // G
 		 const FortranMatrix &Xt, // only for XtSNP
 		 const FortranMatrix &geno,
-		 double *&d_nextSNP){
+		 double *&d_nextSNP,
+		 const double *y){
 
   uint64_t snpMaskSize = geno_count * sizeof(char), 
     snptsnpSize = geno_count * sizeof(double), 
@@ -305,11 +306,16 @@ int copyToDevice(const unsigned id, // MPI rank
   cutilSafeCall(cudaMalloc(&d_snptsnp, geno_count * sizeof(double)));  
   cutilSafeCall(cudaMalloc(&d_snpty, geno_count * sizeof(double)));
   
-  cutilSafeCall(cudaMemcpyToSymbol(d_G, &XtXi.values[0], n * n * sizeof(double)));
+  cutilSafeCall(cudaMemcpyToSymbol(d_G, &XtXi.values[0], 
+				   n * n * sizeof(double)));
   cutilSafeCall(cudaMemcpyToSymbol(d_Xty, &Xty[0], n * sizeof(double)));
   
   cutilSafeCall(cudaMalloc(&d_f, geno_count * sizeof(float)));
   cutilSafeCall(cudaMalloc(&d_nextSNP, geno_ind * sizeof(double)));
+
+  cutilSafeCall(cudaMalloc(&d_y, geno_ind * sizeof(double)));
+  cutilSafeCall(cudaMemcpy(d_y, y, geno_ind * sizeof(double), 
+			   cudaMemcpyHostToDevice));
 
   cudaEventCreate(&start);
   cudaEventCreate(&stopKernel);

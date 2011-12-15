@@ -30,7 +30,8 @@ int copyToDevice(const unsigned id, // MPI rank
 		 const FortranMatrix &XtXi, // G
 		 const FortranMatrix &Xt, // only for XtSNP
 		 const FortranMatrix &geno,
-		 double *&d_nextSNP);
+		 double *&d_nextSNP,
+		 const double *y);
 
 void copyUpdateToDevice(unsigned id, unsigned iteration,
 			unsigned geno_count, unsigned n,

@@ -355,7 +355,7 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
 #ifdef _DEBUG
   status = cublasGetError();
   if(status != CUBLAS_STATUS_SUCCESS){
-    cerr << "cublas error in cublasDgemm(): " << status << endl;
+    cerr << __FUNCTION__ << " cublas error in cublasDgemm(): " << status << endl;
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 #endif
@@ -379,12 +379,12 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
 	      1
 	      );
   */
-  cublasDgemv('n',
+  cublasDgemv('t',
 	      geno_ind,
 	      mySNPs,
 	      1.0,
 	      d_geno,
-	      d_genoPitch / sizeof(double),
+	      d_genoPitch / sizeof(double), // in words
 	      d_y,
 	      1,
 	      0.0,
@@ -395,7 +395,7 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
 #ifdef _DEBUG
   status = cublasGetError();
   if(status != CUBLAS_STATUS_SUCCESS){
-    cerr << "cublas error in cublasDgemv(): " << status << endl;
+    cerr << __FUNCTION__ << " cublas error in cublasDgemv(): " << status << endl;
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 #endif
@@ -509,7 +509,7 @@ void compUpdate(unsigned id, unsigned iteration,
 #ifdef _DEBUG
   status = cublasGetError();
   if(status != CUBLAS_STATUS_SUCCESS){
-    cerr << "cublas error in cublasDgemv(): " << status << endl;
+    cerr << __FUNCTION__ << " cublas error in cublasDgemv(): " << status << endl;
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 #endif
@@ -806,7 +806,7 @@ int main(int argc, char **argv)
 			d_XtSNPPitch, d_SNPty, d_SNPMask, d_f, d_geno, d_genoPitch,
 			d_Xt, d_XtPitch, d_y,
 			Xty, XtXi, Xt, geno,
-			d_nextSNP);
+			d_nextSNP, &y[0]);
   if(status){
     cerr << "error in copyToDevice()" << endl;
     MPI_Abort(MPI_COMM_WORLD, 1);

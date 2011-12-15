@@ -214,7 +214,7 @@ columnDot(const double *d_mat, unsigned n_rows, unsigned n_cols,
   double myResult = 0.0, tmp;
 
   for(unsigned row = 0; row < n_rows; row += blockSize){
-    if(row + TID < n_rows){
+    if(row + TID >= n_rows){
       tmp = 0.0;
     }else{
       tmp = d_mat[col * columnPitchInWords + row + TID];
@@ -242,6 +242,7 @@ void columnDot_gpu(const double *d_mat, unsigned n_rows, uint64_t n_cols,
     std::cerr << "invalid blockSize:" << blockSize << std::endl;
     exit(1);
   }
+
   columnDot<blockSize>
     <<<grid, blockSize>>>
     (d_mat, n_rows, n_cols, columnPitchInWords, d_result, resultStrideInWords);

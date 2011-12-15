@@ -193,6 +193,9 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
 		 vector<float> &Fval) throw(int)
 {
     cublasGetError();
+#ifdef _DEBUG
+    cutilSafeCall(cudaThreadSynchronize());
+#endif
     cudaEventRecord(start, 0);
     dim3 grid;
     initGrid(grid, geno_count);
@@ -208,9 +211,9 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
        d_snpMask,
        d_f);
     cudaEventRecord(stopKernel, 0);
-    //cutilSafeCall(cudaThreadSynchronize());
 
 #ifdef _DEBUG
+    cutilSafeCall(cudaThreadSynchronize());
     cutilSafeCall(cudaMemcpy(&Fval[0], d_f, geno_count * sizeof(float),
 			     cudaMemcpyDeviceToHost));
 #endif
@@ -403,16 +406,5 @@ void getMaxFGPU(unsigned id, unsigned iteration, unsigned geno_count,
 #ifndef _DEBUG
     cutilSafeCall(cudaMemcpy(&Fval[maxFIndex], &d_f[maxFIndex], sizeof(float),
 			     cudaMemcpyDeviceToHost));
-    /*
-#else
-    {
-      vector<double> Fval_post(geno_count);
-      cutilSafeCall(cudaMemcpy(&Fval_post[0], d_f, geno_count * sizeof(double),
-			       cudaMemcpyDeviceToHost));
-      stringstream ss;
-      ss << "Fval_post_" << iteration << "_" << id << ".dat";
-      writeD(ss.str(), Fval_post);
-    }
-    */
 #endif
 }

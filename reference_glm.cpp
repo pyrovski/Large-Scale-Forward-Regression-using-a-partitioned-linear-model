@@ -416,20 +416,6 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
   columnDot_gpu(d_geno, geno_ind, mySNPs, d_genoPitch / sizeof(double), 
     d_SNPtSNP, 1);
 
-  /*
-#ifdef _DEBUG
-  {
-    stringstream ss;
-    ss << "SNPty_" << id << ".dat";
-    writeD(ss.str(), SNPty);
-  }
-  {
-    stringstream ss;
-    ss << "SNPtSNP_" << id << ".dat";
-    writeD(ss.str(), SNPtSNP);
-  }
-#endif
-  */
 }
 
 //! @todo fix for GPU

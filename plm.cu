@@ -108,8 +108,7 @@ __global__ void plm(// inputs
   double myXtsnp = *(Xtsnp + BID * XtsnpPitch/sizeof(double) + TID);
   // GtXtsnp
   GtXtsnp = vecRMatCSq(TID, myXtsnp, blockDim.x, d_G, 
-		     blockDim.x,  //! length of column plus padding (no padding)
-		     reduce); 
+		       blockDim.x);  //! length of column plus padding (no padding) 
   
   // snptsnp - snptXGXtsnp
   dotRR(TID, blockDim.x, GtXtsnp, myXtsnp, reduce);

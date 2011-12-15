@@ -59,24 +59,10 @@ __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
   ///*
   unsigned threads;
   while(N/2){
-    /*
-    if(N % 2){
-      threads = (N + 1) / 2;
-      //if(TID == threads - 1)
-      //reduce[TID + threads] = 0;
-      //! @todo can remove this condition test if threads <= 64, 
-      //as it doesn't affect the result or save time,
-      //assuming shared size is 2*threads
-
-      if(TID < threads - 1) 
-	reduce[TID] += reduce[TID + threads];
-    } else {
-      threads = N / 2;
-      if(TID < threads)
-	reduce[TID] += reduce[TID + threads];
-    }
-    */
     threads = (N + 1) / 2;
+    //! @todo can remove this condition test if threads <= 64, 
+    //as it doesn't affect the result or save time,
+    //assuming shared size is 2*threads
     if(TID < threads - (N % 2))
       reduce[TID] += reduce[TID + threads];
     
@@ -126,53 +112,31 @@ __device__ void dotGG(const unsigned TID,
 }
 
 /*
-  A is in constant memory.  A must be column-major and square.
- */
+  A is in constant memory.  A must be column-major and square (NxN).
+*/
 __device__ double vecRMatCSq(const unsigned TID,
-			  const double x,
-			  const unsigned N,
-			  const double *A, 
-			  const unsigned lda,
-			  double *reduce){
-#error merge changes from master branch
-}
-
-/*
-  A is in constant memory.  A must be column-major and square.
- */
-__device__ double vecGMatCSq(const unsigned TID,
-			  const double *x,
-			  const unsigned N,
-			  const double *A, 
-			  const unsigned lda,
-			  double *reduce){
-  double retVal;
-  for(int i = 0; i < N; i++){
-    dotGG(TID, N, x, A + lda * i, reduce);
+			     const double x,
+			     const unsigned N,
+			     const double *A, 
+			     const unsigned lda){
+  
+  
+  double retVal = 0.0;
+  __syncthreads();
+  shared[TID] = x;
+  __syncthreads();
+  /*
+    for(int i = 0; i < N; i++){
     if(i == TID)
-      retVal = *reduce;
+      continue;
+    retVal += shared[i] * A[lda * TID + i];
   }
+  retVal += x * A[lda * TID + TID];
+  */
+  for(int i = 0; i < N; i++)
+    retVal += shared[i] * A[lda * i + TID];
   return retVal;
 }
-
-
-__device__ double vecGMatG(const unsigned TID, 
-			  const double *x,
-			  const unsigned M, 
-			  const unsigned N,
-			  const double *A, 
-			  const unsigned lda,
-			  double *reduce) // reduce must be of length >= N, N <= M
-{
-  double retVal;
-  for(int i = 0; i < N; i++){
-    dotRG(TID, M, x[TID], A + lda * i, reduce);
-    if(i == TID)
-      retVal = *reduce;
-  }
-  return retVal;
-}
-
 
 /* ignore this; it is a mess...
 __global__ template<unsigned blockSize> void 

@@ -171,7 +171,9 @@ void compPrepareCPU(unsigned id, unsigned iteration,
   memcpy(&X(0, 1), &fixed.values[0], 
 	 fixed_count * X.get_n_rows() * sizeof(double));
 
-  
+  Xt = X;
+  Xt.transpose_self();
+
   /*! precompute
     XtX
     XtXi
@@ -295,7 +297,7 @@ void compPrepareCPU(unsigned id, unsigned iteration,
   // Compute the matrix-vector product, XTy := X' * y.  
   yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
 
-  //! @todo compute initial V2 = m - rX, SSE = yty - beta' * Xty
+  //! compute initial V2 = m - rX, SSE = yty - beta' * Xty
     
   glm_data.ErrorSS = yty - cblas_ddot(n, &beta[0], 1, &Xty[0], 1), 
   

@@ -122,39 +122,3 @@ __device__ double vecRMatCSq(const unsigned TID,
   return retVal;
 }
 
-/*
-  A is in constant memory.  A must be column-major and square.
- */
-__device__ double vecGMatCSq(const unsigned TID,
-			  const double *x,
-			  const unsigned N,
-			  const double *A, 
-			  const unsigned lda,
-			  double *reduce){
-  double retVal;
-  for(int i = 0; i < N; i++){
-    dotGG(TID, N, x, A + lda * i, reduce);
-    if(i == TID)
-      retVal = *reduce;
-  }
-  return retVal;
-}
-
-
-__device__ double vecGMatG(const unsigned TID, 
-			  const double *x,
-			  const unsigned M, 
-			  const unsigned N,
-			  const double *A, 
-			  const unsigned lda,
-			  double *reduce) // reduce must be of length >= N, N <= M
-{
-  double retVal;
-  for(int i = 0; i < N; i++){
-    dotRG(TID, M, x[TID], A + lda * i);
-    if(i == TID)
-      retVal = *reduce;
-  }
-  return retVal;
-}
-

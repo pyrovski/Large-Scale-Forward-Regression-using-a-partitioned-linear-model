@@ -3,3 +3,9 @@
 *.e*
 *.o*
 *~
+CUDA_SM
+CUDA_PATHS
+LIBRARY_PATHS
+convertToBinary
+reference_glm
+TAGS

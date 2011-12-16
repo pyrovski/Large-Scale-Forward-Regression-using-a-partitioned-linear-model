@@ -70,7 +70,6 @@ __global__ void plm(// inputs
 		    //const double *G,          // symmetric matrix in const mem
 		    //const double *Xty,        // n x 1 vector in const mem
 		    const double *snpty,        // scalar, unique to block
-		    //! @todo snpMask could be a bit mask, instead of a word mask
 		    const char *snpMask,   // n x 1 vector
 		    // outputs
 		    float *f){
@@ -80,7 +79,6 @@ __global__ void plm(// inputs
    */
 
   double *reduce = shared; // n x 1
-  //double *reduce2 = reduce + n;
   double GtXtsnp; // each thread stores one element of each array // Xtsnp
   //! @todo these might use fewer registers if kept in shared memory
   double snptmy; // scalar

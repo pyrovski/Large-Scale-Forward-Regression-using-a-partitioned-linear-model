@@ -443,25 +443,9 @@ void compUpdate(unsigned id, unsigned iteration,
   // update XtXi, Xty
   // output glm_data
   gettimeofday(&tGLMStart, 0);
-  //! @todo fix for GPU
   glm(id, iteration, n, XtXi, nextXtSNP, nextSNPtSNP, nextSNPty, yty, Xty,
 	rX, glm_data);
   gettimeofday(&tGLMStop, 0);
-#ifdef _DEBUG
-  if(!id)
-    {
-      {
-	stringstream ss;
-	ss << "XtXi_" << iteration << "p.dat";
-	XtXi.writeD(ss.str());
-      }
-      {
-	stringstream ss;
-	ss << "Xty_" << iteration << "p.dat";
-	writeD(ss.str(), Xty);
-      }
-    }
-#endif
 
   // actually compute (geno^t * nextSNP)^t, rather than (updated X^t) * geno
   /*! @todo convert for gpu
@@ -479,8 +463,16 @@ void compUpdate(unsigned id, unsigned iteration,
 	      n+1
 	      );
   */
+
+  cutilSafeCall(cudaMemcpy(d_nextSNP, nextSNP, geno_ind * sizeof(double), 
+			   cudaMemcpyHostToDevice));
+
   /*! @todo it would be nice to have x * A rather than A * x; 
     maybe it doesn't matter */
+  /*!
+    XtSNP is allocated at maximum size.  
+    the n+1th row gets updated here.
+  */
   cublasDgemv('t',
 	      geno_ind,
 	      mySNPs,
@@ -491,7 +483,7 @@ void compUpdate(unsigned id, unsigned iteration,
 	      1,
 	      0.0,
 	      d_XtSNP + n,
-	      d_XtSNPPitch
+	      d_XtSNPPitch / sizeof(double)
 	      );
 
 #ifdef _DEBUG

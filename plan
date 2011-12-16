@@ -10,4 +10,5 @@ XtSNP.  Use the previously chosen SNP, multiply by all SNPs.
 Additional work on the CPU can be the first part of prep; namely, 
 applying constructing XtX and applying SVD to XtX.
 
-bug: XtSNP needs to be updated in the last index after the first iteration
+bug: XtSNP needs to be updated in the last index after the first iteration (done)
+bug: there's a data race in the plm kernel at 33 threads/block; where is it?

@@ -86,6 +86,7 @@ __device__ void dotRR(const unsigned TID,
 
   // compute dot product terms
   // place x*y in shared memory (reduce)
+  __syncthreads();
   reduce[TID] = x * y;
   __syncthreads();
   reduceCore(TID, N, reduce);
@@ -96,17 +97,8 @@ __device__ void dotRG(const unsigned TID,
 		      const double x,
 		      const double *y,
 		      double *reduce){ // assume blockDim.x elements
-  reduce[TID] = x * y[TID];
   __syncthreads();
-  reduceCore(TID, N, reduce);
-}
-
-__device__ void dotGG(const unsigned TID,
-		      const unsigned N, 
-		      const double *x,
-		      const double *y,
-		      double *reduce){ // assume blockDim.x elements
-  reduce[TID] = x[TID] * y[TID];
+  reduce[TID] = x * y[TID];
   __syncthreads();
   reduceCore(TID, N, reduce);
 }

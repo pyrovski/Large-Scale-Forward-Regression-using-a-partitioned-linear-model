@@ -22,6 +22,8 @@
 #include <getopt.h>
 #include <mpi.h>
 #include <gsl/gsl_cdf.h>
+#include <sys/sysinfo.h>
+
 extern "C"{
 #include <cblas.h>
 }
@@ -616,6 +618,21 @@ int main(int argc, char **argv)
     cout << "id " << id << " has SNPs " << 
       myStartSNP << "-" << 
       myStartSNP + mySNPs - 1 << endl;
+    
+    struct sysinfo info;
+    int status = sysinfo(&info);
+    if(status){
+      perror("error in sysinfo()");
+    }
+    
+    cout << "id " << id << " SNPs require " 
+	 << mySize / 1024.0 / 1024.0 / 1024.0 << " of " 
+	 << info.totalram / 1024.0 / 1024.0 / 1024.0
+	 << " GB host RAM" << endl;
+    if(mySize > .95 * info.totalram){
+      cerr << "id " << id << " SNP data is likely too large!" << endl;
+    }
+    
   }
 
   // Matrix objects for storing the input data

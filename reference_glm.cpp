@@ -499,6 +499,16 @@ int main(int argc, char **argv)
   MPI_Comm_size(MPI_COMM_WORLD, &numProcs);
   MPI_Comm_rank(MPI_COMM_WORLD, &id);
 
+  ofstream logstream;
+  streambuf *backupbuf, *logbuf;
+  //redirect stdout
+  stringstream ss_filename;
+  ss_filename << "id_" << id << ".log";
+  logstream.open(ss_filename.str().c_str());
+  backupbuf = cout.rdbuf();
+  logbuf = logstream.rdbuf();
+  cout.rdbuf(logbuf);
+  
   int opt;
 
   double entry_limit = 0.2;
@@ -1057,7 +1067,11 @@ int main(int argc, char **argv)
     write("Pindices.dat", chosenSNPsReduced);
     cout << "iterations: " << iteration << endl;
   }
-  
+
+  // restore stdout
+  cout.rdbuf(backupbuf);
+  logstream.close();
+
   MPI_Finalize();
   return 0;
 }

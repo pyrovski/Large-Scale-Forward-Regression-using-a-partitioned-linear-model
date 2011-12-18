@@ -585,14 +585,14 @@ int main(int argc, char **argv)
   }
   if((fixed_filename == "") ^ (!fixed_count)){
     if(!id)
-      printf("must supply both -f and --num_fixed, or neither\n");
+      cout << "must supply both -f and --num_fixed, or neither" << endl;
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
   if(iterationLimit + fixed_count > fixedPlusIteration_limit){
     if(!id)
-      printf("number of iterations plus number of fixed effects must be \n"
-	     "less than %d\n", fixedPlusIteration_limit);
+      cout << "number of iterations plus number of fixed effects must be " 
+	   << "less than " << fixedPlusIteration_limit << endl;
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 

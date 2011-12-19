@@ -21,6 +21,7 @@ __device__ int printBIDs(unsigned BID){
 }
 
 extern __shared__ double shared[];
+extern __shared__ char sharedChar[];
 #include "cuda_blas.cu"
 
 using namespace std;
@@ -70,7 +71,11 @@ __global__ void plm(// inputs
 
   if(BID >= geno_count)
     return;
-  if(snpMask[BID]){
+  if(!TID)
+    sharedChar[0] = snpMask[BID];
+
+  __syncthreads();
+  if(sharedChar[0]){
     // don't compute new F
     if(!TID)
       f[BID] = 0;

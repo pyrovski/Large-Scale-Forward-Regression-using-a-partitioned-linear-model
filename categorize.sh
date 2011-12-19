@@ -1,5 +1,5 @@
 #!/bin/bash
-find . -name 'id_0.log*' -print|grep -v '~'>.list
+find . -name 'id_0.log*' -print|sort -n|grep -v '~'>.list
 #cpu=`eval "echo $list|grep cpu"`
 cat .list|xargs -I{} grep -Hci gpu {}>.gpucount
 cat .gpucount|egrep -v ':0'|cut -d':' -f1|cut -d'/' -f2>.gpu

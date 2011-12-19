@@ -1,11 +1,14 @@
 #ifndef __print_matrix_h__
 #define __print_matrix_h__
-#include <fstream>
 #include <iostream>
+#include <fstream>
 #include <iomanip>
+#include <stdlib.h>
 
 void print_matrix( const char* desc, int m, int n, const double* a, int lda);
-template <class T> void write_matrix(const char *filename, int m, int n, const T *a, int lda){
+
+template <class T> void write_matrix(const char *filename, int m, int n, 
+				     const T *a, int lda){
   std::fstream file;
   file.open(filename, std::fstream::out);
   if(file.fail()){
@@ -23,5 +26,4 @@ template <class T> void write_matrix(const char *filename, int m, int n, const T
   }
   file.close();
 }
-
 #endif

@@ -1,8 +1,6 @@
 
 #include <iostream>
-#include <fstream>
 #include <iomanip>
-#include <stdlib.h>
 
 // Print function: actually uses C++ for printing even though it has a C interface.
 void print_matrix( const char* desc, int m, int n, const double* a, int lda)

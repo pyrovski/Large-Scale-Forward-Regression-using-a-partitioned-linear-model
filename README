@@ -80,3 +80,6 @@ Description of files:
   reference_glm.in - Input file for reference_glm.C, must contain path, see above for additional details
   Makefile - Set variables, etc for the compilation
   README - This file
+
+Performance notes:
+ - testing on a GTX480 revealed that CUDA 4.1 more than triples GPU kernel time over CUDA 3.2

@@ -9,7 +9,7 @@ wayness=`eval 'python -c "print min($1,2)"'`
 #! todo create data dir for each run
 set -x
 
-name=`date +%Y_%m_%d_%H_%M_%S`
+name=`date +%Y_%m_%d_%H_%M_%S_%N`
 oldDir=`pwd`
 mkdir $name
 cd $name
@@ -18,5 +18,6 @@ hostname >> info
 echo $name >> info
 uname -a >> info
 git log -n 1 --oneline >> info
+git branch | grep '*' >> info
 
-qsub -V -cwd -pe $(echo -n $wayness)way $cores -q normal -P gpgpu -l h_rt=0:12:00 -A TG-ASC100041 ../run.sh -c -o log -e errlog
+qsub -V -cwd -pe $(echo -n $wayness)way $cores -q normal -P gpgpu -l h_rt=0:12:00 -A TG-ASC100041 -o log -e errlog ../run.sh

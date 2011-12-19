@@ -8,6 +8,7 @@ extern "C"{
 #include <cblas.h>
 }
 
+#include "print_matrix.h"
 
 class FortranMatrix
 {
@@ -70,14 +71,27 @@ public:
   uint64_t n_rows, n_cols;
 };
 
-void writeD(std::string filename, const std::vector<double> &v);
-void writeD(std::string filename, const std::vector<float> &v);
-void writeD(std::string filename, const double *v, unsigned length);
-void write(std::string filename, const std::vector<double> &v);
+#ifdef _DEBUG
+template <class T> void writeD(std::string filename, const std::vector<T> &v){
+  write_matrix(filename.c_str(), v.size(), 1, &v[0], 1);
+}
+template <class T> void writeD(std::string filename, const T *v, unsigned length){
+  write_matrix(filename.c_str(), length, 1, &v[0], 1);
+}
+#else
+template <class T> void writeD(std::string filename, const std::vector<T> &v){
+}
+template <class T> void writeD(std::string filename, const T *v, unsigned length){
+}
+#endif
+template <class T> void write(std::string filename, const std::vector<T> &v){
+  write_matrix(filename.c_str(), v.size(), 1, &v[0], 1);
+}
 
 FortranMatrix matmat(const FortranMatrix& A, const FortranMatrix& B,
 		     bool transA, bool transB);
 
-std::vector<double> matvec(const FortranMatrix& A, const std::vector<double>& x,
+std::vector<double> matvec(const FortranMatrix& A, 
+			   const std::vector<double>& x,
 			   bool transA);
 #endif

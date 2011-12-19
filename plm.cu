@@ -44,11 +44,12 @@ void initGrid(dim3 &grid, unsigned geno_count) throw(int){
 #endif
 }
 
+extern __shared__ double shared[];
+extern __shared__ char sharedChar[];
 #include "cuda_blas.cu"
 
 using namespace std;
 //__shared__ double fval; // scalar
-extern __shared__ double shared[];
 
 __constant__ double d_Xty[fixedPlusIteration_limit + 1];
 
@@ -78,7 +79,6 @@ __global__ void plm(// inputs
     but might need some thread padding for warps.
    */
 
-  double *reduce = shared; // n x 1
   double GtXtsnp; // each thread stores one element of each array // Xtsnp
   //! @todo these might use fewer registers if kept in shared memory
   double snptmy; // scalar
@@ -95,7 +95,11 @@ __global__ void plm(// inputs
 
   if(BID >= geno_count)
     return;
-  if(snpMask[BID]){
+  if(!TID)
+    sharedChar[0] = snpMask[BID];
+
+  __syncthreads();
+  if(sharedChar[0]){
     // don't compute new F
     if(!TID)
       f[BID] = 0;
@@ -110,8 +114,8 @@ __global__ void plm(// inputs
 		       blockDim.x);  //! length of column plus padding (no padding) 
   
   // snptsnp - snptXGXtsnp
-  dotRR(TID, blockDim.x, GtXtsnp, myXtsnp, reduce);
-  s = snptsnp[BID] - *reduce;
+  dotRR(TID, blockDim.x, GtXtsnp, myXtsnp);
+  s = snptsnp[BID] - shared[0];
 #ifdef printGPU
   if(printBIDs(BID)){
     for(int i = 0; i < blockDim.x; i++){
@@ -135,8 +139,8 @@ __global__ void plm(// inputs
     s = (double)1/s;
     
     // snptmy
-    dotRG(TID, blockDim.x, GtXtsnp, d_Xty, reduce);
-    snptmy = -*reduce;
+    dotRG(TID, blockDim.x, GtXtsnp, d_Xty);
+    snptmy = -shared[0];
     
     if(!TID){
 #ifdef printGPU
@@ -191,6 +195,9 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
 		 vector<float> &Fval) throw(int)
 {
     cublasGetError();
+#ifdef _DEBUG
+    cutilSafeCall(cudaThreadSynchronize());
+#endif
     cudaEventRecord(start, 0);
     dim3 grid;
     initGrid(grid, geno_count);

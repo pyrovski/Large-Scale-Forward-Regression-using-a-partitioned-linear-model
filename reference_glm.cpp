@@ -22,6 +22,8 @@
 #include <getopt.h>
 #include <mpi.h>
 #include <gsl/gsl_cdf.h>
+#include <sys/sysinfo.h>
+
 extern "C"{
 #include <cblas.h>
 }
@@ -556,6 +558,16 @@ int main(int argc, char **argv)
   MPI_Comm_size(MPI_COMM_WORLD, &numProcs);
   MPI_Comm_rank(MPI_COMM_WORLD, &id);
 
+  ofstream logstream;
+  streambuf *backupbuf, *logbuf;
+  //redirect stdout
+  stringstream ss_filename;
+  ss_filename << "id_" << id << ".log";
+  logstream.open(ss_filename.str().c_str());
+  backupbuf = cout.rdbuf();
+  logbuf = logstream.rdbuf();
+  cout.rdbuf(logbuf);
+  
   int opt;
 
   double entry_limit = 0.2;
@@ -641,14 +653,14 @@ int main(int argc, char **argv)
   }
   if((fixed_filename == "") ^ (!fixed_count)){
     if(!id)
-      fprintf(stderr, "must supply both -f and --num_fixed, or neither\n");
+      cout << "must supply both -f and --num_fixed, or neither" << endl;
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
   if(iterationLimit + fixed_count > fixedPlusIteration_limit){
     if(!id)
-      fprintf(stderr, "number of iterations plus number of fixed effects must be \n"
-	     "less than %d\n", fixedPlusIteration_limit);
+      cout << "number of iterations plus number of fixed effects must be " 
+	   << "less than " << fixedPlusIteration_limit << endl;
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
@@ -672,6 +684,21 @@ int main(int argc, char **argv)
     cout << "id " << id << " has SNPs " << 
       myStartSNP << "-" << 
       myStartSNP + mySNPs - 1 << endl;
+    
+    struct sysinfo info;
+    int status = sysinfo(&info);
+    if(status){
+      perror("error in sysinfo()");
+    }
+    
+    cout << "id " << id << " SNPs require " 
+	 << mySize / 1024.0 / 1024.0 / 1024.0 << " of " 
+	 << info.totalram / 1024.0 / 1024.0 / 1024.0
+	 << " GB host RAM" << endl;
+    if(mySize > .95 * info.totalram){
+      cerr << "id " << id << " SNP data is likely too large!" << endl;
+    }
+    
   }
 
   // Matrix objects for storing the input data
@@ -1120,7 +1147,11 @@ int main(int argc, char **argv)
     write("Pindices.dat", chosenSNPsReduced);
     cout << "iterations: " << iteration << endl;
   }
-  
+
+  // restore stdout
+  cout.rdbuf(backupbuf);
+  logstream.close();
+
   MPI_Finalize();
   return 0;
 }

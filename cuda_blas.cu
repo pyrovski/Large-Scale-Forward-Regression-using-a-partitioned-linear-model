@@ -56,7 +56,6 @@ __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
       reduce[0] += reduce[i];
   }
   */
-  ///*
   unsigned threads;
   while(N/2){
     threads = (N + 1) / 2;
@@ -69,7 +68,6 @@ __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
     __syncthreads();
     N = threads;
   }
-  //*/
 }
 
 /*
@@ -81,8 +79,9 @@ __device__ void reduceCore(const unsigned TID, unsigned N, double *reduce){
 __device__ void dotRR(const unsigned TID,
 		    const unsigned N, 
 		    const double x,
-		    const double y,
-		    double *reduce){
+		    const double y){
+
+  double *reduce = shared;
 
   // compute dot product terms
   // place x*y in shared memory (reduce)
@@ -95,8 +94,8 @@ __device__ void dotRR(const unsigned TID,
 __device__ void dotRG(const unsigned TID,
 		      const unsigned N, 
 		      const double x,
-		      const double *y,
-		      double *reduce){ // assume blockDim.x elements
+		      const double *y){
+  double *reduce = shared;
   __syncthreads();
   reduce[TID] = x * y[TID];
   __syncthreads();
@@ -111,8 +110,7 @@ __device__ double vecRMatCSq(const unsigned TID,
 			     const unsigned N,
 			     const double *A, 
 			     const unsigned lda){
-  
-  
+    
   double retVal = 0.0;
   __syncthreads();
   shared[TID] = x;

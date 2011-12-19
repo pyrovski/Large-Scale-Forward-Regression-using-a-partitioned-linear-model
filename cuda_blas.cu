@@ -233,7 +233,12 @@ void columnDot_gpu(const double *d_mat, unsigned n_rows, uint64_t n_cols,
     exit(1);
   }
 
+  cudaEventRecord(start, 0);
   columnDot<blockSize>
     <<<grid, blockSize>>>
     (d_mat, n_rows, n_cols, columnPitchInWords, d_result, resultStrideInWords);
+  cudaEventRecord(stopKernel, 0);
+
+  #warning synchronizing for timing
+  cudaEventSynchronize(stopKernel);
 }

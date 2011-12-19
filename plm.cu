@@ -49,6 +49,7 @@ void initGrid(dim3 &grid, unsigned geno_count) throw(int){
 using namespace std;
 //__shared__ double fval; // scalar
 extern __shared__ double shared[];
+extern __shared__ char sharedChar[];
 
 __constant__ double d_Xty[fixedPlusIteration_limit + 1];
 
@@ -95,7 +96,11 @@ __global__ void plm(// inputs
 
   if(BID >= geno_count)
     return;
-  if(snpMask[BID]){
+  if(!TID)
+    sharedChar[0] = snpMask[BID];
+
+  __syncthreads();
+  if(sharedChar[0]){
     // don't compute new F
     if(!TID)
       f[BID] = 0;

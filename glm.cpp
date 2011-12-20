@@ -8,6 +8,7 @@ extern "C"{
 
 using namespace std;
 
+//! @todo convert for gpu
 // This version of the glm function assumes Kt is a vector.  It makes
 // the code a good deal cleaner (but not really any faster when Kt is
 // a 1-by-N matrix) than the more general case where Kt is a matrix.

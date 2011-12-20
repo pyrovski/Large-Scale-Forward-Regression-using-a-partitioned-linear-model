@@ -201,7 +201,7 @@ columnDot(const double *d_mat, unsigned n_rows, unsigned n_cols,
   const unsigned TID = threadIdx.x;
   
   const unsigned col = BID;
-  double myResult = 0.0, tmp;
+  double myResult = 0.0;
 
   for(unsigned row = 0; row < n_rows; row += blockSize)
     if(row + TID < n_rows)

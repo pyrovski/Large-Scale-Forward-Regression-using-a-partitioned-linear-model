@@ -16,23 +16,29 @@ unsigned plm_GPU(unsigned geno_count, unsigned blockSize,
 		 double* d_snpty, char* d_snpMask, float* d_f,
 		 std::vector<float> &Fval) throw(int);
 
-int copyToDevice(const unsigned id, 
+int copyToDevice(const unsigned id, // MPI rank
 		 const unsigned verbosity,
-		 const unsigned geno_count, const unsigned n,
+		 const unsigned geno_count, // # of SNPs
+		 const unsigned n, // # of columns in X
+		 const unsigned SNPLength, // # length of each SNP
 		 double *&d_snptsnp, double *&d_Xtsnp, size_t &d_XtsnpPitch, 
-		 double *&d_snpty, char *&d_snpMask, float *&d_f,
-		  const std::vector<double> &SNPtSNP, const FortranMatrix &XtSNP,
-		 const std::vector<double> &SNPty,
-		 const std::vector<double> &Xty, const FortranMatrix &XtXi, 
-		 const std::vector<char> &snpMask);
+		 double *&d_snpty, char *&d_snpMask, float *&d_f, 
+		 double *&d_geno, size_t &d_genoPitch, 
+		 double *&d_Xt, size_t &d_XtPitch,
+		 double *&d_y,
+		 const std::vector<double> &Xty, 
+		 const FortranMatrix &XtXi, // G
+		 const FortranMatrix &Xt, // only for XtSNP
+		 const FortranMatrix &geno,
+		 double *&d_nextSNP,
+		 const double *y);
 
 void copyUpdateToDevice(unsigned id, unsigned iteration,
 			unsigned geno_count, unsigned n,
 			char *d_snpMask, 
 			int maxFIndex, double *d_Xtsnp, 
 			size_t d_XtsnpPitch,
-			const std::vector<char> &snpMask,
-			FortranMatrix &XtSNP, const FortranMatrix &XtXi,
+			const FortranMatrix &XtXi,
 			const std::vector<double> &Xty);
 
 float getGPUCompTime();
@@ -42,3 +48,10 @@ float getGPUMaxTime();
 void getMaxFGPU(unsigned id, unsigned iteration, unsigned geno_count, 
 	     std::vector<float> &Fval, 
 	     unsigned maxFIndex, float *d_f);
+
+// defined in cuda_blas.cu:
+void columnDot_gpu(const double *d_mat, unsigned n_rows, uint64_t n_cols, 
+		   unsigned columnPitchInWords, // words between tops of columns
+		   double *d_result, 
+		   unsigned resultStrideInWords // words between result elements
+		   );

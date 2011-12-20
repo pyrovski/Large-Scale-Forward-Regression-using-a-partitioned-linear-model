@@ -417,8 +417,13 @@ void compPrepareGPU(const double *d_Xt, const double *d_geno, const double *d_y,
 				&geno.values[i*geno_ind], 1);
   }
   */
+
   columnDot_gpu(d_geno, geno_ind, mySNPs, d_genoPitch / sizeof(double), 
     d_SNPtSNP, 1);
+
+  if(verbosity > 1){
+    cout << "columnDot time: " <<  getGPUCompTime()<< "s" << endl;
+  }
 
 }
 

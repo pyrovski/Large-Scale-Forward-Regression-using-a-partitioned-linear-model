@@ -46,6 +46,7 @@ void initGrid(dim3 &grid, unsigned geno_count) throw(int){
 
 extern __shared__ double shared[];
 extern __shared__ char sharedChar[];
+cudaEvent_t start, stopKernel, stopMax;
 #include "cuda_blas.cu"
 
 using namespace std;
@@ -185,8 +186,6 @@ __global__ void plm(// inputs
     return;
   }
 }
-
-cudaEvent_t start, stopKernel, stopMax;
 
 unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
 		 unsigned m, double* d_snptsnp, double* d_Xtsnp, 

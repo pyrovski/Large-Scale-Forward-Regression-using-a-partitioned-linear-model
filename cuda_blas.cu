@@ -203,14 +203,9 @@ columnDot(const double *d_mat, unsigned n_rows, unsigned n_cols,
   const unsigned col = BID;
   double myResult = 0.0, tmp;
 
-  for(unsigned row = 0; row < n_rows; row += blockSize){
-    if(row + TID >= n_rows){
-      tmp = 0.0;
-    }else{
-      tmp = d_mat[col * columnPitchInWords + row + TID];
-    }
-    myResult += tmp * tmp;
-  }
+  for(unsigned row = 0; row < n_rows; row += blockSize)
+    if(row + TID < n_rows)
+      myResult += d_mat[col * columnPitchInWords + row + TID] * d_mat[col * columnPitchInWords + row + TID];
 
   myShared[TID] = myResult;
   __syncthreads();
@@ -233,7 +228,12 @@ void columnDot_gpu(const double *d_mat, unsigned n_rows, uint64_t n_cols,
     exit(1);
   }
 
+  cudaEventRecord(start, 0);
   columnDot<blockSize>
     <<<grid, blockSize>>>
     (d_mat, n_rows, n_cols, columnPitchInWords, d_result, resultStrideInWords);
+  cudaEventRecord(stopKernel, 0);
+
+  #warning synchronizing for timing
+  cudaEventSynchronize(stopKernel);
 }

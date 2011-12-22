@@ -78,7 +78,8 @@ lines(uconf, mGPU_large, col='blue', lwd='2', lty=2)
 lines(uconf, mCPU, col='red', lwd='2', lty=3)
 legend(x='topleft', legend=c('gpu small', 'gpu large', 'cpu'), col=c('black', 'blue', 'red'), lwd=2, lty=1:3)
 
-dev.off()
+
+iterSel = which(a$iterations == 50)
 
 ################################################################################
 #
@@ -86,23 +87,54 @@ dev.off()
 #
 ################################################################################
 
-sel = merge(list(gpuSel, selGPU_small, branchSelGPU_small))
+SNPSel100k = which(a$SNPs_on_rank_0 == 100000)
+
+sel = mergeSels(list(gpuSel, branchSelGPU_small, iterSel, SNPSel100k))
+
+selL = mergeSels(list(gpuSel, branchSelGPU_large, iterSel, SNPSel100k))
+
 conf = a[sel,c('nodes','cores.gpus')]
 p = order(conf$nodes,conf$cores.gpus)
 uconf = unique(conf[p,])
+
 m = c()
 std = c()
+count = c()
+
+mL = c()
+stdL = c()
+countL = c()
+
+totalSNPs = c()
+gpuCount = c()
 for(i in 1:length(uconf[,1])){
+  if(uconf[i,'nodes'] == uconf[i,'cores.gpus'] && uconf[i,'cores.gpus'] > 1){
+    next()
+  }
+
+  gpuCount[i] = paste(uconf[i, 'cores.gpus'], 'GPUs')
+  
   # summarize matching configurations;
   # they should have equal numbers of total SNPs
   iSel = mergeSels(list(sel, which(a$nodes == uconf[i,'nodes']), which(a$cores.gpus == uconf[i,'cores.gpus'])))
   vals = a$comp[iSel];
   m[i] = mean(vals);
   std[i] = sd(vals);
+  count[i] = length(vals)
+  
+  iSelL = mergeSels(list(selL, which(a$nodes == uconf[i,'nodes']), which(a$cores.gpus == uconf[i,'cores.gpus'])))
+  valsL = a$comp[iSelL];
+  mL[i] = mean(valsL);
+  stdL[i] = sd(valsL);
+  countL[i] = length(valsL)
+
+  # this is not entirely precise; the last rank could have fewer than SNPs_on_rank_0 SNPs
+#  totalSNPs[i] = paste(format(uconf[i,'cores.gpus'] * 100000, scientific=T), 'SNPs')
 }
 pdf('smallDataGPUMPI.pdf');
-plot(uconf[,'cores.gpus'], m)
-dev.off()
+#plot(uconf[,'cores.gpus'], m)
+barplot(t(matrix(c(m,mL),ncol=2)), names.arg=gpuCount, beside=T,main=paste('weak scaling across GPUs via MPI'), lwd=2, ylab='computation time (s)', legend.text=c('gpu small','gpu large'), sub='100k SNPs/GPU', ylim=c(0,1.2*max(m,mL)))
+print(count)
 
 ################################################################################
 #
@@ -123,32 +155,13 @@ SNPSel1 = which(a$SNPs_on_rank_0 == 1000000)
 SNPSel2 = which(a$SNPs_on_rank_0 == 500000)
 
 nodeSel = which(a$nodes == 1)
-
 core1Sel = which(a$cores == 1)
-
 core2Sel = which(a$cores == 2)
-
-iterSel = which(a$iterations == 50)
-
-print(0)
-
-D2core1 = merge(list(gpuSel,D2Sel,core1Sel))
-
-print(8)
-D2core2 = merge(list(gpuSel,D2Sel,core2Sel))
-
-print(4)
-
-D1core1 = merge(list(gpuSel,D1Sel,core1Sel))
-
-D1core2 = merge(list(gpuSel,D1Sel,core2Sel))
-
-print(2)
-
-S2core1 = merge(list(gpuSel,S2Sel,core1Sel))
-
-S2core2 = merge(list(gpuSel,S2Sel,core2Sel))
-
-S1core1 = merge(list(gpuSel,S1Sel,core1Sel))
-
-S1core2 = merge(list(gpuSel,S1Sel,core2Sel))
+D2core1 = mergeSels(list(gpuSel,D2Sel,core1Sel))
+D2core2 = mergeSels(list(gpuSel,D2Sel,core2Sel))
+D1core1 = mergeSels(list(gpuSel,D1Sel,core1Sel))
+D1core2 = mergeSels(list(gpuSel,D1Sel,core2Sel))
+S2core1 = mergeSels(list(gpuSel,S2Sel,core1Sel))
+S2core2 = mergeSels(list(gpuSel,S2Sel,core2Sel))
+S1core1 = mergeSels(list(gpuSel,S1Sel,core1Sel))
+S1core2 = mergeSels(list(gpuSel,S1Sel,core2Sel))

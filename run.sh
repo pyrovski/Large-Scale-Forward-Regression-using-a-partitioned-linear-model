@@ -8,7 +8,7 @@ ibrun ../reference_glm \
 -f /scratch/01713/pbailey/data_maize_nam/fixed.effects.nam.sorted.filtered.bin \
 --num_fixed 26 \
 -g /scratch/01713/pbailey/massiver.dat \
---num_geno 100000 \
+--num_geno 1000000 \
 -r /scratch/01713/pbailey/data_maize_nam/residuals.chr10.sorted.bin \
 --num_r 4892 \
 -v2 \

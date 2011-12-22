@@ -21,6 +21,14 @@ a = read.table("filteredTable",header=T)
 #master_cpu_100000 = intersect(master_cpu_100000, which(a$SNPs_on_rank_0 == 100000))
 #summary(a$comp[master_cpu_100000])
 
+master_gpu_1000000_29i = mergeSels(list(which(a$branch == "master"), which(a$cpu_gpu == "gpu"), 
+		       which(a$SNPs_on_rank_0 == 1000000), which(a$iterations == 29)))
+#summary(a$comp[master_gpu_1000000_29i])
+
+
+#################################################################
+# generate plot for small GPU vs large GPU vs cpu implementations
+#################################################################
 branchSelGPU_small = which(a$branch == 'test_GPU_all')
 branchSelGPU_large = which(a$branch == 'master')
 branchSelCPU = which(a$branch == 'master')

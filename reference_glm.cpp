@@ -642,7 +642,11 @@ int main(int argc, char **argv)
     if(mySize > .95 * info.totalram){
       cerr << "id " << id << " SNP data is likely too large!" << endl;
     }
-    
+    if(!id)
+      cout << "invoked as: ";
+      for(int i = 0; i < argc; i++)
+	cout << argv[i] << " ";
+      cout << endl;
   }
 
   // Matrix objects for storing the input data

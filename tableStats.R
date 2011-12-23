@@ -168,14 +168,20 @@ uconf = unique(conf[p,])
 m = c()
 std = c()
 count = c()
+cih = c()
+cil = c()
 
 mL = c()
 stdL = c()
 countL = c()
+cihL = c()
+cilL = c()
 
 mC = c()
 stdC = c()
 countC = c()
+cihC = c()
+cilC = c()
 
 totalSNPs = c()
 gpuCount = c()
@@ -195,7 +201,7 @@ for(i in 1:length(uconf[,1])){
   m[i] = mean(vals);
   std[i] = sd(vals);
   count[i] = length(vals)
-  
+
   iSelL = intersect(selL, uconfSel)
   valsL = a$comp[iSelL];
   mL[i] = mean(valsL);
@@ -208,13 +214,27 @@ for(i in 1:length(uconf[,1])){
   stdC[i] = sd(valsC);
   countC[i] = length(valsC)
 
-  # this is not entirely precise; the last rank could have fewer than SNPs_on_rank_0 SNPs
-#  totalSNPs[i] = paste(format(uconf[i,'cores.gpus'] * 100000, scientific=T), 'SNPs')
+  tmp = t.test(valsC)
+  cilC[i] = tmp$conf.int[1]
+  cihC[i] = tmp$conf.int[2]
+
+  tmp = t.test(mC[i]/vals*100-100)
+  cil[i] = tmp$conf.int[1]
+  cih[i] = tmp$conf.int[2]
+
+  tmp = t.test(mC[i]/valsL*100-100)
+  cilL[i] = tmp$conf.int[1]
+  cihL[i] = tmp$conf.int[2]
 }
 pdf('smallDataGPUMPIStrong.pdf');
 #plot(uconf[,'cores.gpus'], m)
 data = c(mC/m,mC/mL)*100.0 - 100.0
 barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('strong scaling across GPUs via MPI'), lwd=2, ylab='improvement over CPU MPI (%)', legend.text=c('gpu small','gpu large'), sub='100k SNPs total', ylim=c(min(data),1.2*max(data)))
+
+# add error bars
+for(i in 1:length(uconf[,1])){
+  lines(3*(c(i,i)-.5), c(cil[i],cih[i]), lwd=3, col='red')
+}
 print(count)
 
 ################################################################################

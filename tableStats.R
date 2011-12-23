@@ -229,11 +229,12 @@ for(i in 1:length(uconf[,1])){
 pdf('smallDataGPUMPIStrong.pdf');
 #plot(uconf[,'cores.gpus'], m)
 data = c(mC/m,mC/mL)*100.0 - 100.0
-barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('strong scaling across GPUs via MPI'), lwd=2, ylab='improvement over CPU MPI (%)', legend.text=c('gpu small','gpu large'), sub='100k SNPs total', ylim=c(min(data),1.2*max(data)))
+barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('strong scaling across GPUs via MPI'), lwd=2, ylab='improvement over CPU MPI (%)', legend.text=c('gpu small','gpu large'), sub='100k SNPs total', ylim=c(1.2*min(cil,cilL),1.2*max(data)))
 
 # add error bars
 for(i in 1:length(uconf[,1])){
   lines(3*(c(i,i)-.5), c(cil[i],cih[i]), lwd=3, col='red')
+  lines(3*(c(i,i)-.5)+1, c(cilL[i],cihL[i]), lwd=3, col='red')
 }
 print(count)
 

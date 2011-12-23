@@ -146,7 +146,10 @@ pdf('smallDataGPUMPI.pdf');
 #plot(uconf[,'cores.gpus'], m)
 data = c(mC/m,mC/mL)*100.0 - 100.0
 barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('weak scaling across GPUs via MPI'), lwd=2, ylab='improvement over CPU MPI (%)', legend.text=c('gpu small','gpu large'), sub='100k SNPs/GPU', ylim=c(0,1.2*max(data)))
+cat('weak scaling counts:\n')
 print(count)
+print(countL)
+print(countC)
 
 ################################################################################
 #
@@ -234,9 +237,17 @@ barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('strong 
 # add error bars
 for(i in 1:length(uconf[,1])){
   lines(3*(c(i,i)-.5), c(cil[i],cih[i]), lwd=3, col='red')
+  lines(3*(i-.5)+c(-.3,.3), c(cil[i],cil[i]),lwd=3, col='red')
+  lines(3*(i-.5)+c(-.3,.3), c(cih[i],cih[i]),lwd=3, col='red')
+
   lines(3*(c(i,i)-.5)+1, c(cilL[i],cihL[i]), lwd=3, col='red')
+  lines(3*(i-.5)+1+c(-.3,.3), c(cilL[i],cilL[i]),lwd=3, col='red')
+  lines(3*(i-.5)+1+c(-.3,.3), c(cihL[i],cihL[i]),lwd=3, col='red')
 }
+cat('strong scaling counts:\n')
 print(count)
+print(countL)
+print(countC)
 
 ################################################################################
 #

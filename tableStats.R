@@ -83,15 +83,16 @@ iterSel = which(a$iterations == 50)
 
 ################################################################################
 #
-# compare small problem size instances across node counts, implementations
+# Compare small problem size instances across node counts, implementations.
+# Weak scaling.
 #
 ################################################################################
 
 SNPSel100k = which(a$SNPs_on_rank_0 == 100000)
 
 sel = mergeSels(list(gpuSel, branchSelGPU_small, iterSel, SNPSel100k))
-
 selL = mergeSels(list(gpuSel, branchSelGPU_large, iterSel, SNPSel100k))
+selC = mergeSels(list(cpuSel, branchSelGPU_large, iterSel, SNPSel100k))
 
 conf = a[sel,c('nodes','cores.gpus')]
 p = order(conf$nodes,conf$cores.gpus)
@@ -104,6 +105,10 @@ count = c()
 mL = c()
 stdL = c()
 countL = c()
+
+mC = c()
+stdC = c()
+countC = c()
 
 totalSNPs = c()
 gpuCount = c()
@@ -128,12 +133,88 @@ for(i in 1:length(uconf[,1])){
   stdL[i] = sd(valsL);
   countL[i] = length(valsL)
 
+  iSelC = mergeSels(list(selC, which(a$nodes == uconf[i,'nodes']), which(a$cores.gpus == uconf[i,'cores.gpus'])))
+  valsC = a$comp[iSelC];
+  mC[i] = mean(valsC);
+  stdC[i] = sd(valsC);
+  countC[i] = length(valsC)
+
   # this is not entirely precise; the last rank could have fewer than SNPs_on_rank_0 SNPs
 #  totalSNPs[i] = paste(format(uconf[i,'cores.gpus'] * 100000, scientific=T), 'SNPs')
 }
 pdf('smallDataGPUMPI.pdf');
 #plot(uconf[,'cores.gpus'], m)
-barplot(t(matrix(c(m,mL),ncol=2)), names.arg=gpuCount, beside=T,main=paste('weak scaling across GPUs via MPI'), lwd=2, ylab='computation time (s)', legend.text=c('gpu small','gpu large'), sub='100k SNPs/GPU', ylim=c(0,1.2*max(m,mL)))
+data = c(mC/m,mC/mL)*100.0 - 100.0
+barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('weak scaling across GPUs via MPI'), lwd=2, ylab='improvement over CPU MPI (%)', legend.text=c('gpu small','gpu large'), sub='100k SNPs/GPU', ylim=c(0,1.2*max(data)))
+print(count)
+
+################################################################################
+#
+# Compare small problem size instances across node counts, implementations.
+# Strong scaling.
+#
+################################################################################
+
+sel = mergeSels(list(gpuSel, branchSelGPU_small, iterSel))
+selL = mergeSels(list(gpuSel, branchSelGPU_large, iterSel))
+selC = mergeSels(list(cpuSel, branchSelGPU_large, iterSel))
+
+SNPSel = which(a$SNPs_on_rank_0 * a$cores.gpus == 100000)
+
+conf = a[sel,c('nodes','cores.gpus')]
+p = order(conf$nodes,conf$cores.gpus)
+uconf = unique(conf[p,])
+
+m = c()
+std = c()
+count = c()
+
+mL = c()
+stdL = c()
+countL = c()
+
+mC = c()
+stdC = c()
+countC = c()
+
+totalSNPs = c()
+gpuCount = c()
+for(i in 1:length(uconf[,1])){
+  if(uconf[i,'nodes'] == uconf[i,'cores.gpus'] && uconf[i,'cores.gpus'] > 1){
+    next()
+  }
+
+  gpuCount[i] = paste(uconf[i, 'cores.gpus'], 'GPUs')
+  
+  # summarize matching configurations;
+  # they should have equal numbers of total SNPs
+  uconfSel = mergeSels(list(which(a$nodes == uconf[i,'nodes']), which(a$cores.gpus == uconf[i,'cores.gpus']), SNPSel))
+
+  iSel = intersect(sel, uconfSel)
+  vals = a$comp[iSel];
+  m[i] = mean(vals);
+  std[i] = sd(vals);
+  count[i] = length(vals)
+  
+  iSelL = intersect(selL, uconfSel)
+  valsL = a$comp[iSelL];
+  mL[i] = mean(valsL);
+  stdL[i] = sd(valsL);
+  countL[i] = length(valsL)
+
+  iSelC = intersect(selC, uconfSel)
+  valsC = a$comp[iSelC];
+  mC[i] = mean(valsC);
+  stdC[i] = sd(valsC);
+  countC[i] = length(valsC)
+
+  # this is not entirely precise; the last rank could have fewer than SNPs_on_rank_0 SNPs
+#  totalSNPs[i] = paste(format(uconf[i,'cores.gpus'] * 100000, scientific=T), 'SNPs')
+}
+pdf('smallDataGPUMPIStrong.pdf');
+#plot(uconf[,'cores.gpus'], m)
+data = c(mC/m,mC/mL)*100.0 - 100.0
+barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('strong scaling across GPUs via MPI'), lwd=2, ylab='improvement over CPU MPI (%)', legend.text=c('gpu small','gpu large'), sub='100k SNPs total', ylim=c(min(data),1.2*max(data)))
 print(count)
 
 ################################################################################

@@ -146,7 +146,10 @@ pdf('smallDataGPUMPI.pdf');
 #plot(uconf[,'cores.gpus'], m)
 data = c(mC/m,mC/mL)*100.0 - 100.0
 barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('weak scaling across GPUs via MPI'), lwd=2, ylab='improvement over CPU MPI (%)', legend.text=c('gpu small','gpu large'), sub='100k SNPs/GPU', ylim=c(0,1.2*max(data)))
+cat('weak scaling counts:\n')
 print(count)
+print(countL)
+print(countC)
 
 ################################################################################
 #
@@ -168,14 +171,20 @@ uconf = unique(conf[p,])
 m = c()
 std = c()
 count = c()
+cih = c()
+cil = c()
 
 mL = c()
 stdL = c()
 countL = c()
+cihL = c()
+cilL = c()
 
 mC = c()
 stdC = c()
 countC = c()
+cihC = c()
+cilC = c()
 
 totalSNPs = c()
 gpuCount = c()
@@ -195,7 +204,7 @@ for(i in 1:length(uconf[,1])){
   m[i] = mean(vals);
   std[i] = sd(vals);
   count[i] = length(vals)
-  
+
   iSelL = intersect(selL, uconfSel)
   valsL = a$comp[iSelL];
   mL[i] = mean(valsL);
@@ -208,14 +217,76 @@ for(i in 1:length(uconf[,1])){
   stdC[i] = sd(valsC);
   countC[i] = length(valsC)
 
-  # this is not entirely precise; the last rank could have fewer than SNPs_on_rank_0 SNPs
-#  totalSNPs[i] = paste(format(uconf[i,'cores.gpus'] * 100000, scientific=T), 'SNPs')
+  tmp = t.test(valsC)
+  cilC[i] = tmp$conf.int[1]
+  cihC[i] = tmp$conf.int[2]
+
+  tmp = t.test(mC[i]/vals*100-100)
+  cil[i] = tmp$conf.int[1]
+  cih[i] = tmp$conf.int[2]
+
+  tmp = t.test(mC[i]/valsL*100-100)
+  cilL[i] = tmp$conf.int[1]
+  cihL[i] = tmp$conf.int[2]
 }
 pdf('smallDataGPUMPIStrong.pdf');
 #plot(uconf[,'cores.gpus'], m)
 data = c(mC/m,mC/mL)*100.0 - 100.0
-barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('strong scaling across GPUs via MPI'), lwd=2, ylab='improvement over CPU MPI (%)', legend.text=c('gpu small','gpu large'), sub='100k SNPs total', ylim=c(min(data),1.2*max(data)))
+barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('strong scaling across GPUs via MPI'), lwd=2, ylab='improvement over CPU MPI (%)', legend.text=c('gpu small','gpu large'), sub='100k SNPs total', ylim=c(1.2*min(cil,cilL),1.2*max(data)))
+
+# add error bars
+#for(i in 1:length(uconf[,1])){
+#  lines(3*(c(i,i)-.5), c(cil[i],cih[i]), lwd=3, col='red')
+#  lines(3*(i-.5)+c(-.3,.3), c(cil[i],cil[i]),lwd=3, col='red')
+#  lines(3*(i-.5)+c(-.3,.3), c(cih[i],cih[i]),lwd=3, col='red')
+#
+#  lines(3*(c(i,i)-.5)+1, c(cilL[i],cihL[i]), lwd=3, col='red')
+#  lines(3*(i-.5)+1+c(-.3,.3), c(cilL[i],cilL[i]),lwd=3, col='red')
+#  lines(3*(i-.5)+1+c(-.3,.3), c(cihL[i],cihL[i]),lwd=3, col='red')
+#}
+cat('strong scaling counts:\n')
 print(count)
+print(countL)
+print(countC)
+
+################################################################################
+#
+# Compare large problem size instances across node counts for CPU only.
+# Strong scaling.
+#
+################################################################################
+
+SNPSel = which(a$SNPs_on_rank_0 * a$cores.gpus == 1000000)
+confSel = union(which(a$cores.gpus == 1), which(a$cores.gpus == 2*a$nodes))
+sel = mergeSels(list(cpuSel, branchSelCPU, iterSel, SNPSel, confSel))
+conf = a[sel,c('nodes','cores.gpus')]
+p = order(conf$nodes,conf$cores.gpus)
+uconf = unique(conf[p,])
+
+m = c()
+sockets = c()
+count = c()
+cih = c()
+cil = c()
+for(i in 1:length(uconf[,1])){
+  uconfSel = mergeSels(list(which(a$nodes == uconf[i,'nodes']), 
+  	     which(a$cores.gpus == uconf[i,'cores.gpus']), sel))
+
+  vals = a$comp[uconfSel]
+  m[i] = mean(vals)
+  count[i] = length(vals)
+  sockets[i] = uconf[i,'cores.gpus']
+}
+pdf('cpuStrong.pdf')
+plot(sockets, m, type='l', lwd=2, main='CPU strong scaling via MPI', 
+     sub='1M SNPs', xlab='cores (2 cores/node)', ylab='SNPs/s', log='xy')
+points(sockets, m, pch=19)
+
+cat('CPU strong scaling counts:\n')
+print(count)
+print(sockets)
+print(m)
+
 
 ################################################################################
 #

@@ -279,8 +279,13 @@ for(i in 1:length(uconf[,1])){
 }
 pdf('cpuStrong.pdf')
 plot(sockets, m, type='l', lwd=2, main='CPU strong scaling via MPI', 
-     sub='1M SNPs', xlab='cores (2 cores/node)', ylab='SNPs/s', log='xy')
+     sub='1M SNPs', xlab='cores (2 cores/node)', ylab='computation time (s)', log='xy')
 points(sockets, m, pch=19)
+
+pdf('cpuStrongSNPsPerSecond.pdf')
+plot(sockets, 1000000/m, type='l', lwd=2, main='CPU strong scaling via MPI', 
+     sub='1M SNPs', xlab='cores (2 cores/node)', ylab='SNPs/s', log='xy')
+points(sockets, 1000000/m, pch=19)
 
 cat('CPU strong scaling counts:\n')
 print(count)

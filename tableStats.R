@@ -8,6 +8,10 @@ mergeSels = function(selList){
   return(result)
 }
 
+
+labcex=1.2
+maincex=1.2
+
 a = read.table("filteredTable",header=T)
 #cat(names(a), '\n')
 
@@ -73,7 +77,7 @@ for(i in 1:length(uconf)){
 
 yl = range(c(mGPU_small, mCPU))
 pdf('smallDataGPU.pdf')
-plot(uconf, mGPU_small, log='xy', xlab='log(SNP count)', ylab='log (computation time) (s)', main='computation time vs. SNP count', sub='small datasets', type='l', col='black', ylim=yl, lwd='2', lty=1)
+plot(uconf, mGPU_small, log='xy', xlab='log(SNP count)', ylab='log (computation time) (s)', main='Computation time vs. SNP count', sub='Small datasets', type='l', col='black', ylim=yl, lwd='2', lty=1, cex.lab=labcex, cex.main=maincex)
 lines(uconf, mGPU_large, col='blue', lwd='2', lty=2)
 lines(uconf, mCPU, col='red', lwd='2', lty=3)
 legend(x='topleft', legend=c('gpu small', 'gpu large', 'cpu'), col=c('black', 'blue', 'red'), lwd=2, lty=1:3)
@@ -145,7 +149,7 @@ for(i in 1:length(uconf[,1])){
 pdf('smallDataGPUMPI.pdf');
 #plot(uconf[,'cores.gpus'], m)
 data = c(mC/m,mC/mL)*100.0 - 100.0
-barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('weak scaling across GPUs via MPI'), lwd=2, ylab='improvement over CPU MPI (%)', legend.text=c('gpu small','gpu large'), sub='100k SNPs/GPU', ylim=c(0,1.2*max(data)))
+barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('Weak scaling across GPUs via MPI'), lwd=2, ylab='Improvement over CPU MPI (%)', legend.text=c('small','large'), sub='100k SNPs/GPU', ylim=c(0,1.2*max(data)), cex.lab=labcex, cex.main=maincex)
 cat('weak scaling counts:\n')
 print(count)
 print(countL)
@@ -232,7 +236,7 @@ for(i in 1:length(uconf[,1])){
 pdf('smallDataGPUMPIStrong.pdf');
 #plot(uconf[,'cores.gpus'], m)
 data = c(mC/m,mC/mL)*100.0 - 100.0
-barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('strong scaling across GPUs via MPI'), lwd=2, ylab='improvement over CPU MPI (%)', legend.text=c('gpu small','gpu large'), sub='100k SNPs total', ylim=c(1.2*min(cil,cilL),1.2*max(data)))
+barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('Strong scaling across GPUs via MPI'), lwd=2, ylab='Improvement over CPU MPI (%)', legend.text=c('small','large'), sub='100k SNPs total', ylim=c(1.2*min(cil,cilL),1.2*max(data)), cex.lab=labcex, cex.main=maincex)
 
 # add error bars
 #for(i in 1:length(uconf[,1])){
@@ -279,12 +283,19 @@ for(i in 1:length(uconf[,1])){
 }
 pdf('cpuStrong.pdf')
 plot(sockets, m, type='l', lwd=2, main='CPU strong scaling via MPI', 
-     sub='1M SNPs', xlab='cores (2 cores/node)', ylab='computation time (s)', log='xy')
+     sub='1M SNPs', xlab='Cores (2 cores/node)', ylab='Computation time (s)', log='xy', axes=F, cex.lab=labcex, cex.main=maincex)
+axis(at=sockets, side=1)
+axis(at=m, labels=format(m,digits=3), side=2)
+box()
+
 points(sockets, m, pch=19)
 
 pdf('cpuStrongSNPsPerSecond.pdf')
 plot(sockets, 1000000/m, type='l', lwd=2, main='CPU strong scaling via MPI', 
-     sub='1M SNPs', xlab='cores (2 cores/node)', ylab='SNPs/s', log='xy')
+     sub='1M SNPs', xlab='Cores (2 cores/node)', ylab='SNPs/s', log='xy', cex.lab=labcex, cex.main=maincex, axes=F)
+axis(at=sockets, side=1)
+axis(at=1000000/m, labels=format(m,digits=3), side=2)
+box()
 points(sockets, 1000000/m, pch=19)
 
 cat('CPU strong scaling counts:\n')

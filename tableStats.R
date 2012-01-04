@@ -255,6 +255,56 @@ print(countC)
 
 ################################################################################
 #
+# Summarize small problem size instances across node counts for GPU only.
+# Single precision.
+# Strong scaling.
+#
+################################################################################
+
+SNPSel = which(a$SNPs_on_rank_0 * a$cores.gpus == 100000)
+confSel = union(which(a$cores.gpus == 1), which(a$cores.gpus == 2*a$nodes))
+branchSelGPUSmallSingle = which(a$branch == 'GPU_all_single')
+sel = mergeSels(list(gpuSel, branchSelGPUSmallSingle, iterSel, SNPSel, confSel))
+conf = a[sel,c('nodes','cores.gpus')]
+p = order(conf$nodes,conf$cores.gpus)
+uconf = unique(conf[p,])
+
+m = c()
+sockets = c()
+count = c()
+cih = c()
+cil = c()
+for(i in 1:length(uconf[,1])){
+  uconfSel = mergeSels(list(which(a$nodes == uconf[i,'nodes']), 
+  	     which(a$cores.gpus == uconf[i,'cores.gpus']), sel))
+
+  vals = a$comp[uconfSel]
+  m[i] = mean(vals)
+  count[i] = length(vals)
+  sockets[i] = uconf[i,'cores.gpus']
+}
+#pdf('cpuStrong.pdf')
+#plot(sockets, m, type='l', lwd=2, main='CPU strong scaling via MPI',   sub='1M SNPs', xlab='Cores (2 cores/node)', ylab='Computation time (s)', log='xy', axes=F, cex.lab=labcex, cex.main=maincex)
+#axis(at=sockets, side=1)
+#axis(at=m, labels=format(m,digits=3), side=2)
+#box()
+
+#points(sockets, m, pch=19)
+
+#pdf('cpuStrongSNPsPerSecond.pdf')
+#plot(sockets, 1000000/m, type='l', lwd=2, main='CPU strong scaling via MPI',  sub='1M SNPs', xlab='Cores (2 cores/node)', ylab='SNPs/s', log='xy', #cex.lab=labcex, cex.main=maincex, axes=F)
+#axis(at=sockets, side=1)
+#axis(at=1000000/m, labels=format(m,digits=3), side=2)
+#box()
+#points(sockets, 1000000/m, pch=19)
+
+cat('GPU small strong scaling counts:\n')
+print(count)
+print(sockets)
+print(m)
+
+################################################################################
+#
 # Compare large problem size instances across node counts for CPU only.
 # Strong scaling.
 #

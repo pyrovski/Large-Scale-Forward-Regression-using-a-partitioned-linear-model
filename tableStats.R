@@ -149,7 +149,8 @@ for(i in 1:length(uconf[,1])){
 pdf('smallDataGPUMPI.pdf');
 #plot(uconf[,'cores.gpus'], m)
 data = c(mC/m,mC/mL)*100.0 - 100.0
-barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('Weak scaling across GPUs via MPI'), lwd=2, ylab='Improvement over CPU MPI (%)', legend.text=c('small','large'), sub='100k SNPs/GPU', ylim=c(0,1.2*max(data)), cex.lab=labcex, cex.main=maincex)
+# gpu only vs selective
+barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('Weak scaling across GPUs via MPI'), lwd=2, ylab='Improvement over CPU MPI (%)', legend.text=c('GPU only','Selective GPU'), sub='100k SNPs/GPU', ylim=c(0,1.2*max(data)), cex.lab=labcex, cex.main=maincex)
 cat('weak scaling counts:\n')
 print(count)
 print(countL)
@@ -232,11 +233,14 @@ for(i in 1:length(uconf[,1])){
   tmp = t.test(mC[i]/valsL*100-100)
   cilL[i] = tmp$conf.int[1]
   cihL[i] = tmp$conf.int[2]
+  cat('test_GPU_all ', uconf[i,'cores.gpus'], ' gpus ', m[i], ' ', std[i], '\n')
+  cat('master ', uconf[i,'cores.gpus'], ' gpus ', mL[i], ' ', stdL[i], '\n')
+  cat('master ', uconf[i,'cores.gpus'], ' cpus ', mC[i], ' ', stdC[i], '\n')
 }
 pdf('smallDataGPUMPIStrong.pdf');
 #plot(uconf[,'cores.gpus'], m)
 data = c(mC/m,mC/mL)*100.0 - 100.0
-barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('Strong scaling across GPUs via MPI'), lwd=2, ylab='Improvement over CPU MPI (%)', legend.text=c('small','large'), sub='100k SNPs total', ylim=c(1.2*min(cil,cilL),1.2*max(data)), cex.lab=labcex, cex.main=maincex)
+barplot(t(matrix(data,ncol=2)), names.arg=gpuCount, beside=T,main=paste('Strong scaling across GPUs via MPI (small datasets)'), lwd=2, ylab='Improvement over CPU MPI (%)', legend.text=c('GPU only','selective GPU'), sub='100k SNPs total', ylim=c(1.2*min(cil,cilL),1.2*max(data)), cex.lab=labcex, cex.main=maincex)
 
 # add error bars
 #for(i in 1:length(uconf[,1])){

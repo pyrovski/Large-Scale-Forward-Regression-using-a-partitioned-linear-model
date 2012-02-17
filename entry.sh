@@ -32,6 +32,9 @@ cat $1/id_0.log|exComp.sh >> .tmp
 snp=`cat $1/id_0.log|grep 'has SNPs'| cut -d' ' -f5|cut -d'-' -f2`
 python -c "print $snp + 1" >> .tmp
 
+#SNP length
+egrep -o 'num_r[[:space:]]+[[:digit:]]+' $1/id_0.log|tr -s ' ' | cut -d' ' -f2 >> .tmp
+
 #regurgitate
 cat .tmp|tr -d ' '|tr '\n' ' '
 echo

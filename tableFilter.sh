@@ -1,2 +1,2 @@
 #!/bin/bash
-cat |egrep '(.+[[:space:]]){9}.+'
+cat |egrep '(.+[[:space:]]){10}.+'

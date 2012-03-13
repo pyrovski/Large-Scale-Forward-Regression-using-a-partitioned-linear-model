@@ -15,6 +15,9 @@ done < .todo
 ls *.sh *.R Makefile > .sh_R_Makefile
 cat .sh_R_Makefile | jtset -d .done > .todo
 
+sed -e 's/^/# /' LICENSE > .LICENSE
+
 while read line; do
-#sed -ie 's/^/# /' $line
+cat .LICENSE $line > $line.tmp
+mv $line.tmp $line
 done < .todo

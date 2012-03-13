@@ -11,11 +11,10 @@ mv $line.tmp $line
 done < .todo
 
 #sed -ie 's/^/\/\/ /'
-#sed -ie 's/^/# /'
-#echo '/*'; cat LICENSE; echo '*/'
 
 ls *.sh *.R Makefile > .sh_R_Makefile
 cat .sh_R_Makefile | jtset -d .done > .todo
 
 while read line; do
+#sed -ie 's/^/# /' $line
 done < .todo

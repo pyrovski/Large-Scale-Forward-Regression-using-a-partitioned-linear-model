@@ -90,7 +90,7 @@ CPU_SRC = reference_glm.cpp tvUtil.cpp fortran_matrix.cpp glm.cpp print_matrix.c
 GPU_SRC = plm.cu
 HEADERS= type.h fortran_matrix.h print_matrix.h glm.h plm.h fortran_matrix.h print_matrix.h svd.h cuda_blas.cu
 SRC=$(CPU_SRC) $(GPU_SRC)
-target = reference_glm
+target = reference_plm
 objects = $(patsubst %.cpp,%.o,$(CPU_SRC)) $(patsubst %.cu,%.o,$(GPU_SRC))
 all: $(target) convertToBinary
 

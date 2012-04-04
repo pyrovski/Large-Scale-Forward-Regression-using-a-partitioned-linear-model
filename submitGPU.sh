@@ -65,4 +65,4 @@ git branch | grep '*' >> info
 echo 'cores: '$1 >> info
 echo 'nodes: '$2 >> info
 
-qsub -V -cwd -pe $(echo -n $wayness)way $cores -q normal -P gpgpu -l h_rt=0:12:00 -A TG-ASC100041 -o log -e errlog ../run.sh
+qsub -V -cwd -pe $(echo -n $wayness)way $cores -q normal -P gpgpu -l h_rt=0:12:00 -o log -e errlog ../run.sh

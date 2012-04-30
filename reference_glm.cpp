@@ -50,6 +50,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   - can get allocated memory size from sge runtime
   
   @todo comp prepare or update on GPU?
+
+  @todo integrate SNP projection; 
+  full SNPs are only used in a couple
+  places (SNPtSNP and XtSNP prep, and XtSNP update).  
+  If we were to reproject them when necessary, we could
+  handle larger input sets.
+
+  caveats: SNP projection currently operates per individual, not per
+  SNP, producing row-major outputs.
+
+  timing: Matlab on fermi does 3300 individuals per second with 4892
+  SNPs (126081634 Bps), writing the results to disk.  Without writing
+  the results to disk, the rate is 6400 (251610545 Bps) I expect this
+  number would be higher for a C implementation, as the input data is
+  only 128 MB in ASCII format, uncompressed.
  */
 
 // System header files

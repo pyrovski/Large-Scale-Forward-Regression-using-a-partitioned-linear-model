@@ -1104,12 +1104,6 @@ int main(int argc, char **argv)
 	 << endl;
   }
 
-  // kludge to get chosen SNP indices from whichever node owns the SNPs
-  /*! @todo fix
-  MPI_Reduce(&chosenSNPs[0], &chosenSNPsReduced[0], chosenSNPs.size(), 
-	     MPI_UNSIGNED, MPI_BOR, 0, MPI_COMM_WORLD);
-  */
-
   if(!id){
     write("Pval.dat", Pval);
     write("Pindices.dat", chosenSNPsReduced);
@@ -1123,16 +1117,3 @@ int main(int argc, char **argv)
   MPI_Finalize();
   return 0;
 }
-
-
-// On my Macbook (seconds) timings (algorithm assumes a Kt-matrix). 
-// The algorithm which assumes a Kt-vector is only marginally faster, if at all...
-
-// Avg. Time for I/O 
-// (1.2631+1.24829+1.29038+1.26401+1.24963)/5 = 1.263082
-
-// Avg. Computation time
-// (0.279372+0.282701+0.271749+0.275394+0.274847)/5 = .2768126
-
-// Percentage of total time used for computations:
-// .2768126/(1.263082+.2768126) = .17976074

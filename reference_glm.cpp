@@ -62,9 +62,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
   timing: Matlab on fermi does 3300 individuals per second with 4892
   SNPs (126081634 Bps), writing the results to disk.  Without writing
-  the results to disk, the rate is 6400 (251610545 Bps). I expect this
-  number would be higher for a C implementation, as the input data is
-  only 128 MB in ASCII format, uncompressed.
+  the results to disk, the rate is 11000 (431572070 Bps). 
+
+  I expect these number would be higher for a C implementation, as the
+  input data is only 128 MB in ASCII format, uncompressed, and Matlab
+  uses a single core.
  */
 
 // System header files

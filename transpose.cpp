@@ -195,7 +195,7 @@ main(int argc, char *argv[]){
       int kIter = i + blockRows <= rows ? blockRows : rows - i;
       int lIter = i + blockCols <= cols ? blockCols : cols - i;
       for(int k = 0; k < kIter; k++)
-	for(int l = 0; l < lIter; l++)
+	for(int l = k + 1; l < lIter; l++)
 	  swap(inData[(i + k) * cols + (i + l)], 
 	       outData[(i + l) * rows + i + k]);
     }

@@ -92,9 +92,13 @@ HEADERS= type.h fortran_matrix.h print_matrix.h glm.h plm.h fortran_matrix.h pri
 SRC=$(CPU_SRC) $(GPU_SRC)
 target = reference_plm
 objects = $(patsubst %.cpp,%.o,$(CPU_SRC)) $(patsubst %.cu,%.o,$(GPU_SRC))
-all: $(target) convertToBinary
+all: $(target) convertToBinary transpose
 
 convertToBinary: convertToBinary.o
+	$(CC) $(DBG) $(OPT_FLAGS) $(INCLUDES) $(COMMON_FLAGS) $^ -o $@
+
+transpose: transpose.cpp
+	$(CC) $(DBG) $(OPT_FLAGS) $(INCLUDES) $(COMMON_FLAGS) $^ -o $@
 
 clean:
 	rm -f *~ *.P *.o $(target) convertToBinary

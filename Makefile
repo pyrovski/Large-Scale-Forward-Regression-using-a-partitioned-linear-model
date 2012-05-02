@@ -101,7 +101,7 @@ transpose: transpose.cpp
 	$(CC) $(DBG) $(OPT_FLAGS) $(INCLUDES) $(COMMON_FLAGS) $^ -o $@
 
 clean:
-	rm -f *~ *.P *.o $(target) convertToBinary
+	rm -f *~ *.P *.o $(target) convertToBinary transpose
 
 $(target): $(objects)
 	$(CC) -o $@ $^ $(LIBS)

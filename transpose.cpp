@@ -51,37 +51,41 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdint.h>
 #include <assert.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <string.h>
+#include <algorithm>
 using namespace std;
 
-const char usage1[] = "usage: ",
-	  usage2[] = "-r <input rows> -c <input cols> <input file> -o <output file>";
+const char usage1[] = "usage (for square matrices only!): ",
+	  usage2[] = "-r <input rows/cols> <input file> -o <output file>\n";
 
 void usage(char ** argv){
-  cout << usage1 << argv[0] << usage2;
+  cerr << usage1 << argv[0] << " " << usage2;
 }
 
-const int blockRows = 128;
-const int blockCols = 128;
+#ifndef blockRows
+#define blockRows 128
+#endif
+
+#ifndef blockCols
+#define blockCols blockRows
+#endif
+
+#define min(a,b) ((a) < (b) ? (a) : (b))
 
 int
 main(int argc, char *argv[]){
-  if(argc < 5){
-    usage(argv);
-    exit(1);
-  }
-  
+ 
   int status;
   int rows = 0, cols = 0;
   char *outputFilename = 0, *inputFilename = 0;
   bool inPlace = false;
 
-  while((status = getopt(argc, argv, "r:c:o:i")) != -1){
+  while((status = getopt(argc, argv, "r:o:i")) != -1){
     switch(status){
     case 'r':
       rows = strtoul(optarg, 0, 0);
-      break;
-    case 'c':
-      cols = strtoul(optarg, 0, 0);
       break;
     case 'o':
       outputFilename = optarg;
@@ -90,12 +94,24 @@ main(int argc, char *argv[]){
       inPlace = true;
       break;
     default:
+      cerr << "unexpected parameter: " << status << endl;
       usage(argv);
       exit(1);
     }
   }
 
-  if(!rows || !cols || !inputFilename){
+  cols = rows;
+  
+  if(optind >= argc){
+    cerr << "must provide input file" << endl;
+    usage(argv);
+    exit(1);
+  }
+
+  inputFilename = argv[optind];
+
+  if(!rows || !cols){
+    cerr << "must provide rows, columns" << endl;
     usage(argv);
     exit(1);
   }
@@ -105,7 +121,7 @@ main(int argc, char *argv[]){
   FILE *inFile = 0;
 
   if(inPlace){
-    inFile = fopen(inputFilename, "w+");
+    inFile = fopen(inputFilename, "r+");
   }
   
   assert(inFile);
@@ -120,26 +136,75 @@ main(int argc, char *argv[]){
     *outData = 0;
   
   if(inPlace){
+#ifdef _DEBUG
+    cerr << "size: " << fileStat.st_size << endl;
+#endif
     inData = (double*)
-      mmap(0, fileStat.st_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+      mmap(0, fileStat.st_size, PROT_READ | PROT_WRITE, 
+	   MAP_SHARED | MAP_NORESERVE,
 	   ifd, 0);
-    assert(inData);
+    
+    if(inData == (void*)-1){
+      perror("mmap failed");
+      exit(2);
+    }
     outData = inData;
-  }
+  }    
+  
+  double *swapData1 = (double*)malloc(blockRows * blockCols * sizeof(double));
+  double *swapData2 = (double*)malloc(blockRows * blockCols * sizeof(double));
+    
+  if(inPlace){
+    for(int i = 0; i < rows; i += blockRows){
+      int kIter = i + blockRows <= rows ? blockRows : rows - i;
+      int jLim = min(i, cols);
+      for(int j = 0; j < jLim; j += blockCols){
+	int lIter = j + blockCols <= jLim ? blockCols : jLim - j;
+	for(int k = 0; k < kIter; k++){
+	  for(int l = 0; l < lIter; l++){
+	    swapData1[l * blockCols + k] = 
+	      inData[(i + k) * cols + (j + l)];
+	    // where will this block end up?
+	    swapData2[k * blockCols + l] = 
+	      inData[(j + l) * rows + (i + k)];
+	  }
+	}
+	/* Copy transposed data 1 to output.
+	   j + l = rows of output
+	   i + k = cols of output
+	*/
+	for(int l = 0; l < lIter; l++)
+	  memcpy(outData + (j + l) * rows + i, 
+		 swapData1 + l * blockCols, 
+		 kIter * sizeof(double));
 
-  for(int i = 0; i < rows; i += blockRows){
-    int kIter = i + blockRows <= rows ? blockRows : rows - i;
-    for(int j = 0; j < cols; j += blockCols){
-      int lIter = j + blockCols <= cols ? blockCols : cols - j;
+	/* Copy transposed data 2 to output.
+	   j + l = rows of output
+	   i + k = cols of output
+	*/
+	for(int k = 0; k < kIter; k++)
+	  memcpy(outData + (i + k) * cols + j, 
+		 swapData2 + k * blockCols, 
+		 lIter * sizeof(double));
+      }
+    }
+
+    // handle blocks on the diagonal
+    int iLim = min(rows, cols);
+    for(int i = 0; i < iLim; i += blockRows){
+      int kIter = i + blockRows <= rows ? blockRows : rows - i;
+      int lIter = i + blockCols <= cols ? blockCols : cols - i;
       for(int k = 0; k < kIter; k++)
 	for(int l = 0; l < lIter; l++)
-	  outData[j * cols + i] = inData[i * cols + j];
+	  swap(inData[(i + k) * cols + (i + l)], 
+	       outData[(i + l) * rows + i + k]);
     }
-  }
 
-  if(inPlace)
     status = munmap(inData, fileStat.st_size);
-  
+  }
+  free(swapData1);
+  free(swapData2);
+  fclose(inFile);
   return 0;
   
 }

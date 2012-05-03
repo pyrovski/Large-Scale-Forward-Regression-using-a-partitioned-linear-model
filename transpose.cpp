@@ -57,8 +57,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <algorithm>
 using namespace std;
 
-const char usage1[] = "usage (for square matrices only!): ",
-	  usage2[] = "-r <input rows/cols> <input file> -o <output file>\n";
+const char usage1[] = "usage: ",
+	  usage2[] = "-r <input rows> -c <input cols> <input file> -o <output file> [-i (for square matrices only!)]\n";
 
 void usage(char ** argv){
   cerr << usage1 << argv[0] << " " << usage2;
@@ -82,10 +82,13 @@ main(int argc, char *argv[]){
   char *outputFilename = 0, *inputFilename = 0;
   bool inPlace = false;
 
-  while((status = getopt(argc, argv, "r:o:i")) != -1){
+  while((status = getopt(argc, argv, "r:c:o:i")) != -1){
     switch(status){
     case 'r':
       rows = strtoul(optarg, 0, 0);
+      break;
+    case 'c':
+      cols = strtoul(optarg, 0, 0);
       break;
     case 'o':
       outputFilename = optarg;
@@ -100,7 +103,6 @@ main(int argc, char *argv[]){
     }
   }
 
-  cols = rows;
   
   if(optind >= argc){
     cerr << "must provide input file" << endl;
@@ -108,6 +110,9 @@ main(int argc, char *argv[]){
     exit(1);
   }
 
+  if(inPlace)
+    cols = rows;
+  
   inputFilename = argv[optind];
 
   if(!rows || !cols){
@@ -116,45 +121,72 @@ main(int argc, char *argv[]){
     exit(1);
   }
 
-  
-
-  FILE *inFile = 0;
-
-  if(inPlace){
-    inFile = fopen(inputFilename, "r+");
-  }
-  
-  assert(inFile);
-  int ifd = fileno(inFile);
-  assert(ifd > 0);
-  
+  FILE *inFile = 0, *outFile = 0;
+  int ifd = -1, ofd = -1;
   struct stat fileStat;
-  status = fstat(ifd, &fileStat);
-  assert(!status);
-  
   double *inData = 0,
     *outData = 0;
+
+  if(inPlace)
+    inFile = fopen(inputFilename, "r+");
+  else
+    inFile = fopen(inputFilename, "r");
+
+  assert(inFile);
+  ifd = fileno(inFile);
+  assert(ifd > 0);
   
-  if(inPlace){
+  status = fstat(ifd, &fileStat);
+  assert(!status);
+    
 #ifdef _DEBUG
-    cerr << "size: " << fileStat.st_size << endl;
+  cerr << "size: " << fileStat.st_size << endl;
 #endif
+
+  if(inPlace){
     inData = (double*)
       mmap(0, fileStat.st_size, PROT_READ | PROT_WRITE, 
 	   MAP_SHARED | MAP_NORESERVE,
 	   ifd, 0);
+  } else {
+    inData = (double*)
+      mmap(0, fileStat.st_size, PROT_READ, 
+	   MAP_SHARED | MAP_NORESERVE,
+	   ifd, 0);
+  }
     
-    if(inData == (void*)-1){
-      perror("mmap failed");
+  if(inData == (void*)-1){
+    //! @todo if mmap fails, do it out of core
+    perror("mmap input failed");
+    exit(2);
+  }
+
+  if(inPlace){
+    outData = inData;
+  } else {
+    outFile = fopen(outputFilename, "w+");
+    ofd = fileno(outFile);
+    assert(ofd > 0);
+
+    status = ftruncate(ofd, fileStat.st_size);
+    assert(!status);
+    
+    outData = (double*)
+      mmap(0, fileStat.st_size, PROT_WRITE, 
+	   MAP_SHARED | MAP_NORESERVE,
+	   ofd, 0);
+  
+    if(outData == (void*)-1){
+      //! @todo if mmap fails, do it out of core
+      perror("mmap output failed");
       exit(2);
     }
-    outData = inData;
-  }    
+  } 
   
-  double *swapData1 = (double*)malloc(blockRows * blockCols * sizeof(double));
-  double *swapData2 = (double*)malloc(blockRows * blockCols * sizeof(double));
-    
   if(inPlace){
+    double *swapData1 = (double*)malloc(blockRows * blockCols * sizeof(double));
+    double *swapData2 = (double*)malloc(blockRows * blockCols * sizeof(double));
+    
     for(int i = 0; i < rows; i += blockRows){
       int kIter = i + blockRows <= rows ? blockRows : rows - i;
       int jLim = min(i, cols);
@@ -188,7 +220,6 @@ main(int argc, char *argv[]){
 		 lIter * sizeof(double));
       }
     }
-
     // handle blocks on the diagonal
     int iLim = min(rows, cols);
     for(int i = 0; i < iLim; i += blockRows){
@@ -199,11 +230,27 @@ main(int argc, char *argv[]){
 	  swap(inData[(i + k) * cols + (i + l)], 
 	       outData[(i + l) * rows + i + k]);
     }
-
-    status = munmap(inData, fileStat.st_size);
+    free(swapData1);
+    free(swapData2);
+  } else {
+    for(int i = 0; i < rows; i += blockRows){
+      int kIter = i + blockRows <= rows ? blockRows : rows - i;
+      for(int j = 0; j < cols; j += blockCols){
+	int lIter = j + blockCols <= cols ? blockCols : cols - j;
+	for(int k = 0; k < kIter; k++)
+	  for(int l = 0; l < lIter; l++)
+	    outData[(j + l) * rows + i + k] = 
+	      inData[(i + k) * cols + (j + l)];
+      }
+    }
   }
-  free(swapData1);
-  free(swapData2);
+
+  status = munmap(inData, fileStat.st_size);
+  if(!inPlace){
+    status = munmap(outData, fileStat.st_size);
+    fclose(outFile);
+  }
+
   fclose(inFile);
   return 0;
   

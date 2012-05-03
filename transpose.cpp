@@ -65,7 +65,7 @@ void usage(char ** argv){
 }
 
 #ifndef blockRows
-#define blockRows 128
+#define blockRows 8192
 #endif
 
 #ifndef blockCols
@@ -173,7 +173,7 @@ main(int argc, char *argv[]){
     
     outData = (double*)
       mmap(0, fileStat.st_size, PROT_WRITE, 
-	   MAP_SHARED | MAP_NORESERVE,
+	   MAP_SHARED | MAP_NORESERVE | MAP_POPULATE,
 	   ofd, 0);
   
     if(outData == (void*)-1){

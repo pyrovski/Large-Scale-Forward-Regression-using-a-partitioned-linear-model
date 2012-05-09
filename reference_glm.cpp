@@ -119,7 +119,8 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
 	       string fixed_filename, 
 	       string geno_filename, 
 	       string y_filename,
-	       FortranMatrix &fixed, FortranMatrix &geno, vector<double> &y){
+	       FortranMatrix &fixed, FortranMatrix &geno, vector<double> &y
+	       ){
   // Read the "fixed" array from file.
   // assume this is small.
   if(fixed_filename != ""){
@@ -216,7 +217,7 @@ void compPrepare(unsigned id, unsigned iteration,
 		 FortranMatrix &Vt, unsigned &rX, vector<double> &beta, 
 		 unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, 
 		 GLMData &glm_data, unsigned &geno_ind, uint64_t &mySNPs, 
-		 const unsigned &m, FortranMatrix &geno, FortranMatrix &XtSNP, 
+		 FortranMatrix &geno, FortranMatrix &XtSNP, 
 		 vector<double> &SNPty, vector<double> &SNPtSNP){
 
   FortranMatrix X(geno_ind/*4892*/, n/*27*/);
@@ -379,9 +380,9 @@ void compPrepare(unsigned id, unsigned iteration,
 	      geno_ind,
 	      1.0,
 	      &X.values[0],
-	      m, 
+	      geno_ind, 
 	      &geno.values[0],
-	      m,
+	      geno_ind,
 	      0.0,
 	      &XtSNP.values[0],
 	      n
@@ -400,11 +401,11 @@ void compPrepare(unsigned id, unsigned iteration,
    */
   cblas_dgemv(CblasColMajor,
 	      CblasTrans,
-	      m,
+	      geno_ind,
 	      mySNPs,
 	      1.0,
 	      &geno.values[0],
-	      m,
+	      geno_ind,
 	      &y[0],
 	      1,
 	      0.0,
@@ -581,6 +582,13 @@ int main(int argc, char **argv)
   uint64_t geno_count; // columns of the geno array
 
   bool CPUOnly = false;
+
+  /*
+    Skip a number of SNP entries for each individual; ideally, we will
+    deal with the population and sample fields.
+   */
+  int skip = 0;
+
   int optIndex;
   struct option options[4] = {{"num_fixed", required_argument, 0, 'n'},
 			      {"num_geno", required_argument, 0, 'm'},
@@ -605,7 +613,7 @@ int main(int argc, char **argv)
      -e <entry limit>
   */
 
-  while((opt = getopt_long(argc, argv, "cf:v::l:r:g:e:", options, &optIndex)) != -1){
+  while((opt = getopt_long(argc, argv, "cf:v::l:r:g:e:s:", options, &optIndex)) != -1){
     switch(opt){
     case 'e':
       entry_limit = atof(optarg);
@@ -640,6 +648,9 @@ int main(int argc, char **argv)
     case 'l':
       iterationLimit = atoi(optarg);
       break;
+    case 's':
+      skip = strtoul(optarg, 0, 0);
+      break;
     default:
       if(!id)
 	printUsage(argv[0]);
@@ -673,7 +684,7 @@ int main(int argc, char **argv)
   // global timing
   timeval tGlobalStart, tGlobalStop;
 
-  const unsigned m = geno_ind;
+  //const unsigned m = geno_ind;
 
   uint64_t totalSize = geno_count * geno_ind * sizeof(double);
   uint64_t perRankSNPs = adjust(geno_count, numProcs);
@@ -778,7 +789,7 @@ int main(int argc, char **argv)
 
   compPrepare(id, 0, fixed, fixed_count, XtX, Xty, y, U, S, Vt, rX, 
 	      beta, n, tol, XtXi, 
-	      yty, glm_data, geno_ind, mySNPs, m, geno, XtSNP, SNPty, 
+	      yty, glm_data, geno_ind, mySNPs, geno, XtSNP, SNPty, 
 	      SNPtSNP);
 
   gettimeofday(&tstop, NULL);
@@ -860,7 +871,7 @@ int main(int argc, char **argv)
       // ~3.5 us per SNP on Longhorn (FX5800)
       try{
 	localMaxFIndex = plm_GPU(mySNPs, n, 
-				 m ,        
+				 geno_ind,        
 				 d_snptsnp, 
 				 d_Xtsnp, 
 				 d_XtsnpPitch, 
@@ -1073,7 +1084,7 @@ int main(int argc, char **argv)
      */
 
     gettimeofday(&tstart, NULL);
-    compUpdate(id, iteration, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, m, 
+    compUpdate(id, iteration, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, geno_ind, 
 	       geno, 
 	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty);
     gettimeofday(&tstop, NULL);

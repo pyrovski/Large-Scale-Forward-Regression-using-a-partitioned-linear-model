@@ -49,6 +49,7 @@ extern "C"{
 #include <sstream>
 
 #include "glm.h"
+#include "type.h"
 
 using namespace std;
 

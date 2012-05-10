@@ -179,6 +179,17 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
 	  cerr << id << " " << ferror(geno_file) << endl;
 	MPI_Abort(MPI_COMM_WORLD, 1);
       }
+#ifdef _DEBUG
+      for(int i = readCount; i < readCount + status; i ++)
+	if(geno.values[i] < 0){
+	  cerr << "id " << id 
+	       << " read a negative geno value at global offset " 
+	       << myOffset / sizeof(double) + i
+	       << "; aborting." 
+	       << endl;
+	  MPI_Abort(MPI_COMM_WORLD, 1);
+	}
+#endif
       left -= status;
       readCount += status;
     }

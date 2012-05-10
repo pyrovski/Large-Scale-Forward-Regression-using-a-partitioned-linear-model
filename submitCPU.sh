@@ -65,5 +65,7 @@ echo 'cores: '$1 >> info
 echo 'nodes: '$2 >> info
 
 #echo $(echo -n $wayness)way $cores
-qsub -V -cwd -pe $(echo -n $wayness)way $cores -q normal -P hpc -l h_rt=0:12:00 -A TG-ASC100041 -o log -e errlog ../run.sh -c > sublog 2>suberrlog
+#TG-MCB110022
+#TG-ASC100041
+qsub -V -cwd -pe $(echo -n $wayness)way $cores -q normal -P hpc -l h_rt=0:12:00 -A TG-MCB110022 -o log -e errlog ../run.sh -c > sublog 2>suberrlog
 

@@ -48,8 +48,8 @@ NODE_MEMORY_LIMIT=`echo "0.95 * $NODE_MEMORY / 1" | bc`
 ibrun ../reference_plm \
 -f /scratch/01713/pbailey/data_maize_nam/fixed.effects.nam.sorted.filtered.bin \
 --num_fixed 26 \
--g /scratch/01713/pbailey/massivest.dat \
---num_geno 1000000 \
+-g /scratch/01713/pbailey/projectedSNP.0010.dat.trans \
+--num_geno 110551 \
 -r /scratch/01713/pbailey/data_maize_nam/residuals.chr10.sorted.bin \
 --num_r 4892 \
 -v2 \

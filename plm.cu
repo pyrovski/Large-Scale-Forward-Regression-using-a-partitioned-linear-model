@@ -17,7 +17,7 @@
 #endif
 
 __device__ int printBIDs(unsigned BID){
-  return(BID == 14206);
+  return(BID == 0);
 }
 
 extern __shared__ double shared[];

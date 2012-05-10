@@ -139,20 +139,20 @@ __global__ void plm(// inputs
       unsigned V2 = errorDF - 1;
       f[BID] = modelSS / errorSS2 * V2;
 #ifdef printGPU
-  if(printBIDs(BID)){
-    for(int i = 0; i < blockDim.x; i++){
-      if(i == TID){
-	
-	printf("b%03u\tt%03u\tmodelSS: %1.10le\n", BID, TID, modelSS);
-	printf("b%03u\tt%03u\tnew errorSS: %1.10le\n", BID, TID, errorSS2);
-	printf("b%03u\tt%03u\tnew V2: %u\n", BID, TID, V2);
-	printf("b%03u\tt%03u\tf: %1.10le\n", BID, TID, f[BID]);
+      if(printBIDs(BID)){
+	for(int i = 0; i < blockDim.x; i++){
+	  if(i == TID){
+	    
+	    printf("b%03u\tt%03u\tmodelSS: %1.10le\n", BID, TID, modelSS);
+	    printf("b%03u\tt%03u\tnew errorSS: %1.10le\n", BID, TID, errorSS2);
+	    printf("b%03u\tt%03u\tnew V2: %u\n", BID, TID, V2);
+	    printf("b%03u\tt%03u\tf: %1.10le\n", BID, TID, f[BID]);
+	  }
+	  __syncthreads();
+	}
       }
-      __syncthreads();
-    }
-  }
 #endif
-
+      
     }
     return;
   } else {

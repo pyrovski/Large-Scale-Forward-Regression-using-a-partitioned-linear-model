@@ -43,10 +43,9 @@ __global__ void plm(// inputs
 		    const unsigned XtsnpPitchInWords, 
 		    const double errorSS,       // scalar
 		    const unsigned errorDF,       // scalar
-		    //const double *G,          // symmetric matrix in const mem
+		    //const double *G,          // symmetric n x n matrix in const mem
 		    //const double *Xty,        // n x 1 vector in const mem
 		    const double *snpty,        // scalar, unique to block
-		    //! @todo snpMask could be a bit mask, instead of a word mask
 		    const char *snpMask,   // n x 1 vector
 		    // outputs
 		    float *f){
@@ -83,14 +82,20 @@ __global__ void plm(// inputs
   }
   // snptsnp - snptXGXtsnp:
 
-  //#error fixme double read
+  // 3n ops
+  // 1 read per thread = n total
   double myXtsnp = *(Xtsnp + BID * XtsnpPitchInWords + TID);
-  // GtXtsnp
+  
+  // GtXtsnp: n * (1 fmad, 1 imad?) per thread, 2n^2 total operations,
+  // n^2 total reads
   GtXtsnp = vecRMatCSq(TID, BID, myXtsnp, blockDim.x, d_G, 
 		       blockDim.x);  //! length of column plus padding (no padding)
   
   // snptsnp - snptXGXtsnp
+  // ~2n operations, no reads
   dotRR(TID, blockDim.x, GtXtsnp, myXtsnp);
+
+  // n operations
   s = snptsnp[BID] - shared[0];
 #ifdef printGPU
   if(printBIDs(BID)){
@@ -111,32 +116,38 @@ __global__ void plm(// inputs
   }
 #endif
   // 1/(above)
+  // n ops
   if(s > doubleTol){
-    s = (double)1/s;
-    
     // snptmy
+    // ~2n ops, n reads
     dotRG(TID, blockDim.x, GtXtsnp, d_Xty);
-    snptmy = -shared[0];
     
     if(!TID){
+      // 1 op
+      //s = (double)1/s;
+      
+      // 1 op
+      //snptmy = -shared[0];
 #ifdef printGPU
       if(printBIDs(BID)){
-	for(int i = 0; i < blockDim.x; i++){
-	  if(i == TID){
-	    printf("b%03u\tt%03u\tsnptXGXty: %1.10le\n", BID, TID, snptmy);
-	    printf("b%03u\tt%03u\tsnpty: %1.10le\n", BID, TID, snpty[BID]);
-	  }
-	  __syncthreads();
-	}
+	printf("b%03u\tt%03u\tsnptXGXty: %1.10le\n", BID, TID, -shared[0]);
+	printf("b%03u\tt%03u\tsnpty: %1.10le\n", BID, TID, snpty[BID]);
       }
 #endif
-      snptmy += snpty[BID];
-      //! @todo this could be single precision
-      float modelSS = snptmy * snptmy * s;
+      
+      // 1 op
+      snptmy = snpty[BID] - shared[0];
 
-      double errorSS2 = errorSS - (double)modelSS;
+      // 2 ops
+      double modelSS = (snptmy * snptmy) / s;
 
+      // 1 op
+      double errorSS2 = errorSS - modelSS;
+
+      // 1 op
       unsigned V2 = errorDF - 1;
+
+      // 2 ops
       f[BID] = modelSS / errorSS2 * V2;
 #ifdef printGPU
       if(f[BID] < 0){

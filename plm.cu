@@ -127,27 +127,22 @@ __global__ void plm(// inputs
       //s = (double)1/s;
       
       // 1 op
-      snptmy = -shared[0];
+      //snptmy = -shared[0];
 #ifdef printGPU
       if(printBIDs(BID)){
-	for(int i = 0; i < blockDim.x; i++){
-	  if(i == TID){
-	    printf("b%03u\tt%03u\tsnptXGXty: %1.10le\n", BID, TID, snptmy);
-	    printf("b%03u\tt%03u\tsnpty: %1.10le\n", BID, TID, snpty[BID]);
-	  }
-	  __syncthreads();
-	}
+	printf("b%03u\tt%03u\tsnptXGXty: %1.10le\n", BID, TID, -shared[0]);
+	printf("b%03u\tt%03u\tsnpty: %1.10le\n", BID, TID, snpty[BID]);
       }
 #endif
       
       // 1 op
-      snptmy += snpty[BID];
+      snptmy = snpty[BID] - shared[0];
 
       // 2 ops
-      float modelSS = (snptmy * snptmy) / s;
+      double modelSS = (snptmy * snptmy) / s;
 
       // 1 op
-      double errorSS2 = errorSS - (double)modelSS;
+      double errorSS2 = errorSS - modelSS;
 
       // 1 op
       unsigned V2 = errorDF - 1;

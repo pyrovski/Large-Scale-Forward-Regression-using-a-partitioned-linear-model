@@ -43,10 +43,9 @@ __global__ void plm(// inputs
 		    const unsigned XtsnpPitchInWords, 
 		    const double errorSS,       // scalar
 		    const unsigned errorDF,       // scalar
-		    //const double *G,          // symmetric matrix in const mem
+		    //const double *G,          // symmetric n x n matrix in const mem
 		    //const double *Xty,        // n x 1 vector in const mem
 		    const double *snpty,        // scalar, unique to block
-		    //! @todo snpMask could be a bit mask, instead of a word mask
 		    const char *snpMask,   // n x 1 vector
 		    // outputs
 		    float *f){

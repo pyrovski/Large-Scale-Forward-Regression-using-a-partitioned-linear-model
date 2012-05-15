@@ -974,7 +974,7 @@ int main(int argc, char **argv)
 	   << ", global 0-index " << myStartSNP + localMaxFIndex << ")" << endl;
     }
     if(Fval[localMaxFIndex] <= 0){
-      cerr << "error: max F <= 0: " << Fval[localMaxFIndex] << endl;
+      cerr << "error on iteration " << iteration << ": max F <= 0: " << Fval[localMaxFIndex] << endl;
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
 

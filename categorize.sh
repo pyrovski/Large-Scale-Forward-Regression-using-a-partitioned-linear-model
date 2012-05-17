@@ -1,3 +1,4 @@
+#!/bin/bash
 # 
 # 
 # Copyright (c) 2011, The Arizona Board of Regents on behalf of 
@@ -40,7 +41,6 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # 
 # 
-#!/bin/bash
 find . -name 'id_0.log*' -print|sort -n|grep -v '~'>.list
 #cpu=`eval "echo $list|grep cpu"`
 cat .list|xargs -I{} grep -Hci gpu {}>.gpucount

@@ -48,6 +48,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   @todo use GPU and host RAM size to estimate how many SNPs can be processed at a time
   - host holds all SNPs plus derived data; currently, GPU holds only derived data
   - can get allocated memory size from sge runtime
+
+  @todo CPU code might be faster if we ran each SNP to completion, 
+  rather than computing Xt*SNP for all SNPs, then computing F
+
+  @todo GtXtSNP could be computed in one dgemv call.
+  This would leave only two dot products and some vector math.
+  For the CPU, it is probably better to do one or a few SNPs at a time,
+  but for the GPU, we could just use cublasDgemv in place of 
+  cublasDgemmBatched, and cublasDgemmBatched for the dot products
   
   @todo comp prepare or update on GPU?
 

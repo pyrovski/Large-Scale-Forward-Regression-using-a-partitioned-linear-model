@@ -172,6 +172,16 @@ __global__ void plm(// inputs
       f[BID] = 0;
     return;
   }
+
+  /*
+    
+    Selective GPU:
+    ops: $3n+2n^2+2n+n+2n+1+2+1+1+2  =  2n^2+8n+7$
+    
+    reads: $n+n^2+n  =  n^2+2n, n^2$ of which are from constant memory
+    
+    writes: 1
+  */
 }
 
 cudaEvent_t start, stopKernel, stopMax;

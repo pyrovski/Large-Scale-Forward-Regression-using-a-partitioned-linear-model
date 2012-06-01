@@ -179,6 +179,17 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
 	  cerr << id << " " << ferror(geno_file) << endl;
 	MPI_Abort(MPI_COMM_WORLD, 1);
       }
+#ifdef _DEBUG
+      for(int i = readCount; i < readCount + status; i ++)
+	if(geno.values[i] < 0){
+	  cerr << "id " << id 
+	       << " read a negative geno value at global offset " 
+	       << myOffset / sizeof(double) + i
+	       << "; aborting." 
+	       << endl;
+	  MPI_Abort(MPI_COMM_WORLD, 1);
+	}
+#endif
       left -= status;
       readCount += status;
     }
@@ -963,7 +974,7 @@ int main(int argc, char **argv)
 	   << ", global 0-index " << myStartSNP + localMaxFIndex << ")" << endl;
     }
     if(Fval[localMaxFIndex] <= 0){
-      cerr << "error: max F <= 0: " << Fval[localMaxFIndex] << endl;
+      cerr << "error on iteration " << iteration << ": max F <= 0: " << Fval[localMaxFIndex] << endl;
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
 

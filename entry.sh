@@ -1,3 +1,4 @@
+#!/bin/bash
 # 
 # 
 # Copyright (c) 2011, The Arizona Board of Regents on behalf of 
@@ -40,7 +41,6 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # 
 # 
-#!/bin/bash
 rm -f .tmp
 
 #id
@@ -56,19 +56,19 @@ cat $1/info | grep 'nodes:'|cut -d':' -f2 >> .tmp
 cat $1/info | grep 'cores:'|cut -d':' -f2 >> .tmp
 
 #rank
-cat $1/id_0.log|exRank.sh >> .tmp
+cat $1/id_0.log|./exRank.sh >> .tmp
 
 #cpu_gpu
 echo $2 >> .tmp
 
 #iterations
-cat $1/id_0.log|exIter.sh >> .tmp
+cat $1/id_0.log|./exIter.sh >> .tmp
 
 #time
-cat $1/id_0.log|exTotal.sh >> .tmp
+cat $1/id_0.log|./exTotal.sh >> .tmp
 
 #comp time
-cat $1/id_0.log|exComp.sh >> .tmp
+cat $1/id_0.log|./exComp.sh >> .tmp
 
 #SNPs on rank 0
 snp=`cat $1/id_0.log|grep 'has SNPs'| cut -d' ' -f5|cut -d'-' -f2`

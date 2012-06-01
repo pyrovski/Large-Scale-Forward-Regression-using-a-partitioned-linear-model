@@ -49,6 +49,7 @@ extern "C"{
 #include <sstream>
 
 #include "glm.h"
+#include "type.h"
 
 using namespace std;
 
@@ -103,7 +104,7 @@ void glm(unsigned id, unsigned iteration,
 
   // compute S = Schur complement of partitioned matrix to invert
   double S = SNPtSNP - SNPtXGXtSNP;
-  if(!S){
+  if(S <= doubleTol){
     // bad news
     glm_data.F = 0.0;
     return;

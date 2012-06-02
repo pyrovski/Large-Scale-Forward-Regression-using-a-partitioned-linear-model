@@ -66,9 +66,10 @@ public:
   const FortranMatrix & operator = (const FortranMatrix &rhs);
   
   // Returns a writable reference to the (i,j) entry of the matrix
-  inline double& operator()(uint64_t i, uint64_t j)
+  inline double& operator()(uint64_t row, uint64_t col)
   {
-    return values[i + n_rows*j];
+    // storage is column-major
+    return values[row + n_rows*col];
   }
 
   void print(std::string title) const;

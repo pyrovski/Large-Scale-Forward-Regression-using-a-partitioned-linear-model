@@ -116,10 +116,12 @@ uint64_t adjust(uint64_t total, unsigned ranks){
 }
 
 int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, 
+	       uint64_t mySNPs,
 	       string fixed_filename, 
 	       string geno_filename, 
 	       string y_filename,
-	       FortranMatrix &fixed, FortranMatrix &geno, vector<double> &y
+	       FortranMatrix &fixed, FortranMatrix &geno, vector<double> &y,
+	       bool rowMajor = false // applies only to geno for now
 	       ){
   // Read the "fixed" array from file.
   // assume this is small.
@@ -158,42 +160,81 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
     }
     
     uint64_t readCount = 0, left = mySize / sizeof(double);
-    double *array = (double*)malloc(readSize);
     /*! @todo convert from row-major format on disk to 
        column-major format in RAM
        - for now, just assume column-major on disk
      */
-    while(left){
+    if(rowMajor){
+      double *array = (double*)malloc(mySNPs * sizeof(double));
+      uint64_t row = 0;
+      while(left){
 #ifdef _DEBUG
-      cout << "id " << id << " reading " << min(readLength, left) 
-	   << " doubles from " << geno_filename << endl;
+	cout << "id " << id << " reading " << min(mySNPs, left) 
+	     << " doubles from " << geno_filename << endl;
 #endif
-      size_t status = fread(&geno.values[readCount], sizeof(double), 
-			    min(readLength, left), 
-			    geno_file);
-      if(status != min(readLength, left)){
-	cerr << "read failed on id " << id << endl;
-	if(feof(geno_file))
-	  cerr << id << " eof" << endl;
-	else if(ferror(geno_file))
-	  cerr << id << " " << ferror(geno_file) << endl;
-	MPI_Abort(MPI_COMM_WORLD, 1);
-      }
-#ifdef _DEBUG
-      for(int i = readCount; i < readCount + status; i ++)
-	if(geno.values[i] < 0){
-	  cerr << "id " << id 
-	       << " read a negative geno value at global offset " 
-	       << myOffset / sizeof(double) + i
-	       << "; aborting." 
-	       << endl;
+	size_t status = fread(array, sizeof(double), 
+			      mySNPs, 
+			      geno_file);
+	if(status != mySNPs){
+	  cerr << "read failed on id " << id << endl;
+	  if(feof(geno_file))
+	    cerr << id << " eof" << endl;
+	  else if(ferror(geno_file))
+	    cerr << id << " " << ferror(geno_file) << endl;
 	  MPI_Abort(MPI_COMM_WORLD, 1);
 	}
+#ifdef _DEBUG
+	for(int i = 0; i < mySNPs; i ++)
+	  if(array[i] < 0){
+	    cerr << "id " << id 
+		 << " read a negative geno value at row " 
+		 << row
+		 << " column "
+		 << myOffset / sizeof(double) + i
+		 << "; aborting." 
+		 << endl;
+	    MPI_Abort(MPI_COMM_WORLD, 1);
+	  }
 #endif
-      left -= status;
-      readCount += status;
+	for(int i = 0; i < mySNPs; i ++)
+	  geno(row, i) = array[i];
+	left -= status;
+	readCount += status;
+	row++;
+      }
+      free(array);
+    } else {
+      while(left){
+#ifdef _DEBUG
+	cout << "id " << id << " reading " << min(readLength, left) 
+	     << " doubles from " << geno_filename << endl;
+#endif
+	size_t status = fread(&geno.values[readCount], sizeof(double), 
+			      min(readLength, left), 
+			      geno_file);
+	if(status != min(readLength, left)){
+	  cerr << "read failed on id " << id << endl;
+	  if(feof(geno_file))
+	    cerr << id << " eof" << endl;
+	  else if(ferror(geno_file))
+	    cerr << id << " " << ferror(geno_file) << endl;
+	  MPI_Abort(MPI_COMM_WORLD, 1);
+	}
+#ifdef _DEBUG
+	for(int i = readCount; i < readCount + status; i ++)
+	  if(geno.values[i] < 0){
+	    cerr << "id " << id 
+		 << " read a negative geno value at global offset " 
+		 << myOffset / sizeof(double) + i
+		 << "; aborting." 
+		 << endl;
+	    MPI_Abort(MPI_COMM_WORLD, 1);
+	  }
+#endif
+	left -= status;
+	readCount += status;
+      }
     }
-    free(array);
   }
   
   
@@ -593,6 +634,7 @@ int main(int argc, char **argv)
   uint64_t geno_count; // columns of the geno array
 
   bool CPUOnly = false;
+  bool rowMajor = false;
 
   /*
     Skip a number of SNP entries for each individual; ideally, we will
@@ -601,10 +643,11 @@ int main(int argc, char **argv)
   int skip = 0;
 
   int optIndex;
-  struct option options[4] = {{"num_fixed", required_argument, 0, 'n'},
-			      {"num_geno", required_argument, 0, 'm'},
-			      {"num_r", required_argument, 0, 'o'},
-			      {0,0,0,0}};
+  struct option options[] = {{"num_fixed", required_argument, 0, 'n'},
+			     {"num_geno", required_argument, 0, 'm'},
+			     {"num_r", required_argument, 0, 'o'},
+			     {"rowmajor", optional_argument, 0, 'p'},
+			     {0,0,0,0}};
   
   /* get the following from the command line:
 
@@ -661,6 +704,12 @@ int main(int argc, char **argv)
       break;
     case 's':
       skip = strtoul(optarg, 0, 0);
+      break;
+    case 'p':
+      rowMajor = true;
+#ifdef _DEBUG
+      cout << "Using row-major geno input" << endl;
+#endif
       break;
     default:
       if(!id)
@@ -752,8 +801,8 @@ int main(int argc, char **argv)
 
   // Begin timing the file IO for all 3 files
   gettimeofday(&tstart, NULL);
-  readInputs(id, myOffset, mySize, fixed_filename, geno_filename, 
-	     y_filename, fixed, geno, y);
+  readInputs(id, myOffset, mySize, mySNPs, fixed_filename, geno_filename, 
+	     y_filename, fixed, geno, y, rowMajor);
   gettimeofday(&tstop, NULL);
   
   diskIOTime = tvDouble(tstop - tstart);

@@ -200,7 +200,7 @@ void plm(
 
   //! @todo use cblas_dsymv for this
   cblas_dgemv(CblasColMajor,
-	      CblasTrans, //! @todo G is symmetric; don't need transpose
+	      CblasTrans, //! G is symmetric; but transpose is faster
 	      n,
 	      n,
 	      1.0,
@@ -227,14 +227,14 @@ void plm(
     return;
   }
 
-  S = 1.0 / S;
+  //S = 1.0 / S;
 
   // compute snpty - snptXGXty = snptMy == scalar
   // already know snpty, snptXG', Xty
   double SNPtMy = -cblas_ddot(n, &GtXtSNP[0], 1, &Xty[0], 1);
   SNPtMy += SNPty;
 
-  double SSM = SNPtMy * SNPtMy * S;
+  double SSM = SNPtMy * SNPtMy / S;
   V2--;
   ErrorSS = ErrorSS - SSM;
   *F = V2 * SSM / ErrorSS;

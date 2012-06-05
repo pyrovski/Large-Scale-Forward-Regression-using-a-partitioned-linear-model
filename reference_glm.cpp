@@ -96,6 +96,7 @@ extern "C"{
 #include "type.h"
 #include "tvUtil.h"
 #include "plm.h"
+#include "md5.h"
 
 //! @todo match this to Lustre stripe size?
 const uint64_t readSize = 1024 * 1024 * 32;
@@ -235,6 +236,18 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
 	readCount += status;
       }
     }
+#ifdef _DEBUG
+    md5_state_t pms;
+    md5_init(&pms);
+    md5_append(&pms, (md5_byte_t*)&geno.values[0], mySize);
+    md5_byte_t digest[16];
+    md5_finish(&pms, digest);
+    cout << "rank " << id << " md5 of geno:" ;
+    for(int i = 0; i < 16; i++)
+      cout << std::hex << (int)digest[i];
+    cout << std::dec << endl;
+      
+#endif    
   }
   
   

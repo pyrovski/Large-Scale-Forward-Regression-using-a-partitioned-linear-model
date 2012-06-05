@@ -58,7 +58,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using namespace std;
 
 const char usage1[] = "usage: ",
-	  usage2[] = "-r <input rows> -c <input cols> <input file> -o <output file> [-i (for square matrices only!)]\n";
+	  usage2[] = "-r <input rows> -c <input cols> <input file> -o <output file> [-i (for square matrices only!)]\nAssuming input is row-major\n";
 
 void usage(char ** argv){
   cerr << usage1 << argv[0] << " " << usage2;

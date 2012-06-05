@@ -316,7 +316,7 @@ void compPrepare(unsigned id, unsigned iteration,
 
       //! @todo if XtX is stored as symmetric matrix, we don't need this
       for(uint64_t row = 0; row < col; row++)
-	XtX(col, row) = XtX(row, col);
+ 	XtX(col, row) = XtX(row, col);
     }
     XtX(col, col) = cblas_ddot(geno_ind, 
 			       &X(0, col),
@@ -900,21 +900,14 @@ int main(int argc, char **argv)
 
     // Call the glm function.  Note that X is currently overwritten by this function,
     // and therefore would need to be re-formed completely at each iteration...
-    //glm(X, y, Kt, glm_data);
     /*
       ~200 us per SNP on Core i3, ~106 us per SNP on Core i7
      */
-    //glm(X, XtX, XtXi, XtSNP, SNPtSNP, SNPty, yty, Kt, Xty, rX, glm_data);
     
     /*
       170 us per SNP on Core i3, 92 us per SNP on Core i7
      */
 
-    /*
-    plm(X, XtXi, XtSNP, SNPtSNP[i], SNPty[i], yty, Xty, rX, glm_data, 
-	glm_data_new);
-    */
-    
   unsigned iteration = 0;
   while(iteration < iterationLimit && Pval[iteration] < entry_limit){
     // d_G, in constant memory
@@ -976,17 +969,13 @@ int main(int argc, char **argv)
       int n = XtXi.get_n_rows();
       
       // G = XtXi
+
       // compute transpose of SNPtXG: 1xn
       vector<double> GtXtSNP(n, 0.0);
       for(uint64_t i = 0; i < mySNPs; i++){
 	if(!snpMask[i]){
 	  int V2 = glm_data.V2;
 	  double ErrorSS = glm_data.ErrorSS;
-	  /*
-	    plm(XtXi, &XtSNP(0, i), SNPtSNP[i], SNPty[i],
-	    glm_data.ErrorSS, glm_data.V2);
-	    // inputs
-	  */
 	  // previous V2 in glm_data
 
 	  //! @todo use cblas_dsymv for this

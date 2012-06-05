@@ -75,6 +75,7 @@ public:
   void print(std::string title) const;
   int write(std::string filename);
   int writeD(std::string filename);
+  bool checkNeg();
 
   // Replace this matrix with its transpose.  Here we simply
   // use n_rows*n_cols temporary storage.  In-place transposition

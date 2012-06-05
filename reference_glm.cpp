@@ -973,11 +973,63 @@ int main(int argc, char **argv)
     } else { // CPUOnly == 1
       // call CPU plm, get max F & index
       gettimeofday(&tstart, 0);
+      int n = XtXi.get_n_rows();
+      
+      // G = XtXi
+      // compute transpose of SNPtXG: 1xn
+      vector<double> GtXtSNP(n, 0.0);
       for(uint64_t i = 0; i < mySNPs; i++){
-	if(!snpMask[i])
-	  plm(XtXi, &XtSNP(0, i), SNPtSNP[i], SNPty[i], yty, Xty, rX, &Fval[i], 
-	      glm_data.ErrorSS, glm_data.V2);
-	else{
+	if(!snpMask[i]){
+	  int V2 = glm_data.V2;
+	  double ErrorSS = glm_data.ErrorSS;
+	  /*
+	    plm(XtXi, &XtSNP(0, i), SNPtSNP[i], SNPty[i],
+	    glm_data.ErrorSS, glm_data.V2);
+	    // inputs
+	  */
+	  // previous V2 in glm_data
+
+	  //! @todo use cblas_dsymv for this
+	  cblas_dgemv(CblasColMajor,
+		      CblasTrans, //! G is symmetric; but transpose is faster
+		      n,
+		      n,
+		      1.0,
+		      &XtXi.values[0],
+		      n,
+		      &XtSNP(0, i),
+		      1,
+		      0.0,
+		      &GtXtSNP[0],
+		      1);
+
+	  writeD("GtXtSNP.dat", GtXtSNP); // ok
+
+
+	  // compute SNPtXGXtSNP (scalar)
+	  // <SNPtX GtXtSNP> == <XtSNP GtXtSNP>
+	  double SNPtXGXtSNP = cblas_ddot(n, &XtSNP(0, i), 1, &GtXtSNP[0], 1);
+
+	  // compute S = Schur complement of partitioned matrix to invert
+	  double S = SNPtSNP[i] - SNPtXGXtSNP;
+	  if(S < doubleTol){ //! @todo if zero within tolerance
+	    // bad news
+	    Fval[i] = 0.0;
+	    continue;
+	  }
+
+	  //S = 1.0 / S;
+
+	  // compute snpty - snptXGXty = snptMy == scalar
+	  // already know snpty, snptXG', Xty
+	  double SNPtMy = -cblas_ddot(n, &GtXtSNP[0], 1, &Xty[0], 1);
+	  SNPtMy += SNPty[i];
+
+	  double SSM = SNPtMy * SNPtMy / S;
+	  V2--;
+	  ErrorSS = ErrorSS - SSM;
+	  Fval[i] = V2 * SSM / ErrorSS;
+	}else{
 	  Fval[i] = 0.0;
 	}
       }

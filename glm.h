@@ -53,6 +53,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Local headers
 #include "fortran_matrix.h"
 
+using namespace std;
 
 // This file contains data structures/routines for handling the
 // internals of the GLM function originally written in Matlab.
@@ -93,19 +94,5 @@ void glm(unsigned id, unsigned iteration,
 	 // output
 	 GLMData& glm_data);
 
-
-void plm(
-	 // inputs
-	 const FortranMatrix &XtXi, 
-	 const double *XtSNP,
-	 const double SNPtSNP, 
-	 const double SNPty, 
-	 const double yty, 
-	 const std::vector<double> &Xty, 
-	 const unsigned rX,
-	 float *F,
-	 double ErrorSS,
-	 unsigned V2
-);
 
 #endif

@@ -124,11 +124,17 @@ template <class T> void writeD(std::string filename, const std::vector<T> &v){
 template <class T> void writeD(std::string filename, const T *v, unsigned length){
   write_matrix(filename.c_str(), length, 1, &v[0], 1);
 }
+
+template <class T> bool checkNeg(T* data, uint64_t length){
+  for(uint64_t i = 0; i < length; i++)
+    if(data[i] < 0)
+      return true;
+  return false;
+}
 #else
-template <class T> void writeD(std::string filename, const std::vector<T> &v){
-}
-template <class T> void writeD(std::string filename, const T *v, unsigned length){
-}
+template <class T> void writeD(std::string filename, const std::vector<T> &v){}
+template <class T> void writeD(std::string filename, const T *v, unsigned length){}
+template <class T> bool checkNeg(T* data, uint64_t length){}
 #endif
 template <class T> void write(std::string filename, const std::vector<T> &v){
   write_matrix(filename.c_str(), v.size(), 1, &v[0], 1);

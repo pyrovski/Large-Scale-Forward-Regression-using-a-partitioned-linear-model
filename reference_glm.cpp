@@ -1173,6 +1173,8 @@ int main(int argc, char **argv)
     
 #ifdef _DEBUG
     {
+      if(checkNeg(nextSNP, geno_ind))
+	cerr << "rank " << id << " nextSNP negative at iteration " << iteration << endl;
       stringstream ssSNP, ssXtSNP, ssSNPtSNP, ssSNPty;
       ssSNP << "nextSNP_" << id << "_" << iteration << ".dat";
       ssXtSNP << "nextXtSNP_" << id << "_" << iteration << ".dat";

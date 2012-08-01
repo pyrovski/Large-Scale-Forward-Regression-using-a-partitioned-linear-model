@@ -641,7 +641,6 @@ int main(int argc, char **argv)
     geno_ind; //rows 
   uint64_t geno_count; // columns of the geno array
 
-  bool CPUOnly = false;
   bool rowMajor = false;
 
   /*
@@ -679,7 +678,6 @@ int main(int argc, char **argv)
       entry_limit = atof(optarg);
       break;
     case 'c':
-      CPUOnly = true;
       break;
     case 'f':
       fixed_filename = optarg;
@@ -737,14 +735,6 @@ int main(int argc, char **argv)
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
-  if(iterationLimit + fixed_count > fixedPlusIteration_limit){
-    if(!id)
-      cout << "number of iterations plus number of fixed effects must be " 
-	   << "less than " << fixedPlusIteration_limit << endl;
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
-
-  // local timing
   timeval tstart, tstop;
 
   // global timing

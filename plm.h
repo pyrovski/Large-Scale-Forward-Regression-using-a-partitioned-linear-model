@@ -52,13 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   according to device family, so we can define hardIterationLimit as 
   a macro function of 
  */
-#define fixedPlusIteration_limit 89
-
-unsigned plm_GPU(unsigned geno_count, unsigned blockSize, 
-		 unsigned m, double* d_snptsnp, double* d_Xtsnp, 
-		 unsigned d_XtsnpPitch, double ErrorSS, unsigned V2, 
-		 double* d_snpty, char* d_snpMask, float* d_f,
-		 std::vector<float> &Fval) throw(int);
+//#define fixedPlusIteration_limit 89
 
 int copyToDevice(const unsigned id, 
 		 const unsigned verbosity,
@@ -78,11 +72,3 @@ void copyUpdateToDevice(unsigned id, unsigned iteration,
 			const std::vector<char> &snpMask,
 			FortranMatrix &XtSNP, const FortranMatrix &XtXi,
 			const std::vector<double> &Xty);
-
-float getGPUCompTime();
-
-float getGPUMaxTime();
-
-void getMaxFGPU(unsigned id, unsigned iteration, unsigned geno_count, 
-	     std::vector<float> &Fval, 
-	     unsigned maxFIndex, float *d_f);

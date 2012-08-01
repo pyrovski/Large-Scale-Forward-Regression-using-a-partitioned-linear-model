@@ -274,12 +274,80 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
   return 0;
 }
 
+int pinv(FortranMatrix &M, vector<double> &rhs, FortranMatrix &Mi, 
+	 vector<double> &beta, double &tol, int id){
+  int n = M.get_n_rows();
+  vector<double> S;
+  FortranMatrix U, Vt;
+
+  int rank;
+  // Initialize SVD components, A = U * S * V^T
+  //! @todo this is altering M
+  svd_create(M, U, S, Vt);
+
+  rank = svd_apply(U, S, Vt, /*result=*/beta, rhs);
+
+  if(!id){
+    U.writeD("U.dat");
+    writeD("S.dat", S);
+    Vt.writeD("Vt.dat");
+    writeD("beta.dat", beta);
+  }
+
+  // Mi = V * S^-1 * Ut
+  // S^-1 = 1./S, where S > tol
+
+  /* compute V * 1./S
+     S is stored as a vector, but represents an nxn diagonal matrix
+  */
+
+  // first compute V from Vt
+    
+  Vt.transpose_self();
+
+  double maxS = 0.0;
+  for(unsigned i = 0; i < n; i++)
+    maxS = max(maxS, S[i]); // compute norm(M, 2) = max(S)
+  tol = n * numeric_limits<double>::epsilon() * maxS;
+  for(unsigned i = 0; i < n; i++)
+    if(S[i])
+      if(S[i] > tol)
+	S[i] = 1.0/S[i];
+      else
+	S[i] = 0.0;
+    
+  // emulate matrix-matrix multiply, with second matrix diagonal
+  for(unsigned col = 0; col < n; col++)
+    cblas_dscal(n,
+		S[col],
+		&Vt.values[col * n],
+		1);
+
+  // compute Mi = V * S^-1 * Ut
+  Mi.resize(n, n);
+  cblas_dgemm(CblasColMajor,
+	      CblasNoTrans, // V_Si is not transposed
+	      CblasTrans, // U is transposed
+	      n,
+	      n,
+	      n,
+	      1.0,
+	      &Vt.values[0],
+	      n,
+	      &U.values[0],
+	      n,
+	      0.0,
+	      &Mi.values[0],
+	      n);
+
+  return rank;
+}
+
 void compPrepare(unsigned id, unsigned iteration, 
 		 //FortranMatrix &X, 
 		 FortranMatrix &fixed, 
 		 unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, 
-		 vector<double> &y, FortranMatrix &U, vector<double> &S, 
-		 FortranMatrix &Vt, unsigned &rX, vector<double> &beta, 
+		 vector<double> &y, unsigned &rX, vector<double> &beta, 
 		 unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, 
 		 GLMData &glm_data, unsigned &geno_ind, uint64_t &mySNPs, 
 		 FortranMatrix &geno, FortranMatrix &XtSNP, 
@@ -338,78 +406,20 @@ void compPrepare(unsigned id, unsigned iteration,
 			       1);
   }
 
-  if(!id)
-    XtX.writeD("XtX.dat");
-  
-  // Solve (X^T * X)*beta = X^T*y for beta.  Note that X and X^T * X
-  // have the same rank.
-
-  // Initialize SVD components, A = U * S * V^T
-  Xty = matvec(X, y, /*transX=*/true);
-  
-  //! @todo this is altering XtX
-  // Create the SVD of X^T * X 
-  svd_create(XtX, U, S, Vt);
-
-  rX = svd_apply(U, S, Vt, /*result=*/beta, Xty);
-
   if(!id){
     X.writeD("X.dat");
     XtX.writeD("XtX.dat");
+  }
+  
 
+  Xty = matvec(X, y, /*transX=*/true);
+  if(!id)
     writeD("Xty_0.dat", Xty);
 
-    U.writeD("U.dat");
-    writeD("S.dat", S);
-    Vt.writeD("Vt.dat");
-    writeD("beta.dat", beta);
-  }
-
-  // XtXi = V * S^-1 * Ut
-  // S^-1 = 1./S, where S > tol
-
-  /* compute V * 1./S
-     S is stored as a vector, but represents an nxn diagonal matrix
-  */
-
-  // first compute V from Vt
-    
-  Vt.transpose_self();
-
-  double maxS = 0.0;
-  for(unsigned i = 0; i < n; i++)
-    maxS = max(maxS, S[i]); // compute norm(XtX, 2) = max(S)
-  tol = n * numeric_limits<double>::epsilon() * maxS;
-  for(unsigned i = 0; i < n; i++)
-    if(S[i])
-      if(S[i] > tol)
-	S[i] = 1.0/S[i];
-      else
-	S[i] = 0.0;
-    
-  // emulate matrix-matrix multiply, with second matrix diagonal
-  for(unsigned col = 0; col < n; col++)
-    cblas_dscal(n,
-		S[col],
-		&Vt.values[col * n],
-		1);
-
-  // compute XtXi = V * S^-1 * Ut
-  XtXi.resize(n, n);
-  cblas_dgemm(CblasColMajor,
-	      CblasNoTrans, // V_Si is not transposed
-	      CblasTrans, // U is transposed
-	      n,
-	      n,
-	      n,
-	      1.0,
-	      &Vt.values[0],
-	      n,
-	      &U.values[0],
-	      n,
-	      0.0,
-	      &XtXi.values[0],
-	      n);
+  // Create the SVD of X^T * X 
+  // Solve (X^T * X)*beta = X^T*y for beta.  
+  // Note that X and X^T * X have the same rank.
+  rX = pinv(XtX, Xty, XtXi, beta, tol, id);
 #ifdef _DEBUG
   if(!id)
     {
@@ -418,6 +428,7 @@ void compPrepare(unsigned id, unsigned iteration,
       XtXi.writeD(ss.str());
     }
 #endif
+
 
   // Compute the matrix-vector product, XTy := X' * y.  
   yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
@@ -845,22 +856,21 @@ int main(int argc, char **argv)
 
   //! have to set size here; constructor for return value doesn't work in matmat
   FortranMatrix XtX(n, n);
-  vector<double> S;
-  FortranMatrix U, Vt, XtXi;
+  FortranMatrix XtXi;
 
   GLMData glm_data, glm_data_new;
-  vector<double> beta;
   vector<double> Xty;
   unsigned rX;
   double tol;
   double yty;
   vector<double> SNPtSNP(mySNPs), SNPty(mySNPs);
   FortranMatrix XtSNP(n, mySNPs);
+  vector<double> beta;
   
   // Begin timing the computations
   gettimeofday(&tstart, NULL);
 
-  compPrepare(id, 0, fixed, fixed_count, XtX, Xty, y, U, S, Vt, rX, 
+  compPrepare(id, 0, fixed, fixed_count, XtX, Xty, y, rX, 
 	      beta, n, tol, XtXi, 
 	      yty, glm_data, geno_ind, mySNPs, geno, XtSNP, SNPty, 
 	      SNPtSNP);

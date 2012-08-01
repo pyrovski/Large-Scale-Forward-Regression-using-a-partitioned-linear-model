@@ -134,7 +134,7 @@ template <class T> bool checkNeg(T* data, uint64_t length){
 #else
 template <class T> void writeD(std::string filename, const std::vector<T> &v){}
 template <class T> void writeD(std::string filename, const T *v, unsigned length){}
-template <class T> bool checkNeg(T* data, uint64_t length){}
+template <class T> bool checkNeg(T* data, uint64_t length){return false;}
 #endif
 template <class T> void write(std::string filename, const std::vector<T> &v){
   write_matrix(filename.c_str(), v.size(), 1, &v[0], 1);

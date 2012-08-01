@@ -1028,6 +1028,9 @@ int main(int argc, char **argv)
 	  SNPtMy += SNPty[i];
 
 	  double SSM = SNPtMy * SNPtMy / S;
+
+	  //! @todo calculate rank estimate here (trace(XtX * G))
+	  // if rank too large or too small, set Fval[i] = 0
 	  V2--;
 	  ErrorSS = ErrorSS - SSM;
 	  Fval[i] = V2 * SSM / ErrorSS;
@@ -1037,6 +1040,13 @@ int main(int argc, char **argv)
       }
       gettimeofday(&tstop, 0);
       double CPUCompTime = tvDouble(tstop - tstart);
+
+      /*! @todo categorize SNPs by V2, find max F for each V2, 
+	calculate one p-value per V2 per MPI rank,
+	reduce on min non-zero p-value regardless of V2, but
+	record V2 for posterity
+       */
+
       localMaxFIndex = cblas_isamax(mySNPs, &Fval[0], 1);
       gettimeofday(&tstart, 0);
       double CPUMaxTime = tvDouble(tstart - tstop);

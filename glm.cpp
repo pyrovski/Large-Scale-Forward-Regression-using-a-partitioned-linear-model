@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 */
+#include <string.h>
 #include <gsl/gsl_cdf.h> 
 extern "C"{
 #include <cblas.h>
@@ -50,6 +51,7 @@ extern "C"{
 
 #include "glm.h"
 #include "type.h"
+#include "pinv.h"
 
 using namespace std;
 
@@ -57,22 +59,30 @@ using namespace std;
 // the code a good deal cleaner (but not really any faster when Kt is
 // a 1-by-N matrix) than the more general case where Kt is a matrix.
 void glm(unsigned id, unsigned iteration,
-	 int n,
+	 int n, // pre-updated size
+	 int geno_ind,
+	 double &tol,
+	 FortranMatrix &XtX, // updated
 	 FortranMatrix &XtXi, // updated
 	 const double *XtSNP,
 	 const double SNPtSNP, 
 	 const double SNPty, 
 	 const double yty, 
 	 vector<double> &Xty, // updated
-	 double rX,
 	 // output
-	 GLMData& glm_data)
+	 GLMData& glm_data,
+	 vector<double> &beta)
 {  
   //int 
     //m  = X.get_n_rows(),
     //n = X.get_n_cols();
   //int V1 = 1; // Kt is assumed to be a row vector in this version
 
+  // update XtX
+  XtX.resize_retain(n + 1, n + 1);
+  cblas_dcopy(n, XtSNP, 1, &XtX(n + 1, 1), n + 1);
+  memcpy(&XtX(1, n + 1), XtSNP, sizeof(double) * n);
+  XtX(n + 1, n + 1) = SNPtSNP;
   // G = XtXi
   // compute transpose of SNPtXG: nx1
   vector<double> GtXtSNP(n, 0.0);
@@ -121,24 +131,28 @@ void glm(unsigned id, unsigned iteration,
     future operations using this result must also assume XtXi is packed
    */
   //cblas_dsyr(CblasColMajor, CblasUpper, n, S, &GtXtSNP[0], 1, &XtXi.values[0], n);
+  /*
   cblas_dger(CblasColMajor, n,
 	     n, S, &GtXtSNP[0], 1, &GtXtSNP[0], 1,
 	     &XtXi.values[0], n);
+  */
 
-  //! @todo recompute XtXi with svd; it is numerically stable
 
   //! @todo this could be avoided by use of lda in computation of XtXi;
   // just allocate XtXi as n+1xn+1 and use lda=n+1, M = n, N = n
-  XtXi.resize_retain(n + 1, n + 1);
+  //XtXi.resize_retain(n + 1, n + 1);
 
   // compute right and bottom edges of XtXi
   // right edge
-  cblas_daxpy(n, -S, &GtXtSNP[0], 1, &XtXi.values[n * (n + 1)], 1);
-  cblas_dcopy(n, &XtXi.values[n * (n + 1)], 1, &XtXi.values[n], n + 1);
+  //cblas_daxpy(n, -S, &GtXtSNP[0], 1, &XtXi.values[n * (n + 1)], 1);
+  //cblas_dcopy(n, &XtXi.values[n * (n + 1)], 1, &XtXi.values[n], n + 1);
 
   // store bottom right element of XtXi
-  XtXi(n, n) = S;
+  //XtXi(n + 1, n + 1) = S;
  
+  //! @todo recompute XtXi with svd; it is numerically stable
+  int rX = pinv(XtX, Xty, XtXi, beta, tol, id);
+
   // Xtyn = [Xty; snpty]; % n + 1 x 1
   Xty.push_back(SNPty); // append 1
 
@@ -164,10 +178,10 @@ void glm(unsigned id, unsigned iteration,
 
   //! @todo update rX from trace
   //double trn = S * (SNPtSNP - SNPtXGXtSNP);
-  rX++;
+  //rX++;
 
   // Compute "V2" now that we know rX == rank(X) == rank(X^T X)
-  glm_data.V2--;
+  glm_data.V2 = geno_ind - rX;
 
 
   // F = Kb' * inv(Kt * G * Kt') * Kb * V2 / (rK * ErrorSS);

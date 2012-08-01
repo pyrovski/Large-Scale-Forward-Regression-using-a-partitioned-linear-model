@@ -97,6 +97,7 @@ extern "C"{
 #include "tvUtil.h"
 #include "plm.h"
 #include "md5.h"
+#include "pinv.h"
 
 //! @todo match this to Lustre stripe size?
 const uint64_t readSize = 1024 * 1024 * 32;
@@ -161,10 +162,6 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
     }
     
     uint64_t readCount = 0, left = mySize / sizeof(double);
-    /*! @todo convert from row-major format on disk to 
-       column-major format in RAM
-       - for now, just assume column-major on disk
-     */
     if(rowMajor){
       double *array = (double*)malloc(mySNPs * sizeof(double));
       uint64_t row = 0;
@@ -272,75 +269,6 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
       writeD("y.dat", y);
   }
   return 0;
-}
-
-int pinv(FortranMatrix &M, vector<double> &rhs, FortranMatrix &Mi, 
-	 vector<double> &beta, double &tol, int id){
-  int n = M.get_n_rows();
-  vector<double> S;
-  FortranMatrix U, Vt;
-
-  int rank;
-  // Initialize SVD components, A = U * S * V^T
-  //! @todo this is altering M
-  svd_create(M, U, S, Vt);
-
-  rank = svd_apply(U, S, Vt, /*result=*/beta, rhs);
-
-  if(!id){
-    U.writeD("U.dat");
-    writeD("S.dat", S);
-    Vt.writeD("Vt.dat");
-    writeD("beta.dat", beta);
-  }
-
-  // Mi = V * S^-1 * Ut
-  // S^-1 = 1./S, where S > tol
-
-  /* compute V * 1./S
-     S is stored as a vector, but represents an nxn diagonal matrix
-  */
-
-  // first compute V from Vt
-    
-  Vt.transpose_self();
-
-  double maxS = 0.0;
-  for(unsigned i = 0; i < n; i++)
-    maxS = max(maxS, S[i]); // compute norm(M, 2) = max(S)
-  tol = n * numeric_limits<double>::epsilon() * maxS;
-  for(unsigned i = 0; i < n; i++)
-    if(S[i])
-      if(S[i] > tol)
-	S[i] = 1.0/S[i];
-      else
-	S[i] = 0.0;
-    
-  // emulate matrix-matrix multiply, with second matrix diagonal
-  for(unsigned col = 0; col < n; col++)
-    cblas_dscal(n,
-		S[col],
-		&Vt.values[col * n],
-		1);
-
-  // compute Mi = V * S^-1 * Ut
-  Mi.resize(n, n);
-  cblas_dgemm(CblasColMajor,
-	      CblasNoTrans, // V_Si is not transposed
-	      CblasTrans, // U is transposed
-	      n,
-	      n,
-	      n,
-	      1.0,
-	      &Vt.values[0],
-	      n,
-	      &U.values[0],
-	      n,
-	      0.0,
-	      &Mi.values[0],
-	      n);
-
-  return rank;
 }
 
 void compPrepare(unsigned id, unsigned iteration, 
@@ -513,7 +441,7 @@ void compPrepare(unsigned id, unsigned iteration,
 }
 
 void compUpdate(unsigned id, unsigned iteration, 
-		//FortranMatrix &X, 
+		FortranMatrix &XtX, 
 		FortranMatrix &XtXi, FortranMatrix &XtSNP, 
 		const double &yty,
 		vector<double> &Xty, const unsigned &rX, GLMData &glm_data,
@@ -522,15 +450,19 @@ void compUpdate(unsigned id, unsigned iteration,
 		const double *nextSNP,
 		const double *nextXtSNP,
 		const double &nextSNPtSNP, 
-		const double &nextSNPty){
+		const double &nextSNPty,
+		double &tol,
+		vector<double> &beta){
 
   timeval tGLMStart, tGLMStop, tResizeStop, tXtSNPStop;
   
+  // update XtX
   // update XtXi, Xty
   // output glm_data
   gettimeofday(&tGLMStart, 0);
-  glm(id, iteration, n, XtXi, nextXtSNP, nextSNPtSNP, nextSNPty, yty, Xty,
-	rX, glm_data);
+  
+  glm(id, iteration, n, geno.get_n_rows(), tol, XtX, XtXi, nextXtSNP, nextSNPtSNP, nextSNPty, yty, Xty,
+      glm_data, beta);
   gettimeofday(&tGLMStop, 0);
 #ifdef _DEBUG
   if(!id)
@@ -1220,9 +1152,9 @@ int main(int argc, char **argv)
      */
 
     gettimeofday(&tstart, NULL);
-    compUpdate(id, iteration, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, geno_ind, 
+    compUpdate(id, iteration, XtX, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, geno_ind, 
 	       geno, 
-	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty);
+	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty, tol, beta);
     gettimeofday(&tstop, NULL);
     CPUCompUpdateTime = tvDouble(tstop - tstart);
 

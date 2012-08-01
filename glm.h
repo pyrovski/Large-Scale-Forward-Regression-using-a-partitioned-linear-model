@@ -84,15 +84,18 @@ struct GLMData
 // a 1-by-N matrix) than the more general case where Kt is a matrix.
 void glm(unsigned id, unsigned iteration, 
 	 int n,
+	 int geno_ind,
+	 double &tol,
+	 FortranMatrix &XtX, // updated
 	 FortranMatrix &XtXi, // updated
 	 const double *XtSNP,
 	 const double SNPtSNP, 
 	 const double SNPty, 
 	 const double yty, 
 	 std::vector<double> &Xty, // updated
-	 double rX,
 	 // output
-	 GLMData& glm_data);
+	 GLMData& glm_data,
+	 vector<double> &beta);
 
 
 #endif

@@ -104,7 +104,7 @@ nonneg: nonneg.cpp
 	$(CC) $(DBG) $(OPT_FLAGS) $(INCLUDES) $(COMMON_FLAGS) $^ -o $@
 
 clean:
-	rm -f *~ *.P *.o $(target) convertToBinary transpose
+	rm -f *~ *.P *.o $(target) convertToBinary transpose nonneg
 
 $(target): $(objects)
 	$(CC) -o $@ $^ $(LIBS)

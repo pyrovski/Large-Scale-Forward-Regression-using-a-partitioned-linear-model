@@ -867,15 +867,6 @@ int main(int argc, char **argv)
   // we are assuming y is a vector for now (because GLM currently expects
   // a vector for its second argument) but this could be generalized later.
 
-    // Call the glm function.  Note that X is currently overwritten by this function,
-    // and therefore would need to be re-formed completely at each iteration...
-    /*
-      ~200 us per SNP on Core i3, ~106 us per SNP on Core i7
-     */
-    
-    /*
-      170 us per SNP on Core i3, 92 us per SNP on Core i7
-     */
 
   unsigned iteration = 0;
   while(iteration < iterationLimit && Pval[iteration] < entry_limit){

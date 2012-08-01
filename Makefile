@@ -66,11 +66,11 @@ GSL_PATH ?= /usr/
 GSL_INCLUDE ?= -I$(GSL_PATH)/include
 GSL_LIB = -L$(GSL_PATH)/lib -lgsl
 
-LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB) -lcublas $(CUDA_LIBS)
+LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB)
 
 INCLUDES = $(GSL_INCLUDE) $(BLAS_INCLUDE)
 
-CPU_SRC = reference_glm.cpp tvUtil.cpp fortran_matrix.cpp glm.cpp print_matrix.cpp svd.cpp md5.cpp
+CPU_SRC = reference_plm.cpp tvUtil.cpp fortran_matrix.cpp glm.cpp print_matrix.cpp svd.cpp md5.cpp
 HEADERS= type.h fortran_matrix.h print_matrix.h glm.h plm.h fortran_matrix.h print_matrix.h svd.h cuda_blas.cu
 SRC=$(CPU_SRC)
 target = reference_plm

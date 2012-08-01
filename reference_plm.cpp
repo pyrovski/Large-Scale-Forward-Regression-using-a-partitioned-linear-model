@@ -45,11 +45,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*! @todo print id numbers padded with 0s
   @todo use sched_setaffinity() to select a CPU core
   - if using two cores per node, use separate sockets
-  @todo use GPU and host RAM size to estimate how many SNPs can be processed at a time
-  - host holds all SNPs plus derived data; currently, GPU holds only derived data
-  - can get allocated memory size from sge runtime
-  
-  @todo comp prepare or update on GPU?
 
   @todo integrate SNP projection; 
   full SNPs are only used in a couple
@@ -675,8 +670,6 @@ int main(int argc, char **argv)
 
      -v <verbosity level>
 
-     -c for CPU only (otherwise use GPU too)
-
      -e <entry limit>
   */
 
@@ -807,8 +800,7 @@ int main(int argc, char **argv)
     cout << "id " << id 
 	 << " reading input data..." << endl;
   
-  double GPUCompTime = 0, GPUMaxTime = 0,
-    GPUCopyTime = 0, GPUCopyUpdateTime = 0,
+  double 
     CPUCompUpdateTime = 0,
     MPITime = 0, diskIOTime = 0;
 
@@ -880,32 +872,6 @@ int main(int argc, char **argv)
   // column-major with padding
   size_t d_XtsnpPitch;
   
-  if(!CPUOnly){
-    gettimeofday(&tstart, NULL);
-    int copyStatus = 
-      copyToDevice(id, verbosity,
-		   mySNPs, n,
-		   d_snptsnp, d_Xtsnp, d_XtsnpPitch, d_snpty, d_snpMask, d_f,
-		   SNPtSNP, XtSNP, 
-		   SNPty, Xty, XtXi, snpMask);
-    gettimeofday(&tstop, NULL);
-  
-    if(copyStatus){
-      cerr << "id " << id << " copyToDevice failed." << endl;
-      MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-
-    GPUCopyTime = tvDouble(tstop - tstart);
-  
-    if(verbosity > 0){
-      cout << "id " << id 
-	   << " GPU copy time: "
-	   << GPUCopyTime << " s" << endl;
-      cout << "GPU copy time per SNP: " << GPUCopyTime / mySNPs 
-	   << " s" << endl;
-    }
-    
-  }
   // For each column of the geno array, set up the "X" matrix,
   // call the GLM routine, and store the computed p value.  Note
   // we are assuming y is a vector for now (because GLM currently expects
@@ -933,108 +899,64 @@ int main(int argc, char **argv)
 
     float globalMaxF;
 
-    if(!CPUOnly){
-      // ~3.5 us per SNP on Longhorn (FX5800)
-      try{
-	localMaxFIndex = plm_GPU(mySNPs, n, 
-				 geno_ind,        
-				 d_snptsnp, 
-				 d_Xtsnp, 
-				 d_XtsnpPitch, 
-				 glm_data.ErrorSS, glm_data.V2, 
-				 d_snpty, 
-				 d_snpMask,
-				 d_f,
-				 Fval);
-      } catch(int e){
-	MPI_Abort(MPI_COMM_WORLD, e);
-      }
-      GPUCompTime = getGPUCompTime();
-    
-      // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
-      // if V1 = 0, ignore; F is undefined
-      getMaxFGPU(id, iteration, mySNPs, Fval, localMaxFIndex, d_f);
-      GPUMaxTime = getGPUMaxTime();
-      if(verbosity > 1){
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU computation time: "
-	     << GPUCompTime << " s" << endl;
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU computation time per SNP: "
-	     << GPUCompTime / mySNPs 
-	     << " s" << endl;
-	
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU reduction time: "
-	     << GPUMaxTime << " s" << endl;
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU reduction time per SNP: "
-	     << GPUMaxTime / mySNPs 
-	     << " s" << endl;
-      }
-    } else { // CPUOnly == 1
-      // call CPU plm, get max F & index
-      gettimeofday(&tstart, 0);
-      int n = XtXi.get_n_rows();
+    // call CPU plm, get max F & index
+    gettimeofday(&tstart, 0);
+    int n = XtXi.get_n_rows();
       
-      // G = XtXi
+    // G = XtXi
 
-      // compute transpose of SNPtXG: 1xn
-      vector<double> GtXtSNP(n, 0.0);
-      for(uint64_t i = 0; i < mySNPs; i++){
-	if(!snpMask[i]){
-	  int V2 = glm_data.V2;
-	  double ErrorSS = glm_data.ErrorSS;
-	  // previous V2 in glm_data
+    // compute transpose of SNPtXG: 1xn
+    vector<double> GtXtSNP(n, 0.0);
+    for(uint64_t i = 0; i < mySNPs; i++){
+      if(!snpMask[i]){
+	int V2 = glm_data.V2;
+	double ErrorSS = glm_data.ErrorSS;
+	// previous V2 in glm_data
 
-	  //! @todo use cblas_dsymv for this
-	  cblas_dgemv(CblasColMajor,
-		      CblasTrans, //! G is symmetric; but transpose is faster
-		      n,
-		      n,
-		      1.0,
-		      &XtXi.values[0],
-		      n,
-		      &XtSNP(0, i),
-		      1,
-		      0.0,
-		      &GtXtSNP[0],
-		      1);
+	//! @todo use cblas_dsymv for this
+	cblas_dgemv(CblasColMajor,
+		    CblasTrans, //! G is symmetric; but transpose is faster
+		    n,
+		    n,
+		    1.0,
+		    &XtXi.values[0],
+		    n,
+		    &XtSNP(0, i),
+		    1,
+		    0.0,
+		    &GtXtSNP[0],
+		    1);
 
-	  writeD("GtXtSNP.dat", GtXtSNP); // ok
+	writeD("GtXtSNP.dat", GtXtSNP); // ok
 
 
-	  // compute SNPtXGXtSNP (scalar)
-	  // <SNPtX GtXtSNP> == <XtSNP GtXtSNP>
-	  double SNPtXGXtSNP = cblas_ddot(n, &XtSNP(0, i), 1, &GtXtSNP[0], 1);
+	// compute SNPtXGXtSNP (scalar)
+	// <SNPtX GtXtSNP> == <XtSNP GtXtSNP>
+	double SNPtXGXtSNP = cblas_ddot(n, &XtSNP(0, i), 1, &GtXtSNP[0], 1);
 
-	  // compute S = Schur complement of partitioned matrix to invert
-	  double S = SNPtSNP[i] - SNPtXGXtSNP;
-	  if(S < doubleTol){ //! @todo if zero within tolerance
-	    // bad news
-	    Fval[i] = 0.0;
-	    continue;
-	  }
-
-	  //S = 1.0 / S;
-
-	  // compute snpty - snptXGXty = snptMy == scalar
-	  // already know snpty, snptXG', Xty
-	  double SNPtMy = -cblas_ddot(n, &GtXtSNP[0], 1, &Xty[0], 1);
-	  SNPtMy += SNPty[i];
-
-	  double SSM = SNPtMy * SNPtMy / S;
-	  V2--;
-	  ErrorSS = ErrorSS - SSM;
-	  Fval[i] = V2 * SSM / ErrorSS;
-	}else{
+	// compute S = Schur complement of partitioned matrix to invert
+	double S = SNPtSNP[i] - SNPtXGXtSNP;
+	if(S < doubleTol){ //! @todo if zero within tolerance
+	  // bad news
 	  Fval[i] = 0.0;
+	  continue;
 	}
+
+	//S = 1.0 / S;
+
+	// compute snpty - snptXGXty = snptMy == scalar
+	// already know snpty, snptXG', Xty
+	double SNPtMy = -cblas_ddot(n, &GtXtSNP[0], 1, &Xty[0], 1);
+	SNPtMy += SNPty[i];
+
+	double SSM = SNPtMy * SNPtMy / S;
+	V2--;
+	ErrorSS = ErrorSS - SSM;
+	Fval[i] = V2 * SSM / ErrorSS;
+      }else{
+	Fval[i] = 0.0;
       }
+
       gettimeofday(&tstop, 0);
       double CPUCompTime = tvDouble(tstop - tstart);
       localMaxFIndex = cblas_isamax(mySNPs, &Fval[0], 1);
@@ -1195,7 +1117,6 @@ int main(int argc, char **argv)
       - glm_data.ErrorSS, (done)
       - glm_data.V2, (done)
       - list of chosen SNP indices:
-      Assume data is in-core for GPU; i.e. don't recopy SNPs at each iteration.
       To remove SNP from geno, set mask at SNP index.
      */
 
@@ -1213,21 +1134,6 @@ int main(int argc, char **argv)
 	   << CPUCompUpdateTime << " s" << endl;
     }
 
-    if(!CPUOnly){
-      gettimeofday(&tstart, NULL);
-      copyUpdateToDevice(id, iteration, mySNPs, n, d_snpMask, localMaxFIndex, 
-			 d_Xtsnp, d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);
-      gettimeofday(&tstop, NULL);
-      GPUCopyUpdateTime = tvDouble(tstop - tstart);
-
-      if(verbosity > 1){	
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " GPU copy update time: "
-	     << GPUCopyUpdateTime << " s" << endl;
-      }
-    }
-      
     n++;
     iteration++;
   } // while(1)

@@ -86,6 +86,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/sysinfo.h>
 #include <math.h>
 
+#include <algorithm>
+
 extern "C"{
 #include <cblas.h>
 }
@@ -855,13 +857,6 @@ int main(int argc, char **argv)
 
   // Call the glm function.  Note that X is currently overwritten by this function,
   // and therefore would need to be re-formed completely at each iteration...
-  /*
-    ~200 us per SNP on Core i3, ~106 us per SNP on Core i7
-  */
-    
-  /*
-    170 us per SNP on Core i3, 92 us per SNP on Core i7
-  */
 
   unsigned iteration = 0;
   while(iteration < iterationLimit && Pval[iteration] < entry_limit){
@@ -871,12 +866,16 @@ int main(int argc, char **argv)
     /*! @todo this will need more bits when running more than 2^32 SNPs 
       on a single CPU process
     */
-    int localMaxFIndex;
+    int localMinPIndex;
 
-    float globalMaxF;
+    double globalMinP;
+    double localMinP;
 
     if(!CPUOnly){
       // ~3.5 us per SNP on Longhorn (FX5800)
+      fprintf(stderr, "fixme get max F for each V2 %s: %d\n", __FILE__, __LINE__);
+      MPI_Abort(MPI_COMM_WORLD, 1);
+      /*
       try{
 	localMaxFIndex = plm_GPU(mySNPs, n, 
 				 geno_ind,        
@@ -889,13 +888,15 @@ int main(int argc, char **argv)
 				 d_f,
 				 Fval);
       } catch(int e){
+	fprintf(stderr, "fixme %s: %d\n", __FILE__, __LINE__);
 	MPI_Abort(MPI_COMM_WORLD, e);
       }
+      */
       GPUCompTime = getGPUCompTime();
     
       // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
       // if V1 = 0, ignore; F is undefined
-      getMaxFGPU(id, iteration, mySNPs, Fval, localMaxFIndex, d_f);
+      getMaxFGPU(id, iteration, mySNPs, Fval, localMinPIndex, d_f);
       GPUMaxTime = getGPUMaxTime();
       if(verbosity > 1){
 	cout << "iteration " << iteration 
@@ -1045,8 +1046,8 @@ int main(int argc, char **argv)
 	  V2s.push_back(V2[i]);
 	  V2Lists.resize(V2Lists.size() + 1);
 	  FLists.resize(FLists.size() + 1);
-	  V2Lists[V2Lists.size() - 1].push_back(i);
-	  FLists[FLists.size() - 1].push_back(Fval[i]);
+	  V2Lists.back().push_back(i);
+	  FLists.back().push_back(Fval[i]);
 	  continue;
 	}
 	V2Lists[V2Index].push_back(i);
@@ -1057,15 +1058,23 @@ int main(int argc, char **argv)
       gettimeofday(&tstart, 0);
       vector<int> maxFIndices(V2s.size());
       vector<float> maxFs(V2s.size());
+      vector<double> minPs(V2s.size());
       for(V2Index = 0; V2Index < V2s.size(); V2Index++){
-	maxFIndices[V2Index] = cblas_isamax(FLists[V2Index].size(), &FLists[V2Index][0], 1);
+	maxFIndices[V2Index] = 
+	  max_element(FLists[V2Index].begin(), FLists[V2Index].end()) - FLists[V2Index].begin();
 	maxFs[V2Index] = FLists[V2Index][maxFIndices[V2Index]];
+	minPs[V2Index] = 1 - gsl_cdf_fdist_P(maxFs[V2Index], 1, V2s[V2Index]);
+	if(minPs[V2Index] == 0)
+	  minPs[V2Index] = std::numeric_limits<double>::infinity();
       }
-      localMaxFIndex = cblas_isamax(V2s.size(), &maxFs[0], 1);
-      localMaxFIndex = V2Lists[localMaxFIndex][maxFIndices[localMaxFIndex]];
+
+      //! @todo compute p-values for each V2-specific max F-value
+      localMinPIndex = min_element(minPs.begin(), minPs.end()) - minPs.begin();
+      localMinP = minPs[localMinPIndex];
+      localMinPIndex = V2Lists[localMinPIndex][maxFIndices[localMinPIndex]];
     
       gettimeofday(&tstop, 0);
-      double CPUMaxTime = tvDouble(tstart - tstop);
+      double CPUMinTime = tvDouble(tstart - tstop);
       if(verbosity > 1){
 	cout << "iteration " << iteration 
 	     << " id " << id 
@@ -1080,11 +1089,11 @@ int main(int argc, char **argv)
 	cout << "iteration " << iteration 
 	     << " id " << id 
 	     << " CPU reduction time: "
-	     << CPUMaxTime << " s" << endl;
+	     << CPUMinTime << " s" << endl;
 	cout << "iteration " << iteration 
 	     << " id " << id 
 	     << " CPU reduction time per SNP: "
-	     << CPUMaxTime / mySNPs 
+	     << CPUMinTime / mySNPs 
 	     << " s" << endl;
       
       }
@@ -1098,24 +1107,20 @@ int main(int argc, char **argv)
     
     if(verbosity > 1){
       cout << "iteration " << iteration << " id " << id <<  
-	" max F: " << Fval[localMaxFIndex] 
-	   << " (local 0-index " << localMaxFIndex 
-	   << ", global 0-index " << myStartSNP + localMaxFIndex << ")" << endl;
-    }
-    if(Fval[localMaxFIndex] <= 0){
-      cerr << "error on iteration " << iteration << ": max F <= 0: " << Fval[localMaxFIndex] << endl;
-      MPI_Abort(MPI_COMM_WORLD, 1);
+	" min P: " << localMinP 
+	   << " (local 0-index " << localMinPIndex 
+	   << ", global 0-index " << myStartSNP + localMinPIndex << ")" << endl;
     }
 
     gettimeofday(&tstart, NULL);
-    // get max F value
-    MPI_Allreduce(&Fval[localMaxFIndex], &globalMaxF, 1, MPI_FLOAT, MPI_MAX,
+    // get global min P value
+    MPI_Allreduce(&localMinP, &globalMinP, 1, MPI_DOUBLE, MPI_MIN,
 		  MPI_COMM_WORLD);
     gettimeofday(&tstop, NULL);
     MPITime += tvDouble(tstop - tstart);
 
     // get p value
-    Pval[iteration] = 1 - gsl_cdf_fdist_P(globalMaxF, 1, glm_data.V2 - 1);
+    Pval[iteration] = globalMinP;
 
     if(Pval[iteration] > entry_limit){
       if(!id){
@@ -1130,13 +1135,13 @@ int main(int argc, char **argv)
       
     gettimeofday(&tstart, NULL);
     // determine a unique rank holding the max F value
-    int globalMinRankMaxF;
-    if(Fval[localMaxFIndex] == globalMaxF)
-      MPI_Allreduce(&id, &globalMinRankMaxF, 1, MPI_INT, MPI_MIN, 
+    int globalMinRankMinP;
+    if(localMinP == globalMinP)
+      MPI_Allreduce(&id, &globalMinRankMinP, 1, MPI_INT, MPI_MIN, 
 		    MPI_COMM_WORLD);
     else{
       int tempInt = numProcs + 1;
-      MPI_Allreduce(&tempInt, &globalMinRankMaxF, 1, MPI_INT, MPI_MIN, 
+      MPI_Allreduce(&tempInt, &globalMinRankMinP, 1, MPI_INT, MPI_MIN, 
 		    MPI_COMM_WORLD);
     }
     gettimeofday(&tstop, NULL);
@@ -1144,28 +1149,28 @@ int main(int argc, char **argv)
 
     if(verbosity > 1){
       if(!id)
-	cout << "iteration " << iteration << " global max F on rank " << 
-	  globalMinRankMaxF << ": " << globalMaxF << endl;
+	cout << "iteration " << iteration << " global min P on rank " << 
+	  globalMinRankMinP << ": " << globalMinP << endl;
     }
 
-    if(id == globalMinRankMaxF){
-      // I have the max F value
-      // send SNP which yielded max F value
-      nextSNP = &geno(0, localMaxFIndex);
-      nextXtSNP = &XtSNP(0, localMaxFIndex);
-      nextSNPty = SNPty[localMaxFIndex];
-      nextSNPtSNP = SNPtSNP[localMaxFIndex];
-      snpMask[localMaxFIndex] = 1;
+    if(id == globalMinRankMinP){
+      // I have the min P value
+      // send SNP which yielded min P value
+      nextSNP = &geno(0, localMinPIndex);
+      nextXtSNP = &XtSNP(0, localMinPIndex);
+      nextSNPty = SNPty[localMinPIndex];
+      nextSNPtSNP = SNPtSNP[localMinPIndex];
+      snpMask[localMinPIndex] = 1;
 #ifdef _DEBUG
       cout << "iteration " << iteration << " id " << id 
-	   << " masking index " << localMaxFIndex << endl;
+	   << " masking index " << localMinPIndex << endl;
 #endif
-      chosenSNPs[iteration] = localMaxFIndex + myStartSNP;
+      chosenSNPs[iteration] = localMinPIndex + myStartSNP;
     }else{
-      // receive SNP which yielded max F value
+      // receive SNP which yielded min P value
       nextSNP = &incomingSNP[0];
       nextXtSNP = &incomingXtSNP[0];
-      localMaxFIndex = -1;
+      localMinPIndex = -1;
       chosenSNPs[iteration] = -1;
     }
 
@@ -1175,7 +1180,7 @@ int main(int argc, char **argv)
     }
 
     /*
-      need the following values from the SNP corresponding to the max F value:
+      need the following values from the SNP corresponding to the min P value:
       - SNP: vector(geno_ind)
       - SNPtSNP: scalar
       - SNPty: scalar
@@ -1186,13 +1191,13 @@ int main(int argc, char **argv)
       or recalculate them
     */
     gettimeofday(&tstart, NULL);
-    MPI_Bcast(nextSNP, geno_ind, MPI_DOUBLE, globalMinRankMaxF,
+    MPI_Bcast(nextSNP, geno_ind, MPI_DOUBLE, globalMinRankMinP,
 	      MPI_COMM_WORLD);
-    MPI_Bcast(nextXtSNP, n, MPI_DOUBLE, globalMinRankMaxF,
+    MPI_Bcast(nextXtSNP, n, MPI_DOUBLE, globalMinRankMinP,
 	      MPI_COMM_WORLD);
-    MPI_Bcast(&nextSNPtSNP, 1, MPI_DOUBLE, globalMinRankMaxF,
+    MPI_Bcast(&nextSNPtSNP, 1, MPI_DOUBLE, globalMinRankMinP,
 	      MPI_COMM_WORLD);
-    MPI_Bcast(&nextSNPty, 1, MPI_DOUBLE, globalMinRankMaxF,
+    MPI_Bcast(&nextSNPty, 1, MPI_DOUBLE, globalMinRankMinP,
 	      MPI_COMM_WORLD);
     gettimeofday(&tstop, NULL);
     MPITime += tvDouble(tstop - tstart);
@@ -1241,7 +1246,7 @@ int main(int argc, char **argv)
 
     if(!CPUOnly){
       gettimeofday(&tstart, NULL);
-      copyUpdateToDevice(id, iteration, mySNPs, n, d_snpMask, localMaxFIndex, 
+      copyUpdateToDevice(id, iteration, mySNPs, n, d_snpMask, localMinPIndex, 
 			 d_Xtsnp, d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);
       gettimeofday(&tstop, NULL);
       GPUCopyUpdateTime = tvDouble(tstop - tstart);

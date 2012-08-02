@@ -119,7 +119,7 @@ uint64_t adjust(uint64_t total, unsigned ranks){
 }
 
 int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, 
-	       uint64_t mySNPs,
+	       int mySNPs,
 	       string fixed_filename, 
 	       string geno_filename, 
 	       string y_filename,
@@ -168,7 +168,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
       uint64_t row = 0;
       while(left){
 #ifdef _DEBUG
-	cout << "id " << id << " reading " << min(mySNPs, left) 
+	cout << "id " << id << " reading " << left 
 	     << " doubles from " << geno_filename << endl;
 #endif
 	size_t status = fread(array, sizeof(double), 
@@ -278,7 +278,7 @@ void compPrepare(unsigned id, unsigned iteration,
 		 unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, 
 		 vector<double> &y, unsigned &rX, vector<double> &beta, 
 		 unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, 
-		 GLMData &glm_data, unsigned &geno_ind, uint64_t &mySNPs, 
+		 GLMData &glm_data, unsigned &geno_ind, int &mySNPs, 
 		 FortranMatrix &geno, FortranMatrix &XtSNP, 
 		 vector<double> &SNPty, vector<double> &SNPtSNP){
 
@@ -309,7 +309,7 @@ void compPrepare(unsigned id, unsigned iteration,
   /*!
     construct XtX from X manually.
    */
-  for(uint64_t col = 0; col < X.get_n_cols(); col++){
+  for(int col = 0; col < X.get_n_cols(); col++){
     if(col){
       cblas_dgemv(CblasColMajor,
 		  CblasTrans,
@@ -325,7 +325,7 @@ void compPrepare(unsigned id, unsigned iteration,
 		  1);
 
       //! @todo if XtX is stored as symmetric matrix, we don't need this
-      for(uint64_t row = 0; row < col; row++)
+      for(int row = 0; row < col; row++)
  	XtX(col, row) = XtX(row, col);
     }
     XtX(col, col) = cblas_ddot(geno_ind, 
@@ -419,7 +419,7 @@ void compPrepare(unsigned id, unsigned iteration,
 
   /*! @todo SNPtSNP could be computed as the geno data is read from disk
    */
-  for (uint64_t i=0; i<mySNPs; ++i){
+  for (int i=0; i<mySNPs; ++i){
     //! these will never change for each SNP
     SNPtSNP[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
 				&geno.values[i*geno_ind], 1);
@@ -445,7 +445,7 @@ void compUpdate(unsigned id, unsigned iteration,
 		FortranMatrix &XtXi, FortranMatrix &XtSNP, 
 		const double &yty,
 		vector<double> &Xty, const unsigned &rX, GLMData &glm_data,
-		const unsigned &n, const uint64_t &mySNPs, const unsigned &m, 
+		const unsigned &n, const int &mySNPs, const unsigned &m, 
 		FortranMatrix &geno,
 		const double *nextSNP,
 		const double *nextXtSNP,
@@ -542,7 +542,7 @@ template <class T> void write(const char *filename, const vector<T> &list){
 
 void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop, 
 		     double MPITime, double diskIOTime,
-		     uint64_t mySNPs, unsigned iteration, unsigned id){
+		     int mySNPs, unsigned iteration, unsigned id){
   gettimeofday(&tGlobalStop, NULL);
   
   cout << "id " << id << " total time: " 
@@ -595,7 +595,7 @@ int main(int argc, char **argv)
   /*
     Skip a number of SNP entries for each individual; ideally, we will
     deal with the population and sample fields.
-   */
+  */
   int skip = 0;
 
   int optIndex;
@@ -703,13 +703,13 @@ int main(int argc, char **argv)
   //const unsigned m = geno_ind;
 
   uint64_t totalSize = geno_count * geno_ind * sizeof(double);
-  uint64_t perRankSNPs = adjust(geno_count, numProcs);
+  int perRankSNPs = adjust(geno_count, numProcs);
   uint64_t perRankLength = perRankSNPs * geno_ind;
   uint64_t perRankSize =  perRankLength * sizeof(double);    
   uint64_t myOffset = id * perRankSize;
   uint64_t mySize = myOffset + perRankSize <= totalSize ?
     perRankSize : totalSize - myOffset;
-  uint64_t mySNPs = mySize / sizeof(double) / geno_ind;
+  int mySNPs = mySize / sizeof(double) / geno_ind;
   uint64_t myStartSNP = id * perRankSNPs;
 
   if(verbosity > 1){
@@ -732,9 +732,9 @@ int main(int argc, char **argv)
     }
     if(!id)
       cout << "invoked as: ";
-      for(int i = 0; i < argc; i++)
-	cout << argv[i] << " ";
-      cout << endl;
+    for(int i = 0; i < argc; i++)
+      cout << argv[i] << " ";
+    cout << endl;
   }
 
   // Matrix objects for storing the input data
@@ -853,15 +853,15 @@ int main(int argc, char **argv)
   // we are assuming y is a vector for now (because GLM currently expects
   // a vector for its second argument) but this could be generalized later.
 
-    // Call the glm function.  Note that X is currently overwritten by this function,
-    // and therefore would need to be re-formed completely at each iteration...
-    /*
-      ~200 us per SNP on Core i3, ~106 us per SNP on Core i7
-     */
+  // Call the glm function.  Note that X is currently overwritten by this function,
+  // and therefore would need to be re-formed completely at each iteration...
+  /*
+    ~200 us per SNP on Core i3, ~106 us per SNP on Core i7
+  */
     
-    /*
-      170 us per SNP on Core i3, 92 us per SNP on Core i7
-     */
+  /*
+    170 us per SNP on Core i3, 92 us per SNP on Core i7
+  */
 
   unsigned iteration = 0;
   while(iteration < iterationLimit && Pval[iteration] < entry_limit){
@@ -928,153 +928,164 @@ int main(int argc, char **argv)
       // compute transpose of SNPtXG: 1xn
       vector<double> GtXtSNP(n, 0.0);
       vector<double> tmpResult(n);
-    vector<int> V2(mySNPs);
-      for(uint64_t i = 0; i < mySNPs; i++){
-	if(!snpMask[i]){
-	  double ErrorSS = glm_data.ErrorSS;
-	  // previous V2 in glm_data
+      vector<int> V2(mySNPs);
+      for(int i = 0; i < mySNPs; i++){
+	if(snpMask[i]){
+	  Fval[i] = 0.0;
+	  continue;
+	}
+	double ErrorSS = glm_data.ErrorSS;
+	// previous V2 in glm_data
 
-	  //! @todo use cblas_dsymv for this
-	  cblas_dgemv(CblasColMajor,
-		      CblasTrans, //! G is symmetric; but transpose is faster
-		      n,
-		      n,
-		      1.0,
-		      &XtXi.values[0],
-		      n,
-		      &XtSNP(0, i),
-		      1,
-		      0.0,
-		      &GtXtSNP[0],
-		      1);
+	//! @todo use cblas_dsymv for this
+	cblas_dgemv(CblasColMajor,
+		    CblasTrans, //! G is symmetric; but transpose is faster
+		    n,
+		    n,
+		    1.0,
+		    &XtXi.values[0],
+		    n,
+		    &XtSNP(0, i),
+		    1,
+		    0.0,
+		    &GtXtSNP[0],
+		    1);
 
-	  writeD("GtXtSNP.dat", GtXtSNP); // ok
+	writeD("GtXtSNP.dat", GtXtSNP); // ok
 
 
-	  // compute SNPtXGXtSNP (scalar)
-	  // <SNPtX GtXtSNP> == <XtSNP GtXtSNP>
-	  double SNPtXGXtSNP = cblas_ddot(n, &XtSNP(0, i), 1, &GtXtSNP[0], 1);
+	// compute SNPtXGXtSNP (scalar)
+	// <SNPtX GtXtSNP> == <XtSNP GtXtSNP>
+	double SNPtXGXtSNP = cblas_ddot(n, &XtSNP(0, i), 1, &GtXtSNP[0], 1);
 
-	  // compute S = Schur complement of partitioned matrix to invert
-	  double S = SNPtSNP[i] - SNPtXGXtSNP;
-	  if(S < doubleTol){ //! @todo if zero within tolerance
-	    // bad news
-	    Fval[i] = 0.0;
-	    continue;
-	  }
+	// compute S = Schur complement of partitioned matrix to invert
+	double S = SNPtSNP[i] - SNPtXGXtSNP;
+	if(S < doubleTol){ //! @todo if zero within tolerance
+	  // bad news
+	  Fval[i] = 0.0;
+	  continue;
+	}
 
-	  S = 1.0 / S;
+	S = 1.0 / S;
 
-	  // compute snpty - snptXGXty = snptMy == scalar
-	  // already know snpty, snptXG', Xty
-	  double SNPtMy = -cblas_ddot(n, &GtXtSNP[0], 1, &Xty[0], 1);
-	  SNPtMy += SNPty[i];
+	// compute snpty - snptXGXty = snptMy == scalar
+	// already know snpty, snptXG', Xty
+	double SNPtMy = -cblas_ddot(n, &GtXtSNP[0], 1, &Xty[0], 1);
+	SNPtMy += SNPty[i];
 
-	  double SSM = SNPtMy * SNPtMy * S;
+	double SSM = SNPtMy * SNPtMy * S;
 
 	//! calculate rank estimate here: round(trace(XtX * G) = 
-	  // sum([XtX snptX'; snptX snptsnp] .* [G1 + S*(snptXG'*snptXG), -S*snptXG'; -S*snptXG, S])) = 
-	  // round(|| XtX .* G|| + S * snptXG' * XtX * snptXG - 2 * S * (snptX . snptXG) + S * snptsnp)
-	  cblas_dgemv(CblasColMajor,
-		      CblasTrans,
-		      n,
-		      n,
-		      1.0,
-		      &XtX.values[0],
-		      n,
-		      &GtXtSNP[0],
-		      1,
-		      0.0,
-		      &tmpResult[0],
-		      1
-		      ); // snptXG' * XtX
-	  double drX = cblas_ddot(n * n, 
-			  &XtX.values[0],
-			  1,
-			  &XtXi.values[0],
-			  1
-			  ); // ||XtX .* G||
-	  drX += S * cblas_ddot(n, 
-			       &tmpResult[0],
-			       1,
-			       &GtXtSNP[0], 
-			       1
-			       ); // snptXG' * XtX * snptXG
-	  drX -= 2* S * cblas_ddot(n, 
-				  &XtSNP(0, i),
-				  1,
-				  &GtXtSNP[0],
-				  1
-				  ); // -2 * S * (snptX . snptXG)
-	  drX += S * SNPtSNP[i];
-	  rX = lrint(drX);
+	// sum([XtX snptX'; snptX snptsnp] .* [G1 + S*(snptXG'*snptXG), -S*snptXG'; -S*snptXG, S])) = 
+	// round(|| XtX .* G|| + S * snptXG' * XtX * snptXG - 2 * S * (snptX . snptXG) + S * snptsnp)
+	cblas_dgemv(CblasColMajor,
+		    CblasTrans,
+		    n,
+		    n,
+		    1.0,
+		    &XtX.values[0],
+		    n,
+		    &GtXtSNP[0],
+		    1,
+		    0.0,
+		    &tmpResult[0],
+		    1
+		    ); // snptXG' * XtX
+	double drX = cblas_ddot(n * n, 
+				&XtX.values[0],
+				1,
+				&XtXi.values[0],
+				1
+				); // ||XtX .* G||
+	drX += S * cblas_ddot(n, 
+			      &tmpResult[0],
+			      1,
+			      &GtXtSNP[0], 
+			      1
+			      ); // snptXG' * XtX * snptXG
+	drX -= 2* S * cblas_ddot(n, 
+				 &XtSNP(0, i),
+				 1,
+				 &GtXtSNP[0],
+				 1
+				 ); // -2 * S * (snptX . snptXG)
+	drX += S * SNPtSNP[i];
+	rX = lrint(drX);
 
-	  // if rank too large or too small, set Fval[i] = 0
-	  V2[i] = geno_ind - rX;
-	  ErrorSS = ErrorSS - SSM;
-	  Fval[i] = V2[i] * SSM / ErrorSS;
-	}else{
+	// if rank too large or too small, set Fval[i] = 0
+	if(rX < 1 || rX > n + 1){
 	  Fval[i] = 0.0;
+	  continue;
 	}
-    }
-    gettimeofday(&tstop, 0);
-    double CPUCompTime = tvDouble(tstop - tstart);
+
+	V2[i] = geno_ind - rX;
+	ErrorSS = ErrorSS - SSM;
+	Fval[i] = V2[i] * SSM / ErrorSS;
+      } // for all SNPs, PLM
+      gettimeofday(&tstop, 0);
+      double CPUCompTime = tvDouble(tstop - tstart);
     
-    /*! @todo categorize SNPs by V2, find max F for each V2, 
-      calculate one p-value per V2 per MPI rank,
-      reduce on min non-zero p-value regardless of V2, but
-      record V2 for posterity
-    */
-    vector<vector<int> > V2Lists;
-    vector<int> V2s;
-    for(uint64_t i = 0; i < mySNPs; i++){
-      if(!Fval[i]) 
-	continue;
-      if(!V2s.size()){
-	V2s.push_back(V2[i]);
-	V2Lists.resize(V2Lists.size() + 1);
-	V2Lists[0].push_back(i);
-	continue;
-      }
-      // find corresponding index
+      /*! @todo categorize SNPs by V2, find max F for each V2, 
+	calculate one p-value per V2 per MPI rank,
+	reduce on min non-zero p-value regardless of V2, but
+	record V2 for posterity
+      */
+      vector<vector<int> > V2Lists;
+      vector<vector<float> > FLists;
+      vector<int> V2s;
       int V2Index;
-      for(V2Index = 0; V2Index < V2s.size(); V2Index++)
-	if(V2s[V2Index] == V2[i])
-	  break;
-      if(V2Index >= V2s.size()){
-	V2s.push_back(V2[i]);
-	V2Lists.resize(V2Lists.size() + 1);
-	V2Lists[V2Lists.size() - 1].push_back(i);
-	continue;
+      for(int i = 0; i < mySNPs; i++){
+	if(!Fval[i] || !V2[i])
+	  continue;
+	// find corresponding index
+	for(V2Index = 0; V2Index < V2s.size(); V2Index++)
+	  if(V2s[V2Index] == V2[i])
+	    break;
+	if(V2Index >= V2s.size()){
+	  V2s.push_back(V2[i]);
+	  V2Lists.resize(V2Lists.size() + 1);
+	  FLists.resize(FLists.size() + 1);
+	  V2Lists[V2Lists.size() - 1].push_back(i);
+	  FLists[FLists.size() - 1].push_back(Fval[i]);
+	  continue;
+	}
+	V2Lists[V2Index].push_back(i);
+	FLists[V2Index].push_back(Fval[i]);
       }
-      V2Lists[V2Index].push_back(i);
-    }
-    
-    //! @todo find max F for each V2
-    
-    localMaxFIndex = cblas_isamax(mySNPs, &Fval[0], 1);
-    gettimeofday(&tstart, 0);
-    double CPUMaxTime = tvDouble(tstart - tstop);
-    if(verbosity > 1){
-      cout << "iteration " << iteration 
-	   << " id " << id 
-	   << " CPU computation time: "
-	   << CPUCompTime << " s" << endl;
-      cout << "iteration " << iteration 
-	   << " id " << id 
-	   << " CPU computation time per SNP: "
-	   << CPUCompTime / mySNPs 
-	   << " s" << endl;
       
-      cout << "iteration " << iteration 
-	   << " id " << id 
-	   << " CPU reduction time: "
-	   << CPUMaxTime << " s" << endl;
-      cout << "iteration " << iteration 
-	   << " id " << id 
-	   << " CPU reduction time per SNP: "
-	   << CPUMaxTime / mySNPs 
-	   << " s" << endl;
+      //! @todo find max F for each V2
+      gettimeofday(&tstart, 0);
+      vector<int> maxFIndices(V2s.size());
+      vector<float> maxFs(V2s.size());
+      for(V2Index = 0; V2Index < V2s.size(); V2Index++){
+	maxFIndices[V2Index] = cblas_isamax(FLists[V2Index].size(), &FLists[V2Index][0], 1);
+	maxFs[V2Index] = FLists[V2Index][maxFIndices[V2Index]];
+      }
+      localMaxFIndex = cblas_isamax(V2s.size(), &maxFs[0], 1);
+      localMaxFIndex = V2Lists[localMaxFIndex][maxFIndices[localMaxFIndex]];
+    
+      gettimeofday(&tstop, 0);
+      double CPUMaxTime = tvDouble(tstart - tstop);
+      if(verbosity > 1){
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " CPU computation time: "
+	     << CPUCompTime << " s" << endl;
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " CPU computation time per SNP: "
+	     << CPUCompTime / mySNPs 
+	     << " s" << endl;
+      
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " CPU reduction time: "
+	     << CPUMaxTime << " s" << endl;
+	cout << "iteration " << iteration 
+	     << " id " << id 
+	     << " CPU reduction time per SNP: "
+	     << CPUMaxTime / mySNPs 
+	     << " s" << endl;
       
       }
     }
@@ -1173,7 +1184,7 @@ int main(int argc, char **argv)
       for now, just broadcast them separately.
       it could be faster to send precalculated results in one transmission
       or recalculate them
-     */
+    */
     gettimeofday(&tstart, NULL);
     MPI_Bcast(nextSNP, geno_ind, MPI_DOUBLE, globalMinRankMaxF,
 	      MPI_COMM_WORLD);
@@ -1212,7 +1223,7 @@ int main(int argc, char **argv)
       - list of chosen SNP indices:
       Assume data is in-core for GPU; i.e. don't recopy SNPs at each iteration.
       To remove SNP from geno, set mask at SNP index.
-     */
+    */
 
     gettimeofday(&tstart, NULL);
     compUpdate(id, iteration, XtX, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, geno_ind, 

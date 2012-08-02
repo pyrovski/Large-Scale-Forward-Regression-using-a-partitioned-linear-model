@@ -928,9 +928,9 @@ int main(int argc, char **argv)
       // compute transpose of SNPtXG: 1xn
       vector<double> GtXtSNP(n, 0.0);
       vector<double> tmpResult(n);
+    vector<int> V2(mySNPs);
       for(uint64_t i = 0; i < mySNPs; i++){
 	if(!snpMask[i]){
-	  int V2 = glm_data.V2;
 	  double ErrorSS = glm_data.ErrorSS;
 	  // previous V2 in glm_data
 
@@ -972,7 +972,7 @@ int main(int argc, char **argv)
 
 	  double SSM = SNPtMy * SNPtMy * S;
 
-	  //! @todo calculate rank estimate here: round(trace(XtX * G) = 
+	//! calculate rank estimate here: round(trace(XtX * G) = 
 	  // sum([XtX snptX'; snptX snptsnp] .* [G1 + S*(snptXG'*snptXG), -S*snptXG'; -S*snptXG, S])) = 
 	  // round(|| XtX .* G|| + S * snptXG' * XtX * snptXG - 2 * S * (snptX . snptXG) + S * snptsnp)
 	  cblas_dgemv(CblasColMajor,
@@ -1010,46 +1010,72 @@ int main(int argc, char **argv)
 	  rX = lrint(drX);
 
 	  // if rank too large or too small, set Fval[i] = 0
-	  V2 = geno_ind - rX;
+	  V2[i] = geno_ind - rX;
 	  ErrorSS = ErrorSS - SSM;
-	  Fval[i] = V2 * SSM / ErrorSS;
+	  Fval[i] = V2[i] * SSM / ErrorSS;
 	}else{
 	  Fval[i] = 0.0;
 	}
+    }
+    gettimeofday(&tstop, 0);
+    double CPUCompTime = tvDouble(tstop - tstart);
+    
+    /*! @todo categorize SNPs by V2, find max F for each V2, 
+      calculate one p-value per V2 per MPI rank,
+      reduce on min non-zero p-value regardless of V2, but
+      record V2 for posterity
+    */
+    vector<vector<int> > V2Lists;
+    vector<int> V2s;
+    for(uint64_t i = 0; i < mySNPs; i++){
+      if(!Fval[i]) 
+	continue;
+      if(!V2s.size()){
+	V2s.push_back(V2[i]);
+	V2Lists.resize(V2Lists.size() + 1);
+	V2Lists[0].push_back(i);
+	continue;
       }
-      gettimeofday(&tstop, 0);
-      double CPUCompTime = tvDouble(tstop - tstart);
-
-      /*! @todo categorize SNPs by V2, find max F for each V2, 
-	calculate one p-value per V2 per MPI rank,
-	reduce on min non-zero p-value regardless of V2, but
-	record V2 for posterity
-       */
-
-      localMaxFIndex = cblas_isamax(mySNPs, &Fval[0], 1);
-      gettimeofday(&tstart, 0);
-      double CPUMaxTime = tvDouble(tstart - tstop);
-      if(verbosity > 1){
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " CPU computation time: "
-	     << CPUCompTime << " s" << endl;
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " CPU computation time per SNP: "
-	     << CPUCompTime / mySNPs 
-	     << " s" << endl;
-	
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " CPU reduction time: "
-	     << CPUMaxTime << " s" << endl;
-	cout << "iteration " << iteration 
-	     << " id " << id 
-	     << " CPU reduction time per SNP: "
-	     << CPUMaxTime / mySNPs 
-	     << " s" << endl;
-
+      // find corresponding index
+      int V2Index;
+      for(V2Index = 0; V2Index < V2s.size(); V2Index++)
+	if(V2s[V2Index] == V2[i])
+	  break;
+      if(V2Index >= V2s.size()){
+	V2s.push_back(V2[i]);
+	V2Lists.resize(V2Lists.size() + 1);
+	V2Lists[V2Lists.size() - 1].push_back(i);
+	continue;
+      }
+      V2Lists[V2Index].push_back(i);
+    }
+    
+    //! @todo find max F for each V2
+    
+    localMaxFIndex = cblas_isamax(mySNPs, &Fval[0], 1);
+    gettimeofday(&tstart, 0);
+    double CPUMaxTime = tvDouble(tstart - tstop);
+    if(verbosity > 1){
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " CPU computation time: "
+	   << CPUCompTime << " s" << endl;
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " CPU computation time per SNP: "
+	   << CPUCompTime / mySNPs 
+	   << " s" << endl;
+      
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " CPU reduction time: "
+	   << CPUMaxTime << " s" << endl;
+      cout << "iteration " << iteration 
+	   << " id " << id 
+	   << " CPU reduction time per SNP: "
+	   << CPUMaxTime / mySNPs 
+	   << " s" << endl;
+      
       }
     }
     

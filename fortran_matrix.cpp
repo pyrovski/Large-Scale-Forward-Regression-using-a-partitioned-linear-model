@@ -118,7 +118,14 @@ const FortranMatrix & FortranMatrix::operator = (const FortranMatrix &rhs){
 
 
 #ifdef _DEBUG
-  int FortranMatrix::writeD(string filename){return this->write(filename);}
+int FortranMatrix::writeD(string filename){return this->write(filename);}
+bool FortranMatrix::checkNeg(){
+  for(uint64_t col = 0; col < n_cols; col++)
+    for(uint64_t row = 0; row < n_rows; row++)
+      if(values[row + n_rows * col] < 0)
+	return true;
+  return false;
+}
 #else
   int FortranMatrix::writeD(string filename){return 0;}
 #endif

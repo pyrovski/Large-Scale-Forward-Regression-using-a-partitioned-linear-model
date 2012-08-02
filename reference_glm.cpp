@@ -105,6 +105,7 @@ extern "C"{
 #include "type.h"
 #include "tvUtil.h"
 #include "plm.h"
+#include "md5.h"
 
 //! @todo match this to Lustre stripe size?
 const uint64_t readSize = 1024 * 1024 * 32;
@@ -125,10 +126,12 @@ uint64_t adjust(uint64_t total, unsigned ranks){
 }
 
 int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, 
+	       uint64_t mySNPs,
 	       string fixed_filename, 
 	       string geno_filename, 
 	       string y_filename,
-	       FortranMatrix &fixed, FortranMatrix &geno, vector<double> &y
+	       FortranMatrix &fixed, FortranMatrix &geno, vector<double> &y,
+	       bool rowMajor = false // applies only to geno for now
 	       ){
   // Read the "fixed" array from file.
   // assume this is small.
@@ -167,42 +170,93 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
     }
     
     uint64_t readCount = 0, left = mySize / sizeof(double);
-    double *array = (double*)malloc(readSize);
     /*! @todo convert from row-major format on disk to 
        column-major format in RAM
        - for now, just assume column-major on disk
      */
-    while(left){
+    if(rowMajor){
+      double *array = (double*)malloc(mySNPs * sizeof(double));
+      uint64_t row = 0;
+      while(left){
 #ifdef _DEBUG
-      cout << "id " << id << " reading " << min(readLength, left) 
-	   << " doubles from " << geno_filename << endl;
+	cout << "id " << id << " reading " << min(mySNPs, left) 
+	     << " doubles from " << geno_filename << endl;
 #endif
-      size_t status = fread(&geno.values[readCount], sizeof(double), 
-			    min(readLength, left), 
-			    geno_file);
-      if(status != min(readLength, left)){
-	cerr << "read failed on id " << id << endl;
-	if(feof(geno_file))
-	  cerr << id << " eof" << endl;
-	else if(ferror(geno_file))
-	  cerr << id << " " << ferror(geno_file) << endl;
-	MPI_Abort(MPI_COMM_WORLD, 1);
-      }
-#ifdef _DEBUG
-      for(int i = readCount; i < readCount + status; i ++)
-	if(geno.values[i] < 0){
-	  cerr << "id " << id 
-	       << " read a negative geno value at global offset " 
-	       << myOffset / sizeof(double) + i
-	       << "; aborting." 
-	       << endl;
+	size_t status = fread(array, sizeof(double), 
+			      mySNPs, 
+			      geno_file);
+	if(status != mySNPs){
+	  cerr << "read failed on id " << id << endl;
+	  if(feof(geno_file))
+	    cerr << id << " eof" << endl;
+	  else if(ferror(geno_file))
+	    cerr << id << " " << ferror(geno_file) << endl;
 	  MPI_Abort(MPI_COMM_WORLD, 1);
 	}
+#ifdef _DEBUG
+	for(int i = 0; i < mySNPs; i ++)
+	  if(array[i] < 0){
+	    cerr << "id " << id 
+		 << " read a negative geno value at row " 
+		 << row
+		 << " column "
+		 << myOffset / sizeof(double) + i
+		 << "; aborting." 
+		 << endl;
+	    MPI_Abort(MPI_COMM_WORLD, 1);
+	  }
 #endif
-      left -= status;
-      readCount += status;
+	for(int i = 0; i < mySNPs; i ++)
+	  geno(row, i) = array[i];
+	left -= status;
+	readCount += status;
+	row++;
+      }
+      free(array);
+    } else {
+      while(left){
+#ifdef _DEBUG
+	cout << "id " << id << " reading " << min(readLength, left) 
+	     << " doubles from " << geno_filename << endl;
+#endif
+	size_t status = fread(&geno.values[readCount], sizeof(double), 
+			      min(readLength, left), 
+			      geno_file);
+	if(status != min(readLength, left)){
+	  cerr << "read failed on id " << id << endl;
+	  if(feof(geno_file))
+	    cerr << id << " eof" << endl;
+	  else if(ferror(geno_file))
+	    cerr << id << " " << ferror(geno_file) << endl;
+	  MPI_Abort(MPI_COMM_WORLD, 1);
+	}
+#ifdef _DEBUG
+	for(int i = readCount; i < readCount + status; i ++)
+	  if(geno.values[i] < 0){
+	    cerr << "id " << id 
+		 << " read a negative geno value at global offset " 
+		 << myOffset / sizeof(double) + i
+		 << "; aborting." 
+		 << endl;
+	    MPI_Abort(MPI_COMM_WORLD, 1);
+	  }
+#endif
+	left -= status;
+	readCount += status;
+      }
     }
-    free(array);
+#ifdef _DEBUG
+    md5_state_t pms;
+    md5_init(&pms);
+    md5_append(&pms, (md5_byte_t*)&geno.values[0], mySize);
+    md5_byte_t digest[16];
+    md5_finish(&pms, digest);
+    cout << "rank " << id << " md5 of geno:" ;
+    for(int i = 0; i < 16; i++)
+      cout << std::hex << (int)digest[i];
+    cout << std::dec << endl;
+      
+#endif    
   }
   
   
@@ -284,7 +338,7 @@ void compPrepare(unsigned id, unsigned iteration,
 
       //! @todo if XtX is stored as symmetric matrix, we don't need this
       for(uint64_t row = 0; row < col; row++)
-	XtX(col, row) = XtX(row, col);
+ 	XtX(col, row) = XtX(row, col);
     }
     XtX(col, col) = cblas_ddot(geno_ind, 
 			       &X(0, col),
@@ -602,6 +656,7 @@ int main(int argc, char **argv)
   uint64_t geno_count; // columns of the geno array
 
   bool CPUOnly = false;
+  bool rowMajor = false;
 
   /*
     Skip a number of SNP entries for each individual; ideally, we will
@@ -610,10 +665,11 @@ int main(int argc, char **argv)
   int skip = 0;
 
   int optIndex;
-  struct option options[4] = {{"num_fixed", required_argument, 0, 'n'},
-			      {"num_geno", required_argument, 0, 'm'},
-			      {"num_r", required_argument, 0, 'o'},
-			      {0,0,0,0}};
+  struct option options[] = {{"num_fixed", required_argument, 0, 'n'},
+			     {"num_geno", required_argument, 0, 'm'},
+			     {"num_r", required_argument, 0, 'o'},
+			     {"rowmajor", optional_argument, 0, 'p'},
+			     {0,0,0,0}};
   
   /* get the following from the command line:
 
@@ -670,6 +726,12 @@ int main(int argc, char **argv)
       break;
     case 's':
       skip = strtoul(optarg, 0, 0);
+      break;
+    case 'p':
+      rowMajor = true;
+#ifdef _DEBUG
+      cout << "Using row-major geno input" << endl;
+#endif
       break;
     default:
       if(!id)
@@ -761,8 +823,8 @@ int main(int argc, char **argv)
 
   // Begin timing the file IO for all 3 files
   gettimeofday(&tstart, NULL);
-  readInputs(id, myOffset, mySize, fixed_filename, geno_filename, 
-	     y_filename, fixed, geno, y);
+  readInputs(id, myOffset, mySize, mySNPs, fixed_filename, geno_filename, 
+	     y_filename, fixed, geno, y, rowMajor);
   gettimeofday(&tstop, NULL);
   
   diskIOTime = tvDouble(tstop - tstart);
@@ -860,21 +922,14 @@ int main(int argc, char **argv)
 
     // Call the glm function.  Note that X is currently overwritten by this function,
     // and therefore would need to be re-formed completely at each iteration...
-    //glm(X, y, Kt, glm_data);
     /*
       ~200 us per SNP on Core i3, ~106 us per SNP on Core i7
      */
-    //glm(X, XtX, XtXi, XtSNP, SNPtSNP, SNPty, yty, Kt, Xty, rX, glm_data);
     
     /*
       170 us per SNP on Core i3, 92 us per SNP on Core i7
      */
 
-    /*
-    plm(X, XtXi, XtSNP, SNPtSNP[i], SNPty[i], yty, Xty, rX, glm_data, 
-	glm_data_new);
-    */
-    
   unsigned iteration = 0;
   while(iteration < iterationLimit && Pval[iteration] < entry_limit){
     // d_G, in constant memory
@@ -933,11 +988,59 @@ int main(int argc, char **argv)
     } else { // CPUOnly == 1
       // call CPU plm, get max F & index
       gettimeofday(&tstart, 0);
+      int n = XtXi.get_n_rows();
+      
+      // G = XtXi
+
+      // compute transpose of SNPtXG: 1xn
+      vector<double> GtXtSNP(n, 0.0);
       for(uint64_t i = 0; i < mySNPs; i++){
-	if(!snpMask[i])
-	  plm(XtXi, &XtSNP(0, i), SNPtSNP[i], SNPty[i], yty, Xty, rX, &Fval[i], 
-	      glm_data.ErrorSS, glm_data.V2);
-	else{
+	if(!snpMask[i]){
+	  int V2 = glm_data.V2;
+	  double ErrorSS = glm_data.ErrorSS;
+	  // previous V2 in glm_data
+
+	  //! @todo use cblas_dsymv for this
+	  cblas_dgemv(CblasColMajor,
+		      CblasTrans, //! G is symmetric; but transpose is faster
+		      n,
+		      n,
+		      1.0,
+		      &XtXi.values[0],
+		      n,
+		      &XtSNP(0, i),
+		      1,
+		      0.0,
+		      &GtXtSNP[0],
+		      1);
+
+	  writeD("GtXtSNP.dat", GtXtSNP); // ok
+
+
+	  // compute SNPtXGXtSNP (scalar)
+	  // <SNPtX GtXtSNP> == <XtSNP GtXtSNP>
+	  double SNPtXGXtSNP = cblas_ddot(n, &XtSNP(0, i), 1, &GtXtSNP[0], 1);
+
+	  // compute S = Schur complement of partitioned matrix to invert
+	  double S = SNPtSNP[i] - SNPtXGXtSNP;
+	  if(S < doubleTol){ //! @todo if zero within tolerance
+	    // bad news
+	    Fval[i] = 0.0;
+	    continue;
+	  }
+
+	  //S = 1.0 / S;
+
+	  // compute snpty - snptXGXty = snptMy == scalar
+	  // already know snpty, snptXG', Xty
+	  double SNPtMy = -cblas_ddot(n, &GtXtSNP[0], 1, &Xty[0], 1);
+	  SNPtMy += SNPty[i];
+
+	  double SSM = SNPtMy * SNPtMy / S;
+	  V2--;
+	  ErrorSS = ErrorSS - SSM;
+	  Fval[i] = V2 * SSM / ErrorSS;
+	}else{
 	  Fval[i] = 0.0;
 	}
       }
@@ -1079,6 +1182,8 @@ int main(int argc, char **argv)
     
 #ifdef _DEBUG
     {
+      if(checkNeg(nextSNP, geno_ind))
+	cerr << "rank " << id << " nextSNP negative at iteration " << iteration << endl;
       stringstream ssSNP, ssXtSNP, ssSNPtSNP, ssSNPty;
       ssSNP << "nextSNP_" << id << "_" << iteration << ".dat";
       ssXtSNP << "nextXtSNP_" << id << "_" << iteration << ".dat";

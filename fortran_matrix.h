@@ -66,14 +66,16 @@ public:
   const FortranMatrix & operator = (const FortranMatrix &rhs);
   
   // Returns a writable reference to the (i,j) entry of the matrix
-  inline double& operator()(uint64_t i, uint64_t j)
+  inline double& operator()(uint64_t row, uint64_t col)
   {
-    return values[i + n_rows*j];
+    // storage is column-major
+    return values[row + n_rows*col];
   }
 
   void print(std::string title) const;
   int write(std::string filename);
   int writeD(std::string filename);
+  bool checkNeg();
 
   // Replace this matrix with its transpose.  Here we simply
   // use n_rows*n_cols temporary storage.  In-place transposition
@@ -122,11 +124,17 @@ template <class T> void writeD(std::string filename, const std::vector<T> &v){
 template <class T> void writeD(std::string filename, const T *v, unsigned length){
   write_matrix(filename.c_str(), length, 1, &v[0], 1);
 }
+
+template <class T> bool checkNeg(T* data, uint64_t length){
+  for(uint64_t i = 0; i < length; i++)
+    if(data[i] < 0)
+      return true;
+  return false;
+}
 #else
-template <class T> void writeD(std::string filename, const std::vector<T> &v){
-}
-template <class T> void writeD(std::string filename, const T *v, unsigned length){
-}
+template <class T> void writeD(std::string filename, const std::vector<T> &v){}
+template <class T> void writeD(std::string filename, const T *v, unsigned length){}
+template <class T> bool checkNeg(T* data, uint64_t length){}
 #endif
 template <class T> void write(std::string filename, const std::vector<T> &v){
   write_matrix(filename.c_str(), v.size(), 1, &v[0], 1);

@@ -84,6 +84,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <mpi.h>
 #include <gsl/gsl_cdf.h>
 #include <sys/sysinfo.h>
+#include <math.h>
 
 extern "C"{
 #include <cblas.h>
@@ -361,10 +362,9 @@ void compPrepare(unsigned id, unsigned iteration,
   // Compute the matrix-vector product, XTy := X' * y.  
   yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
 
-  //! @todo compute initial V2 = m - rX, SSE = yty - beta' * Xty
-    
   glm_data.ErrorSS = yty - cblas_ddot(n, &beta[0], 1, &Xty[0], 1), 
   
+  //! @todo compute initial SSE = yty - beta' * Xty
   glm_data.V2 = geno_ind - rX;
 
   
@@ -927,6 +927,7 @@ int main(int argc, char **argv)
 
       // compute transpose of SNPtXG: 1xn
       vector<double> GtXtSNP(n, 0.0);
+      vector<double> tmpResult(n);
       for(uint64_t i = 0; i < mySNPs; i++){
 	if(!snpMask[i]){
 	  int V2 = glm_data.V2;
@@ -971,9 +972,45 @@ int main(int argc, char **argv)
 
 	  double SSM = SNPtMy * SNPtMy / S;
 
-	  //! @todo calculate rank estimate here (trace(XtX * G))
+	  //! @todo calculate rank estimate here: round(trace(XtX * G) = 
+	  // sum([XtX snptX'; snptX snptsnp] .* [G1 + S*(snptXG'*snptXG), -S*snptXG'; -S*snptXG, S])) = 
+	  // round(|| XtX .* G|| + S * snptXG' * XtX * snptXG - 2 * S * (snptX . snptXG) + S * snptsnp)
+	  cblas_dgemv(CblasColMajor,
+		      CblasTrans,
+		      n,
+		      n,
+		      1.0,
+		      &XtX.values[0],
+		      n,
+		      &GtXtSNP[0],
+		      1,
+		      0.0,
+		      &tmpResult[0],
+		      1
+		      ); // snptXG' * XtX
+	  rX = cblas_ddot(n * n, 
+			  &XtX.values[0],
+			  1,
+			  &XtXi.values[0],
+			  1
+			  ); // ||XtX .* G||
+	  rX += S * cblas_ddot(n, 
+			       &tmpResult[0],
+			       1,
+			       &GtXtSNP[0], 
+			       1
+			       ); // snptXG' * XtX * snptXG
+	  rX -= 2* S * cblas_ddot(n, 
+				  &XtSNP(0, i),
+				  1,
+				  &GtXtSNP[0],
+				  1
+				  ); // -2 * S * (snptX . snptXG)
+	  rX += S * SNPtSNP[i];
+	  rX = lrint(rX);
+
 	  // if rank too large or too small, set Fval[i] = 0
-	  V2--;
+	  V2 = geno_ind - rX;
 	  ErrorSS = ErrorSS - SSM;
 	  Fval[i] = V2 * SSM / ErrorSS;
 	}else{

@@ -70,7 +70,7 @@ LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB)
 
 INCLUDES = $(GSL_INCLUDE) $(BLAS_INCLUDE)
 
-CPU_SRC = reference_plm.cpp tvUtil.cpp fortran_matrix.cpp glm.cpp print_matrix.cpp svd.cpp md5.cpp
+CPU_SRC = reference_plm.cpp tvUtil.cpp fortran_matrix.cpp glm.cpp print_matrix.cpp svd.cpp md5.cpp pinv.cpp
 HEADERS= type.h fortran_matrix.h print_matrix.h glm.h plm.h fortran_matrix.h print_matrix.h svd.h cuda_blas.cu
 SRC=$(CPU_SRC)
 target = reference_plm

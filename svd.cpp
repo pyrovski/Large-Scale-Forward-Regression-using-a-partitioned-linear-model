@@ -170,7 +170,11 @@ int svd_apply(/*in */const FortranMatrix& U,
   // (mxn)   (nx1)   (mx1)
   if (b.size() != m)
     {
-      std::cerr << "Error! Number of rows in A must match the length of b!" << std::endl;
+      std::cerr << "Error! Number of rows in A (" 
+		<< m
+		<< ") must match the length of b ("
+		<< b.size()
+		<< ")!" << std::endl;
       exit (1);
     }
   

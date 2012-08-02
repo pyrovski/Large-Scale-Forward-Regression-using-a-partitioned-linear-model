@@ -963,14 +963,14 @@ int main(int argc, char **argv)
 	    continue;
 	  }
 
-	  //S = 1.0 / S;
+	  S = 1.0 / S;
 
 	  // compute snpty - snptXGXty = snptMy == scalar
 	  // already know snpty, snptXG', Xty
 	  double SNPtMy = -cblas_ddot(n, &GtXtSNP[0], 1, &Xty[0], 1);
 	  SNPtMy += SNPty[i];
 
-	  double SSM = SNPtMy * SNPtMy / S;
+	  double SSM = SNPtMy * SNPtMy * S;
 
 	  //! @todo calculate rank estimate here: round(trace(XtX * G) = 
 	  // sum([XtX snptX'; snptX snptsnp] .* [G1 + S*(snptXG'*snptXG), -S*snptXG'; -S*snptXG, S])) = 
@@ -988,26 +988,26 @@ int main(int argc, char **argv)
 		      &tmpResult[0],
 		      1
 		      ); // snptXG' * XtX
-	  rX = cblas_ddot(n * n, 
+	  double drX = cblas_ddot(n * n, 
 			  &XtX.values[0],
 			  1,
 			  &XtXi.values[0],
 			  1
 			  ); // ||XtX .* G||
-	  rX += S * cblas_ddot(n, 
+	  drX += S * cblas_ddot(n, 
 			       &tmpResult[0],
 			       1,
 			       &GtXtSNP[0], 
 			       1
 			       ); // snptXG' * XtX * snptXG
-	  rX -= 2* S * cblas_ddot(n, 
+	  drX -= 2* S * cblas_ddot(n, 
 				  &XtSNP(0, i),
 				  1,
 				  &GtXtSNP[0],
 				  1
 				  ); // -2 * S * (snptX . snptXG)
-	  rX += S * SNPtSNP[i];
-	  rX = lrint(rX);
+	  drX += S * SNPtSNP[i];
+	  rX = lrint(drX);
 
 	  // if rank too large or too small, set Fval[i] = 0
 	  V2 = geno_ind - rX;

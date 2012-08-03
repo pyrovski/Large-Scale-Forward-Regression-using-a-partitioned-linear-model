@@ -59,7 +59,7 @@ CC=mpicxx
 # The location (and name) of the BLAS/Lapack libraries
 BLAS_PATH ?= /usr
 BLAS_INCLUDE ?= -I$(BLAS_PATH)/include
-BLAS_LAPACK_LIB ?= -L$(BLAS_PATH)/lib -llapack -lf77blas -lcblas -latlas -lgfortran
+BLAS_LAPACK_LIB ?= -L$(BLAS_PATH)/lib -llapack -lf77blas -lcblas -latlas $(FORTRAN_LIB)
 
 # Location of GSL header files and libraries
 GSL_PATH ?= /usr

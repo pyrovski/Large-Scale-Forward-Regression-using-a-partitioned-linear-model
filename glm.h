@@ -94,8 +94,8 @@ void glm(unsigned id, unsigned iteration,
 	 const double yty, 
 	 std::vector<double> &Xty, // updated
 	 // output
-	 GLMData& glm_data,
-	 vector<double> &beta);
+	 GLMData& glm_data
+	 );
 
 
 #endif

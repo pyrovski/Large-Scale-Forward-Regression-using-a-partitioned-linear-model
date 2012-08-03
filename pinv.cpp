@@ -14,7 +14,7 @@ int pinv(FortranMatrix &M, vector<double> &rhs, FortranMatrix &Mi,
   //! @todo this is altering M?
   svd_create(M, U, S, Vt);
 
-  rhs.resize(U.get_n_rows());
+  // beta = V' * S^-1 * U' * rhs
   rank = svd_apply(U, S, Vt, /*result=*/beta, rhs);
 
   if(!id){

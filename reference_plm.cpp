@@ -84,6 +84,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <mpi.h>
 #include <gsl/gsl_cdf.h>
 #include <sys/sysinfo.h>
+#include <math.h>
+
+#include <algorithm>
 
 extern "C"{
 #include <cblas.h>
@@ -118,7 +121,7 @@ uint64_t adjust(uint64_t total, unsigned ranks){
 }
 
 int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, 
-	       uint64_t mySNPs,
+	       int mySNPs,
 	       string fixed_filename, 
 	       string geno_filename, 
 	       string y_filename,
@@ -167,7 +170,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
       uint64_t row = 0;
       while(left){
 #ifdef _DEBUG
-	cout << "id " << id << " reading " << min(mySNPs, left) 
+	cout << "id " << id << " reading " << left 
 	     << " doubles from " << geno_filename << endl;
 #endif
 	size_t status = fread(array, sizeof(double), 
@@ -233,6 +236,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
 	readCount += status;
       }
     }
+    /*
 #ifdef _DEBUG
     md5_state_t pms;
     md5_init(&pms);
@@ -244,7 +248,8 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
       cout << std::hex << (int)digest[i];
     cout << std::dec << endl;
       
-#endif    
+#endif
+    */    
   }
   
   
@@ -275,9 +280,9 @@ void compPrepare(unsigned id, unsigned iteration,
 		 //FortranMatrix &X, 
 		 FortranMatrix &fixed, 
 		 unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, 
-		 vector<double> &y, unsigned &rX, vector<double> &beta, 
+		 vector<double> &y, unsigned &rX,
 		 unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, 
-		 GLMData &glm_data, unsigned &geno_ind, uint64_t &mySNPs, 
+		 GLMData &glm_data, unsigned &geno_ind, int &mySNPs, 
 		 FortranMatrix &geno, FortranMatrix &XtSNP, 
 		 vector<double> &SNPty, vector<double> &SNPtSNP){
 
@@ -308,7 +313,7 @@ void compPrepare(unsigned id, unsigned iteration,
   /*!
     construct XtX from X manually.
    */
-  for(uint64_t col = 0; col < X.get_n_cols(); col++){
+  for(int col = 0; col < X.get_n_cols(); col++){
     if(col){
       cblas_dgemv(CblasColMajor,
 		  CblasTrans,
@@ -324,7 +329,7 @@ void compPrepare(unsigned id, unsigned iteration,
 		  1);
 
       //! @todo if XtX is stored as symmetric matrix, we don't need this
-      for(uint64_t row = 0; row < col; row++)
+      for(int row = 0; row < col; row++)
  	XtX(col, row) = XtX(row, col);
     }
     XtX(col, col) = cblas_ddot(geno_ind, 
@@ -347,7 +352,7 @@ void compPrepare(unsigned id, unsigned iteration,
   // Create the SVD of X^T * X 
   // Solve (X^T * X)*beta = X^T*y for beta.  
   // Note that X and X^T * X have the same rank.
-  rX = pinv(XtX, Xty, XtXi, beta, tol, id);
+  rX = pinv(XtX, Xty, XtXi, glm_data.beta, tol, id);
 #ifdef _DEBUG
   if(!id)
     {
@@ -361,10 +366,9 @@ void compPrepare(unsigned id, unsigned iteration,
   // Compute the matrix-vector product, XTy := X' * y.  
   yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
 
-  //! @todo compute initial V2 = m - rX, SSE = yty - beta' * Xty
-    
-  glm_data.ErrorSS = yty - cblas_ddot(n, &beta[0], 1, &Xty[0], 1), 
+  glm_data.ErrorSS = yty - cblas_ddot(n, &glm_data.beta[0], 1, &Xty[0], 1), 
   
+  //! @todo compute initial SSE = yty - beta' * Xty
   glm_data.V2 = geno_ind - rX;
 
   
@@ -419,7 +423,7 @@ void compPrepare(unsigned id, unsigned iteration,
 
   /*! @todo SNPtSNP could be computed as the geno data is read from disk
    */
-  for (uint64_t i=0; i<mySNPs; ++i){
+  for (int i=0; i<mySNPs; ++i){
     //! these will never change for each SNP
     SNPtSNP[i] = cblas_ddot(geno_ind, &geno.values[i*geno_ind], 1, 
 				&geno.values[i*geno_ind], 1);
@@ -445,14 +449,13 @@ void compUpdate(unsigned id, unsigned iteration,
 		FortranMatrix &XtXi, FortranMatrix &XtSNP, 
 		const double &yty,
 		vector<double> &Xty, const unsigned &rX, GLMData &glm_data,
-		const unsigned &n, const uint64_t &mySNPs, const unsigned &m, 
+		const unsigned &n, const int &mySNPs, const unsigned &m, 
 		FortranMatrix &geno,
 		const double *nextSNP,
 		const double *nextXtSNP,
 		const double &nextSNPtSNP, 
 		const double &nextSNPty,
-		double &tol,
-		vector<double> &beta){
+		double &tol){
 
   timeval tGLMStart, tGLMStop, tResizeStop, tXtSNPStop;
   
@@ -462,7 +465,7 @@ void compUpdate(unsigned id, unsigned iteration,
   gettimeofday(&tGLMStart, 0);
   
   glm(id, iteration, n, geno.get_n_rows(), tol, XtX, XtXi, nextXtSNP, nextSNPtSNP, nextSNPty, yty, Xty,
-      glm_data, beta);
+      glm_data);
   gettimeofday(&tGLMStop, 0);
 #ifdef _DEBUG
   if(!id)
@@ -471,11 +474,6 @@ void compUpdate(unsigned id, unsigned iteration,
 	stringstream ss;
 	ss << "XtXi_" << iteration << "p.dat";
 	XtXi.writeD(ss.str());
-      }
-      {
-	stringstream ss;
-	ss << "Xty_" << iteration << "p.dat";
-	writeD(ss.str(), Xty);
       }
     }
 #endif
@@ -542,7 +540,7 @@ template <class T> void write(const char *filename, const vector<T> &list){
 
 void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop, 
 		     double MPITime, double diskIOTime,
-		     uint64_t mySNPs, unsigned iteration, unsigned id){
+		     int mySNPs, unsigned iteration, unsigned id){
   gettimeofday(&tGlobalStop, NULL);
   
   cout << "id " << id << " total time: " 
@@ -595,7 +593,7 @@ int main(int argc, char **argv)
   /*
     Skip a number of SNP entries for each individual; ideally, we will
     deal with the population and sample fields.
-   */
+  */
   int skip = 0;
 
   int optIndex;
@@ -703,13 +701,13 @@ int main(int argc, char **argv)
   //const unsigned m = geno_ind;
 
   uint64_t totalSize = geno_count * geno_ind * sizeof(double);
-  uint64_t perRankSNPs = adjust(geno_count, numProcs);
+  int perRankSNPs = adjust(geno_count, numProcs);
   uint64_t perRankLength = perRankSNPs * geno_ind;
   uint64_t perRankSize =  perRankLength * sizeof(double);    
   uint64_t myOffset = id * perRankSize;
   uint64_t mySize = myOffset + perRankSize <= totalSize ?
     perRankSize : totalSize - myOffset;
-  uint64_t mySNPs = mySize / sizeof(double) / geno_ind;
+  int mySNPs = mySize / sizeof(double) / geno_ind;
   uint64_t myStartSNP = id * perRankSNPs;
 
   if(verbosity > 1){
@@ -732,9 +730,9 @@ int main(int argc, char **argv)
     }
     if(!id)
       cout << "invoked as: ";
-      for(int i = 0; i < argc; i++)
-	cout << argv[i] << " ";
-      cout << endl;
+    for(int i = 0; i < argc; i++)
+      cout << argv[i] << " ";
+    cout << endl;
   }
 
   // Matrix objects for storing the input data
@@ -797,13 +795,12 @@ int main(int argc, char **argv)
   double yty;
   vector<double> SNPtSNP(mySNPs), SNPty(mySNPs);
   FortranMatrix XtSNP(n, mySNPs);
-  vector<double> beta;
   
   // Begin timing the computations
   gettimeofday(&tstart, NULL);
 
   compPrepare(id, 0, fixed, fixed_count, XtX, Xty, y, rX, 
-	      beta, n, tol, XtXi, 
+	      n, tol, XtXi, 
 	      yty, glm_data, geno_ind, mySNPs, geno, XtSNP, SNPty, 
 	      SNPtSNP);
 
@@ -853,15 +850,6 @@ int main(int argc, char **argv)
   // we are assuming y is a vector for now (because GLM currently expects
   // a vector for its second argument) but this could be generalized later.
 
-    // Call the glm function.  Note that X is currently overwritten by this function,
-    // and therefore would need to be re-formed completely at each iteration...
-    /*
-      ~200 us per SNP on Core i3, ~106 us per SNP on Core i7
-     */
-    
-    /*
-      170 us per SNP on Core i3, 92 us per SNP on Core i7
-     */
 
   unsigned iteration = 0;
   while(iteration < iterationLimit && Pval[iteration] < entry_limit){
@@ -871,31 +859,37 @@ int main(int argc, char **argv)
     /*! @todo this will need more bits when running more than 2^32 SNPs 
       on a single CPU process
     */
-    int localMaxFIndex;
+    int localMinPIndex;
 
-    float globalMaxF;
+    double globalMinP;
+    double localMinP;
 
     if(!CPUOnly){
       // ~3.5 us per SNP on Longhorn (FX5800)
-      try{
+      fprintf(stderr, "fixme get max F for each V2 %s: %d\n", __FILE__, __LINE__);
+      MPI_Abort(MPI_COMM_WORLD, 1);
+      /*
+	try{
 	localMaxFIndex = plm_GPU(mySNPs, n, 
-				 geno_ind,        
-				 d_snptsnp, 
-				 d_Xtsnp, 
-				 d_XtsnpPitch, 
-				 glm_data.ErrorSS, glm_data.V2, 
-				 d_snpty, 
-				 d_snpMask,
-				 d_f,
-				 Fval);
-      } catch(int e){
+	geno_ind,        
+	d_snptsnp, 
+	d_Xtsnp, 
+	d_XtsnpPitch, 
+	glm_data.ErrorSS, glm_data.V2, 
+	d_snpty, 
+	d_snpMask,
+	d_f,
+	Fval);
+	} catch(int e){
+	fprintf(stderr, "fixme %s: %d\n", __FILE__, __LINE__);
 	MPI_Abort(MPI_COMM_WORLD, e);
-      }
+	}
+      */
       GPUCompTime = getGPUCompTime();
     
       // for p-val: p = 1 - fcdf(F, V1, V2), V1 = old V2 - new V2 (i.e. 0 or 1)
       // if V1 = 0, ignore; F is undefined
-      getMaxFGPU(id, iteration, mySNPs, Fval, localMaxFIndex, d_f);
+      getMaxFGPU(id, iteration, mySNPs, Fval, localMinPIndex, d_f);
       GPUMaxTime = getGPUMaxTime();
       if(verbosity > 1){
 	cout << "iteration " << iteration 
@@ -927,59 +921,101 @@ int main(int argc, char **argv)
 
       // compute transpose of SNPtXG: 1xn
       vector<double> GtXtSNP(n, 0.0);
-      for(uint64_t i = 0; i < mySNPs; i++){
-	if(!snpMask[i]){
-	  int V2 = glm_data.V2;
-	  double ErrorSS = glm_data.ErrorSS;
-	  // previous V2 in glm_data
-
-	  //! @todo use cblas_dsymv for this
-	  cblas_dgemv(CblasColMajor,
-		      CblasTrans, //! G is symmetric; but transpose is faster
-		      n,
-		      n,
-		      1.0,
-		      &XtXi.values[0],
-		      n,
-		      &XtSNP(0, i),
-		      1,
-		      0.0,
-		      &GtXtSNP[0],
-		      1);
-
-	  writeD("GtXtSNP.dat", GtXtSNP); // ok
-
-
-	  // compute SNPtXGXtSNP (scalar)
-	  // <SNPtX GtXtSNP> == <XtSNP GtXtSNP>
-	  double SNPtXGXtSNP = cblas_ddot(n, &XtSNP(0, i), 1, &GtXtSNP[0], 1);
-
-	  // compute S = Schur complement of partitioned matrix to invert
-	  double S = SNPtSNP[i] - SNPtXGXtSNP;
-	  if(S < doubleTol){ //! @todo if zero within tolerance
-	    // bad news
-	    Fval[i] = 0.0;
-	    continue;
-	  }
-
-	  //S = 1.0 / S;
-
-	  // compute snpty - snptXGXty = snptMy == scalar
-	  // already know snpty, snptXG', Xty
-	  double SNPtMy = -cblas_ddot(n, &GtXtSNP[0], 1, &Xty[0], 1);
-	  SNPtMy += SNPty[i];
-
-	  double SSM = SNPtMy * SNPtMy / S;
-
-	  //! @todo calculate rank estimate here (trace(XtX * G))
-	  // if rank too large or too small, set Fval[i] = 0
-	  V2--;
-	  ErrorSS = ErrorSS - SSM;
-	  Fval[i] = V2 * SSM / ErrorSS;
-	}else{
+      vector<double> tmpResult(n);
+      vector<int> V2(mySNPs);
+      for(int i = 0; i < mySNPs; i++){
+	if(snpMask[i]){
 	  Fval[i] = 0.0;
+	  continue;
 	}
-      }
+	double ErrorSS = glm_data.ErrorSS;
+	// previous V2 in glm_data
+
+	//! @todo use cblas_dsymv for this
+	cblas_dgemv(CblasColMajor,
+		    CblasTrans, //! G is symmetric; but transpose is faster
+		    n,
+		    n,
+		    1.0,
+		    &XtXi.values[0],
+		    n,
+		    &XtSNP(0, i),
+		    1,
+		    0.0,
+		    &GtXtSNP[0],
+		    1);
+
+	writeD("GtXtSNP.dat", GtXtSNP); // ok
+
+
+	// compute SNPtXGXtSNP (scalar)
+	// <SNPtX GtXtSNP> == <XtSNP GtXtSNP>
+	double SNPtXGXtSNP = cblas_ddot(n, &XtSNP(0, i), 1, &GtXtSNP[0], 1);
+
+	// compute S = Schur complement of partitioned matrix to invert
+	double S = SNPtSNP[i] - SNPtXGXtSNP;
+	if(S < doubleTol){ //! @todo if zero within tolerance
+	  // bad news
+	  Fval[i] = 0.0;
+	  continue;
+	}
+
+	S = 1.0 / S;
+
+	// compute snpty - snptXGXty = snptMy == scalar
+	// already know snpty, snptXG', Xty
+	double SNPtMy = -cblas_ddot(n, &GtXtSNP[0], 1, &Xty[0], 1);
+	SNPtMy += SNPty[i];
+
+	double SSM = SNPtMy * SNPtMy * S;
+
+	//! calculate rank estimate here: round(trace(XtX * G) = 
+	// sum([XtX snptX'; snptX snptsnp] .* [G1 + S*(snptXG'*snptXG), -S*snptXG'; -S*snptXG, S])) = 
+	// round(|| XtX .* G|| + S * snptXG' * XtX * snptXG - 2 * S * (snptX . snptXG) + S * snptsnp)
+	cblas_dgemv(CblasColMajor,
+		    CblasTrans,
+		    n,
+		    n,
+		    1.0,
+		    &XtX.values[0],
+		    n,
+		    &GtXtSNP[0],
+		    1,
+		    0.0,
+		    &tmpResult[0],
+		    1
+		    ); // snptXG' * XtX
+	double drX = cblas_ddot(n * n, 
+				&XtX.values[0],
+				1,
+				&XtXi.values[0],
+				1
+				); // ||XtX .* G||
+	drX += S * cblas_ddot(n, 
+			      &tmpResult[0],
+			      1,
+			      &GtXtSNP[0], 
+			      1
+			      ); // snptXG' * XtX * snptXG
+	drX -= 2* S * cblas_ddot(n, 
+				 &XtSNP(0, i),
+				 1,
+				 &GtXtSNP[0],
+				 1
+				 ); // -2 * S * (snptX . snptXG)
+	drX += S * SNPtSNP[i];
+	rX = lrint(drX);
+
+	// if rank too large or too small, set Fval[i] = 0
+	if(rX < 1 || rX > n + 1){
+	  Fval[i] = 0.0;
+	  continue;
+	}
+
+	V2[i] = geno_ind - rX;
+	ErrorSS = ErrorSS - SSM;
+	Fval[i] = V2[i] * SSM / ErrorSS;
+      } // for all SNPs, PLM
       gettimeofday(&tstop, 0);
       double CPUCompTime = tvDouble(tstop - tstart);
 
@@ -987,11 +1023,51 @@ int main(int argc, char **argv)
 	calculate one p-value per V2 per MPI rank,
 	reduce on min non-zero p-value regardless of V2, but
 	record V2 for posterity
-       */
-
-      localMaxFIndex = cblas_isamax(mySNPs, &Fval[0], 1);
+      */
+      vector<vector<int> > V2Lists;
+      vector<vector<float> > FLists;
+      vector<int> V2s;
+      int V2Index;
+      for(int i = 0; i < mySNPs; i++){
+	if(!Fval[i] || !V2[i])
+	  continue;
+	// find corresponding index
+	for(V2Index = 0; V2Index < V2s.size(); V2Index++)
+	  if(V2s[V2Index] == V2[i])
+	    break;
+	if(V2Index >= V2s.size()){
+	  V2s.push_back(V2[i]);
+	  V2Lists.resize(V2Lists.size() + 1);
+	  FLists.resize(FLists.size() + 1);
+	  V2Lists.back().push_back(i);
+	  FLists.back().push_back(Fval[i]);
+	  continue;
+	}
+	V2Lists[V2Index].push_back(i);
+	FLists[V2Index].push_back(Fval[i]);
+      }
+      
+      //! @todo find max F for each V2
       gettimeofday(&tstart, 0);
-      double CPUMaxTime = tvDouble(tstart - tstop);
+      vector<int> maxFIndices(V2s.size());
+      vector<float> maxFs(V2s.size());
+      vector<double> minPs(V2s.size());
+      for(V2Index = 0; V2Index < V2s.size(); V2Index++){
+	maxFIndices[V2Index] = 
+	  max_element(FLists[V2Index].begin(), FLists[V2Index].end()) - FLists[V2Index].begin();
+	maxFs[V2Index] = FLists[V2Index][maxFIndices[V2Index]];
+	minPs[V2Index] = 1 - gsl_cdf_fdist_P(maxFs[V2Index], 1, V2s[V2Index]);
+	if(minPs[V2Index] == 0)
+	  minPs[V2Index] = std::numeric_limits<double>::infinity();
+      }
+
+      //! @todo compute p-values for each V2-specific max F-value
+      localMinPIndex = min_element(minPs.begin(), minPs.end()) - minPs.begin();
+      localMinP = minPs[localMinPIndex];
+      localMinPIndex = V2Lists[localMinPIndex][maxFIndices[localMinPIndex]];
+    
+      gettimeofday(&tstop, 0);
+      double CPUMinTime = tvDouble(tstart - tstop);
       if(verbosity > 1){
 	cout << "iteration " << iteration 
 	     << " id " << id 
@@ -1006,11 +1082,11 @@ int main(int argc, char **argv)
 	cout << "iteration " << iteration 
 	     << " id " << id 
 	     << " CPU reduction time: "
-	     << CPUMaxTime << " s" << endl;
+	     << CPUMinTime << " s" << endl;
 	cout << "iteration " << iteration 
 	     << " id " << id 
 	     << " CPU reduction time per SNP: "
-	     << CPUMaxTime / mySNPs 
+	     << CPUMinTime / mySNPs 
 	     << " s" << endl;
 
       }
@@ -1024,24 +1100,20 @@ int main(int argc, char **argv)
     
     if(verbosity > 1){
       cout << "iteration " << iteration << " id " << id <<  
-	" max F: " << Fval[localMaxFIndex] 
-	   << " (local 0-index " << localMaxFIndex 
-	   << ", global 0-index " << myStartSNP + localMaxFIndex << ")" << endl;
-    }
-    if(Fval[localMaxFIndex] <= 0){
-      cerr << "error on iteration " << iteration << ": max F <= 0: " << Fval[localMaxFIndex] << endl;
-      MPI_Abort(MPI_COMM_WORLD, 1);
+	" min P: " << localMinP 
+	   << " (local 0-index " << localMinPIndex 
+	   << ", global 0-index " << myStartSNP + localMinPIndex << ")" << endl;
     }
 
     gettimeofday(&tstart, NULL);
-    // get max F value
-    MPI_Allreduce(&Fval[localMaxFIndex], &globalMaxF, 1, MPI_FLOAT, MPI_MAX,
+    // get global min P value
+    MPI_Allreduce(&localMinP, &globalMinP, 1, MPI_DOUBLE, MPI_MIN,
 		  MPI_COMM_WORLD);
     gettimeofday(&tstop, NULL);
     MPITime += tvDouble(tstop - tstart);
 
     // get p value
-    Pval[iteration] = 1 - gsl_cdf_fdist_P(globalMaxF, 1, glm_data.V2 - 1);
+    Pval[iteration] = globalMinP;
 
     if(Pval[iteration] > entry_limit){
       if(!id){
@@ -1056,13 +1128,13 @@ int main(int argc, char **argv)
       
     gettimeofday(&tstart, NULL);
     // determine a unique rank holding the max F value
-    int globalMinRankMaxF;
-    if(Fval[localMaxFIndex] == globalMaxF)
-      MPI_Allreduce(&id, &globalMinRankMaxF, 1, MPI_INT, MPI_MIN, 
+    int globalMinRankMinP;
+    if(localMinP == globalMinP)
+      MPI_Allreduce(&id, &globalMinRankMinP, 1, MPI_INT, MPI_MIN, 
 		    MPI_COMM_WORLD);
     else{
       int tempInt = numProcs + 1;
-      MPI_Allreduce(&tempInt, &globalMinRankMaxF, 1, MPI_INT, MPI_MIN, 
+      MPI_Allreduce(&tempInt, &globalMinRankMinP, 1, MPI_INT, MPI_MIN, 
 		    MPI_COMM_WORLD);
     }
     gettimeofday(&tstop, NULL);
@@ -1070,28 +1142,28 @@ int main(int argc, char **argv)
 
     if(verbosity > 1){
       if(!id)
-	cout << "iteration " << iteration << " global max F on rank " << 
-	  globalMinRankMaxF << ": " << globalMaxF << endl;
+	cout << "iteration " << iteration << " global min P on rank " << 
+	  globalMinRankMinP << ": " << globalMinP << endl;
     }
 
-    if(id == globalMinRankMaxF){
-      // I have the max F value
-      // send SNP which yielded max F value
-      nextSNP = &geno(0, localMaxFIndex);
-      nextXtSNP = &XtSNP(0, localMaxFIndex);
-      nextSNPty = SNPty[localMaxFIndex];
-      nextSNPtSNP = SNPtSNP[localMaxFIndex];
-      snpMask[localMaxFIndex] = 1;
+    if(id == globalMinRankMinP){
+      // I have the min P value
+      // send SNP which yielded min P value
+      nextSNP = &geno(0, localMinPIndex);
+      nextXtSNP = &XtSNP(0, localMinPIndex);
+      nextSNPty = SNPty[localMinPIndex];
+      nextSNPtSNP = SNPtSNP[localMinPIndex];
+      snpMask[localMinPIndex] = 1;
 #ifdef _DEBUG
       cout << "iteration " << iteration << " id " << id 
-	   << " masking index " << localMaxFIndex << endl;
+	   << " masking index " << localMinPIndex << endl;
 #endif
-      chosenSNPs[iteration] = localMaxFIndex + myStartSNP;
+      chosenSNPs[iteration] = localMinPIndex + myStartSNP;
     }else{
-      // receive SNP which yielded max F value
+      // receive SNP which yielded min P value
       nextSNP = &incomingSNP[0];
       nextXtSNP = &incomingXtSNP[0];
-      localMaxFIndex = -1;
+      localMinPIndex = -1;
       chosenSNPs[iteration] = -1;
     }
 
@@ -1101,7 +1173,7 @@ int main(int argc, char **argv)
     }
 
     /*
-      need the following values from the SNP corresponding to the max F value:
+      need the following values from the SNP corresponding to the min P value:
       - SNP: vector(geno_ind)
       - SNPtSNP: scalar
       - SNPty: scalar
@@ -1110,15 +1182,15 @@ int main(int argc, char **argv)
       for now, just broadcast them separately.
       it could be faster to send precalculated results in one transmission
       or recalculate them
-     */
+    */
     gettimeofday(&tstart, NULL);
-    MPI_Bcast(nextSNP, geno_ind, MPI_DOUBLE, globalMinRankMaxF,
+    MPI_Bcast(nextSNP, geno_ind, MPI_DOUBLE, globalMinRankMinP,
 	      MPI_COMM_WORLD);
-    MPI_Bcast(nextXtSNP, n, MPI_DOUBLE, globalMinRankMaxF,
+    MPI_Bcast(nextXtSNP, n, MPI_DOUBLE, globalMinRankMinP,
 	      MPI_COMM_WORLD);
-    MPI_Bcast(&nextSNPtSNP, 1, MPI_DOUBLE, globalMinRankMaxF,
+    MPI_Bcast(&nextSNPtSNP, 1, MPI_DOUBLE, globalMinRankMinP,
 	      MPI_COMM_WORLD);
-    MPI_Bcast(&nextSNPty, 1, MPI_DOUBLE, globalMinRankMaxF,
+    MPI_Bcast(&nextSNPty, 1, MPI_DOUBLE, globalMinRankMinP,
 	      MPI_COMM_WORLD);
     gettimeofday(&tstop, NULL);
     MPITime += tvDouble(tstop - tstart);
@@ -1149,12 +1221,12 @@ int main(int argc, char **argv)
       - list of chosen SNP indices:
       Assume data is in-core for GPU; i.e. don't recopy SNPs at each iteration.
       To remove SNP from geno, set mask at SNP index.
-     */
+    */
 
     gettimeofday(&tstart, NULL);
     compUpdate(id, iteration, XtX, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, geno_ind, 
 	       geno, 
-	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty, tol, beta);
+	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty, tol);
     gettimeofday(&tstop, NULL);
     CPUCompUpdateTime = tvDouble(tstop - tstart);
 
@@ -1167,7 +1239,7 @@ int main(int argc, char **argv)
 
     if(!CPUOnly){
       gettimeofday(&tstart, NULL);
-      copyUpdateToDevice(id, iteration, mySNPs, n, d_snpMask, localMaxFIndex, 
+      copyUpdateToDevice(id, iteration, mySNPs, n, d_snpMask, localMinPIndex, 
 			 d_Xtsnp, d_XtsnpPitch, snpMask, XtSNP, XtXi, Xty);
       gettimeofday(&tstop, NULL);
       GPUCopyUpdateTime = tvDouble(tstop - tstart);
@@ -1184,7 +1256,7 @@ int main(int argc, char **argv)
     iteration++;
   } // while(1)
 
-  // reduce chosenSNPs to rank 0
+    // reduce chosenSNPs to rank 0
   chosenSNPsReduced.resize(iteration);
   MPI_Reduce(&chosenSNPs[0], &chosenSNPsReduced[0], iteration, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
 

@@ -80,9 +80,17 @@ void glm(unsigned id, unsigned iteration,
 
   // update XtX
   XtX.resize_retain(n + 1, n + 1);
-  cblas_dcopy(n, XtSNP, 1, &XtX(n + 1, 1), n + 1);
-  memcpy(&XtX(1, n + 1), XtSNP, sizeof(double) * n);
-  XtX(n + 1, n + 1) = SNPtSNP;
+  cblas_dcopy(n, XtSNP, 1, &XtX(n, 0), n + 1);
+  memcpy(&XtX(0, n), XtSNP, sizeof(double) * n);
+  XtX(n, n) = SNPtSNP;
+#ifdef _DEBUG
+  if(!id){
+    stringstream ss;
+    ss << "XtX_" << iteration << ".dat";
+    XtX.writeD(ss.str());
+  }
+#endif
+
   // G = XtXi
   // compute transpose of SNPtXG: nx1
   vector<double> GtXtSNP(n, 0.0);
@@ -150,16 +158,17 @@ void glm(unsigned id, unsigned iteration,
   // store bottom right element of XtXi
   //XtXi(n + 1, n + 1) = S;
  
-  //! @todo recompute XtXi with svd; it is numerically stable
-  int rX = pinv(XtX, Xty, XtXi, beta, tol, id);
-
   // Xtyn = [Xty; snpty]; % n + 1 x 1
   Xty.push_back(SNPty); // append 1
+
+  //! @todo recompute XtXi with svd; it is numerically stable
+  int rX = pinv(XtX, Xty, XtXi, beta, tol, id);
 
   // compute beta (n + 1 x 1)
   // beta = XtXi * Xty
   glm_data.beta.resize(n + 1);
 
+  //! @todo this is done in pinv.  that's what beta corresponds to...
   //! @todo use cblas_dsymv()
   cblas_dgemv(CblasColMajor, CblasNoTrans, n + 1, n + 1, 1.0, 
 	      &XtXi.values[0], n + 1, &Xty[0], 1, 0.0, &glm_data.beta[0], 1);

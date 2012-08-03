@@ -80,9 +80,17 @@ void glm(unsigned id, unsigned iteration,
 
   // update XtX
   XtX.resize_retain(n + 1, n + 1);
-  cblas_dcopy(n, XtSNP, 1, &XtX(n + 1, 1), n + 1);
-  memcpy(&XtX(1, n + 1), XtSNP, sizeof(double) * n);
-  XtX(n + 1, n + 1) = SNPtSNP;
+  cblas_dcopy(n, XtSNP, 1, &XtX(n, 0), n + 1);
+  memcpy(&XtX(0, n), XtSNP, sizeof(double) * n);
+  XtX(n, n) = SNPtSNP;
+#ifdef _DEBUG
+  if(!id){
+    stringstream ss;
+    ss << "XtX_" << iteration << ".dat";
+    XtX.writeD(ss.str());
+  }
+#endif
+
   // G = XtXi
   // compute transpose of SNPtXG: nx1
   vector<double> GtXtSNP(n, 0.0);

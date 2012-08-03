@@ -236,6 +236,7 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
 	readCount += status;
       }
     }
+    /*
 #ifdef _DEBUG
     md5_state_t pms;
     md5_init(&pms);
@@ -247,7 +248,8 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
       cout << std::hex << (int)digest[i];
     cout << std::dec << endl;
       
-#endif    
+#endif
+    */    
   }
   
   
@@ -341,7 +343,6 @@ void compPrepare(unsigned id, unsigned iteration,
     X.writeD("X.dat");
     XtX.writeD("XtX.dat");
   }
-  
 
   Xty = matvec(X, y, /*transX=*/true);
   if(!id)

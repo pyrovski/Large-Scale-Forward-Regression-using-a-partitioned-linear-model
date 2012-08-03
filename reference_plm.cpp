@@ -1100,7 +1100,7 @@ int main(int argc, char **argv)
     
     if(verbosity > 1){
       cout << "iteration " << iteration << " id " << id <<  
-	" min P: " << localMinP 
+	" local min P: " << localMinP 
 	   << " (local 0-index " << localMinPIndex 
 	   << ", global 0-index " << myStartSNP + localMinPIndex << ")" << endl;
     }

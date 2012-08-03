@@ -275,7 +275,7 @@ void compPrepare(unsigned id, unsigned iteration,
 		 //FortranMatrix &X, 
 		 FortranMatrix &fixed, 
 		 unsigned fixed_count, FortranMatrix &XtX, vector<double> &Xty, 
-		 vector<double> &y, unsigned &rX, vector<double> &beta, 
+		 vector<double> &y, unsigned &rX,
 		 unsigned &n, double &tol, FortranMatrix &XtXi, double &yty, 
 		 GLMData &glm_data, unsigned &geno_ind, int &mySNPs, 
 		 FortranMatrix &geno, FortranMatrix &XtSNP, 
@@ -347,7 +347,7 @@ void compPrepare(unsigned id, unsigned iteration,
   // Create the SVD of X^T * X 
   // Solve (X^T * X)*beta = X^T*y for beta.  
   // Note that X and X^T * X have the same rank.
-  rX = pinv(XtX, Xty, XtXi, beta, tol, id);
+  rX = pinv(XtX, Xty, XtXi, glm_data.beta, tol, id);
 #ifdef _DEBUG
   if(!id)
     {
@@ -361,7 +361,7 @@ void compPrepare(unsigned id, unsigned iteration,
   // Compute the matrix-vector product, XTy := X' * y.  
   yty = cblas_ddot(y.size(), &y[0], 1, &y[0], 1);
 
-  glm_data.ErrorSS = yty - cblas_ddot(n, &beta[0], 1, &Xty[0], 1), 
+  glm_data.ErrorSS = yty - cblas_ddot(n, &glm_data.beta[0], 1, &Xty[0], 1), 
   
   //! @todo compute initial SSE = yty - beta' * Xty
   glm_data.V2 = geno_ind - rX;
@@ -450,8 +450,7 @@ void compUpdate(unsigned id, unsigned iteration,
 		const double *nextXtSNP,
 		const double &nextSNPtSNP, 
 		const double &nextSNPty,
-		double &tol,
-		vector<double> &beta){
+		double &tol){
 
   timeval tGLMStart, tGLMStop, tResizeStop, tXtSNPStop;
   
@@ -461,7 +460,7 @@ void compUpdate(unsigned id, unsigned iteration,
   gettimeofday(&tGLMStart, 0);
   
   glm(id, iteration, n, geno.get_n_rows(), tol, XtX, XtXi, nextXtSNP, nextSNPtSNP, nextSNPty, yty, Xty,
-      glm_data, beta);
+      glm_data);
   gettimeofday(&tGLMStop, 0);
 #ifdef _DEBUG
   if(!id)
@@ -470,11 +469,6 @@ void compUpdate(unsigned id, unsigned iteration,
 	stringstream ss;
 	ss << "XtXi_" << iteration << "p.dat";
 	XtXi.writeD(ss.str());
-      }
-      {
-	stringstream ss;
-	ss << "Xty_" << iteration << "p.dat";
-	writeD(ss.str(), Xty);
       }
     }
 #endif
@@ -788,13 +782,12 @@ int main(int argc, char **argv)
   double yty;
   vector<double> SNPtSNP(mySNPs), SNPty(mySNPs);
   FortranMatrix XtSNP(n, mySNPs);
-  vector<double> beta;
   
   // Begin timing the computations
   gettimeofday(&tstart, NULL);
 
   compPrepare(id, 0, fixed, fixed_count, XtX, Xty, y, rX, 
-	      beta, n, tol, XtXi, 
+	      n, tol, XtXi, 
 	      yty, glm_data, geno_ind, mySNPs, geno, XtSNP, SNPty, 
 	      SNPtSNP);
 
@@ -1143,7 +1136,7 @@ int main(int argc, char **argv)
     gettimeofday(&tstart, NULL);
     compUpdate(id, iteration, XtX, XtXi, XtSNP, yty, Xty, rX, glm_data, n, mySNPs, geno_ind, 
 	       geno, 
-	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty, tol, beta);
+	       nextSNP, nextXtSNP, nextSNPtSNP, nextSNPty, tol);
     gettimeofday(&tstop, NULL);
     CPUCompUpdateTime = tvDouble(tstop - tstart);
 

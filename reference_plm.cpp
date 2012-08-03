@@ -940,7 +940,7 @@ int main(int argc, char **argv)
     gettimeofday(&tstop, 0);
     double CPUCompTime = tvDouble(tstop - tstart);
 
-    /*! @todo categorize SNPs by V2, find max F for each V2, 
+    /*! categorize SNPs by V2, find max F for each V2, 
       calculate one p-value per V2 per MPI rank,
       reduce on min non-zero p-value regardless of V2, but
       record V2 for posterity
@@ -968,7 +968,7 @@ int main(int argc, char **argv)
       FLists[V2Index].push_back(Fval[i]);
     }
       
-    //! @todo find max F for each V2
+    //! find max F for each V2
     gettimeofday(&tstart, 0);
     vector<int> maxFIndices(V2s.size());
     vector<float> maxFs(V2s.size());
@@ -982,7 +982,7 @@ int main(int argc, char **argv)
 	minPs[V2Index] = std::numeric_limits<double>::infinity();
     }
 
-    //! @todo compute p-values for each V2-specific max F-value
+    //! compute p-values for each V2-specific max F-value
     localMinPIndex = min_element(minPs.begin(), minPs.end()) - minPs.begin();
     localMinP = minPs[localMinPIndex];
     localMinPIndex = V2Lists[localMinPIndex][maxFIndices[localMinPIndex]];

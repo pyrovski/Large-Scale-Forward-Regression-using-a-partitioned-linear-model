@@ -843,7 +843,7 @@ int main(int argc, char **argv)
     vector<double> tmpResult(n);
     vector<int> V2(mySNPs);
     for(uint64_t i = 0; i < mySNPs; i++){
-      if(!snpMask[i]){
+      if(snpMask[i]){
         Fval[i] = 0.0;
         continue;
       }

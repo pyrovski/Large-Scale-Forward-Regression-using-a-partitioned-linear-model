@@ -75,14 +75,15 @@ CC=mpicxx
 # The location (and name) of the BLAS/Lapack libraries
 BLAS_PATH ?= /usr
 BLAS_INCLUDE ?= -I$(BLAS_PATH)/include
-BLAS_LAPACK_LIB ?= -L$(BLAS_PATH)/lib -llapack -lf77blas -lcblas -latlas 
+BLAS_LAPACK_LIB ?= -L$(BLAS_PATH)/lib -llapack -lf77blas -lcblas -latlas -lgfortran
 
 # Location of GSL header files and libraries
-GSL_PATH ?= /usr/
+GSL_PATH ?= /usr
+GSL_LIB_PATH ?= $(GSL_PATH)/lib
 GSL_INCLUDE ?= -I$(GSL_PATH)/include
-GSL_LIB = -L$(GSL_PATH)/lib -lgsl
+GSL_LIB = -L$(GSL_LIB_PATH) -lgsl
 
-LIBS=$(BLAS_LAPACK_LIB) $(GSL_LIB) -lcublas $(CUDA_LIBS)
+LIBS=$(GSL_LIB) $(BLAS_LAPACK_LIB)
 
 INCLUDES = $(CUDA_INC) $(GSL_INCLUDE) $(BLAS_INCLUDE)
 

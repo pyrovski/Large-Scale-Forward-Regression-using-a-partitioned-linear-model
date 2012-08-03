@@ -70,8 +70,8 @@ void glm(unsigned id, unsigned iteration,
 	 const double yty, 
 	 vector<double> &Xty, // updated
 	 // output
-	 GLMData& glm_data,
-	 vector<double> &beta)
+	 GLMData& glm_data
+	 )
 {  
   //int 
     //m  = X.get_n_rows(),
@@ -162,7 +162,7 @@ void glm(unsigned id, unsigned iteration,
   Xty.push_back(SNPty); // append 1
 
   //! @todo recompute XtXi with svd; it is numerically stable
-  int rX = pinv(XtX, Xty, XtXi, beta, tol, id);
+  int rX = pinv(XtX, Xty, XtXi, glm_data.beta, tol, id);
 
   // compute beta (n + 1 x 1)
   // beta = XtXi * Xty

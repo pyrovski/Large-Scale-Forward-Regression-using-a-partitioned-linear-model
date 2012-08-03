@@ -122,6 +122,8 @@ uint64_t adjust(uint64_t total, unsigned ranks){
 
 int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize, 
 	       int mySNPs,
+	       int myStartSNP,
+	       int geno_count,
 	       string fixed_filename, 
 	       string geno_filename, 
 	       string y_filename,
@@ -164,13 +166,17 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
     
-    uint64_t readCount = 0, left = mySize / sizeof(double);
     if(rowMajor){
       double *array = (double*)malloc(mySNPs * sizeof(double));
-      uint64_t row = 0;
-      while(left){
+      for(int row = 0; row < geno.get_n_rows(); row++){
+	if(fseeko(geno_file, 
+		  (row * geno_count + myStartSNP) * sizeof(double),
+		  SEEK_SET)){
+	  cerr << "seek failed" << endl;
+	  MPI_Abort(MPI_COMM_WORLD, 1);
+	}
 #ifdef _DEBUG
-	cout << "id " << id << " reading " << left 
+	cout << "id " << id << " reading " << mySNPs
 	     << " doubles from " << geno_filename << endl;
 #endif
 	size_t status = fread(array, sizeof(double), 
@@ -197,14 +203,17 @@ int readInputs(unsigned id, uint64_t myOffset, uint64_t mySize,
 	    MPI_Abort(MPI_COMM_WORLD, 1);
 	  }
 #endif
-	for(int i = 0; i < mySNPs; i ++)
-	  geno(row, i) = array[i];
-	left -= status;
-	readCount += status;
-	row++;
+	// copy from array to geno
+	cblas_dcopy(mySNPs, array, 1, &geno(row, 0), geno.get_n_rows());
       }
       free(array);
-    } else {
+    } else { // column-major, default
+      uint64_t readCount = 0, left = mySize / sizeof(double);
+      if(fseeko(geno_file, myOffset, SEEK_SET)){
+	cerr << "seek failed" << endl;
+	MPI_Abort(MPI_COMM_WORLD, 1);
+      }
+      
       while(left){
 #ifdef _DEBUG
 	cout << "id " << id << " reading " << min(readLength, left) 
@@ -755,7 +764,7 @@ int main(int argc, char **argv)
 
   // Begin timing the file IO for all 3 files
   gettimeofday(&tstart, NULL);
-  readInputs(id, myOffset, mySize, mySNPs, fixed_filename, geno_filename, 
+  readInputs(id, myOffset, mySize, mySNPs, myStartSNP, geno_count, fixed_filename, geno_filename, 
 	     y_filename, fixed, geno, y, rowMajor);
   gettimeofday(&tstop, NULL);
   

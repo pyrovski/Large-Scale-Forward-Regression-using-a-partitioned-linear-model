@@ -621,7 +621,7 @@ int main(int argc, char **argv)
      -e <entry limit>
   */
 
-  while((opt = getopt_long(argc, argv, "cf:v::l:r:g:e:s:", options, &optIndex)) != -1){
+  while((opt = getopt_long(argc, argv, "pcf:v::l:r:g:e:s:", options, &optIndex)) != -1){
     switch(opt){
     case 'e':
       entry_limit = atof(optarg);

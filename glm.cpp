@@ -170,8 +170,8 @@ void glm(unsigned id, unsigned iteration,
 
   //! @todo this is done in pinv.  that's what beta corresponds to...
   //! @todo use cblas_dsymv()
-  cblas_dgemv(CblasColMajor, CblasNoTrans, n + 1, n + 1, 1.0, 
-	      &XtXi.values[0], n + 1, &Xty[0], 1, 0.0, &glm_data.beta[0], 1);
+  //cblas_dgemv(CblasColMajor, CblasNoTrans, n + 1, n + 1, 1.0, 
+  //&XtXi.values[0], n + 1, &Xty[0], 1, 0.0, &glm_data.beta[0], 1);
 
   // Compute ErrorSS for return in the GLMData data structure
   glm_data.ErrorSS = yty - 
@@ -194,6 +194,6 @@ void glm(unsigned id, unsigned iteration,
 
 
   // F = Kb' * inv(Kt * G * Kt') * Kb * V2 / (rK * ErrorSS);
-  glm_data.F = (1.0 / S) * Kb * Kb * glm_data.V2 / glm_data.ErrorSS;
+  glm_data.F = (1.0/S) * Kb * Kb * glm_data.V2 / glm_data.ErrorSS;
 }
 

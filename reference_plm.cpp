@@ -560,8 +560,7 @@ void printGlobalTime(timeval &tGlobalStart, timeval &tGlobalStop,
 
 void printUsage(char *name){
   cout << "usage: " << name << " [-f <fixed effects file> --num_fixed <number of fixed effects>] -g <SNP data file> --num_geno <number of SNPs> -r <residuals file> --num_r <number of residuals> [-v [<verbosity level>]] [-e <SNP entry limit>] [-l <max # of iterations>] [-p for row-major input; default is column-major]" 
-       << endl 
-       << "where <input file> contains run-time settings" << endl;
+       << endl;
 }
 
 int main(int argc, char **argv)

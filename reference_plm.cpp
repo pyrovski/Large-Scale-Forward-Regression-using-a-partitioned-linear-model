@@ -988,7 +988,7 @@ int main(int argc, char **argv)
     localMinPIndex = V2Lists[localMinPIndex][maxFIndices[localMinPIndex]];
     
     gettimeofday(&tstop, 0);
-    double CPUMinTime = tvDouble(tstart - tstop);
+    double CPUMinTime = tvDouble(tstop - tstart);
     if(verbosity > 1){
       cout << "iteration " << iteration 
 	   << " id " << id 

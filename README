@@ -1,4 +1,42 @@
-todo: write a readme...
+Building:
+---------------------------------------------------------------------
+This application depends on the following:
+- MPI
+- GSL
+- LAPACK
+- BLAS
 
-Performance notes:
- - testing on a GTX480 revealed that CUDA 4.1 more than triples GPU kernel time over CUDA 3.2
+On a Debian-based system, these may be installed as follows:
+openmpi-bin libopenmpi-dev libatlas-base-dev libgsl0-dev
+
+The Makefile is designed to be configured through the LIBRARY_PATHS and, optionally, CUDA_SM files through the Makefile variables BLAS_PATH, GSL_PATH, and so forth.
+
+Running:
+---------------------------------------------------------------------
+The application requires the following inputs:
+- Independent variables
+- A dependent variable
+- Fixed effects
+
+All inputs are expected in binary double-precision, little-endian, column-major matrix format.
+
+The quantity and specification of the above are achieved through command line parameters:
+
+-g <independent variables file>
+--num_geno <number of independent variables>
+--num_r <length of all independent variables>
+-r <dependent variable file>
+
+The following parameters are optional:
+-f <fixed effects file>
+--num_fixed <number of fixed effects>
+-v <verbosity level> : 0, 1, or 2
+-e <independent variable p-value entry limit> : the application will cease once the smallest p-value for an iteration exceeds the entry limit
+-l <maximum number of iterations>
+
+The application supports MPI.
+
+For citation:
+---------------------------------------------------------------------
+- "Quantitaive Trait Locus Analysis Using a Partitioned Linear Model on a GPU Cluster", presented at the 11th IEEE International Workshop on High Performance Computational Biology, held in conjunction with IPDPS 2012
+

@@ -977,8 +977,8 @@ int main(int argc, char **argv)
 	max_element(FLists[V2Index].begin(), FLists[V2Index].end()) - FLists[V2Index].begin();
       maxFs[V2Index] = FLists[V2Index][maxFIndices[V2Index]];
       minPs[V2Index] = 1 - gsl_cdf_fdist_P(maxFs[V2Index], 1, V2s[V2Index]);
-      if(minPs[V2Index] == 0)
-	minPs[V2Index] = std::numeric_limits<double>::infinity();
+      //      if(minPs[V2Index] == 0)
+      //minPs[V2Index] = std::numeric_limits<double>::infinity();
     }
 
     //! compute p-values for each V2-specific max F-value
